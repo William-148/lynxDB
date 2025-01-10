@@ -1,25 +1,19 @@
 import { CompiledCondition, Filter, OperatorType } from "../../types/filter.type";
-import { getOperatorsHandlerMap } from "./operators";
+import { getOperatorHandler, transformConditionValue } from "./operators";
+
 
 export function compileFilter<T>(filter: Filter<T>): CompiledCondition<T>[] {
   const compiledConditions: CompiledCondition<T>[] = [];
-  const operatorHandlerMap = getOperatorsHandlerMap<T[keyof T]>();
 
   for (const [key, condition] of Object.entries(filter)) {
     for (const [operator, conditionValue] of Object.entries(condition as any)) {
-      const operatorHandlerFinded = operatorHandlerMap[operator as OperatorType];
-      if (!operatorHandlerFinded) {
-        throw new Error(`Unsupported operator: ${operator}`);
-      }
       compiledConditions.push({
         key: key as keyof T,
-        operatorType: operator as OperatorType,
-        conditionValue: conditionValue as T[keyof T],
-        operatorHandler: operatorHandlerFinded,
+        conditionValue: transformConditionValue(conditionValue as T[keyof T], operator as OperatorType),
+        operatorHandler: getOperatorHandler(operator as OperatorType),
       });
     }
   }
-
   return compiledConditions;
 }
 

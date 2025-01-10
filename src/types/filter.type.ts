@@ -59,7 +59,7 @@ export type FilterOperator<T> = {
 /**
  * Type alias for a function that handles a specific filter operator.
  * 
- * @template T - The type of the value to be compared.
+ * @template T - The type of recordValue.
  * @param recordValue - The value from the record being filtered.
  * @param conditionValue - The value to compare against.
  * @returns `true` if the condition is met, otherwise `false`.
@@ -88,13 +88,11 @@ export type Filter<T> = {
  * 
  * @template T - The type of the object to be filtered.
  * @property key - The key of the property to be filtered.
- * @property operatorType - The type of operator to be used for filtering.
  * @property conditionValue - The value to compare against.
  * @property operatorHandler - The function that handles the comparison.
  */
 export type CompiledCondition<T> = {
   key: keyof T;
-  operatorType: OperatorType;
-  conditionValue: T[keyof T];
+  conditionValue: any;
   operatorHandler: OperatorHandler<T[keyof T]>;
 };
