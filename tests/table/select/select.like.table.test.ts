@@ -1,6 +1,6 @@
 import { Table } from "../../../src/core/table";
 import { thirtyItemsUserList } from "../../data/data-test";
-import { User, userPropertyList } from "../../types/user-test.type";
+import { User } from "../../types/user-test.type";
 
 let userTable: Table<User>;
 
