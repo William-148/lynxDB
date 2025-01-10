@@ -41,12 +41,17 @@ export function getOperatorHandler<T>(operatorType: OperatorType): OperatorHandl
  */
 export function transformConditionValue<T>(conditionValue: T, operatorType: OperatorType): T | RegExp {
   if (operatorType === OperatorType.like && typeof conditionValue === 'string') {
-    const regexPattern = conditionValue.replace(/%/g, '.*').replace(/_/g, '.'); 
+    const regexPattern = escapeRegExp(conditionValue)
+      .replace(/%/g, '.*')
+      .replace(/_/g, '.'); 
     return new RegExp(`^${regexPattern}$`, 'i'); 
   }
   return conditionValue;
 }
 
+function escapeRegExp(string: string): string { 
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function likeComparison<T>(recordValue: T, conditionValue: RegExp): boolean {
   if (!(conditionValue instanceof RegExp) || typeof recordValue !== 'string') return false;

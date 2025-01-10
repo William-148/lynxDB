@@ -1,26 +1,89 @@
 import { Table } from "../../../src/core/table";
-import { thirtyItemsUserList } from "../../data/data-test";
-import { User } from "../../types/user-test.type";
 
-let userTable: Table<User>;
+type Element = {
+  id: number;
+  name: string;
+  description: string;
+}
 
-describe ("Table - select() with conditions - should...", () => {
-  
+describe ("Table - select() with like condition - should...", () => {
+  let genericTable: Table<Element>;
+
   beforeEach(() => {
-    userTable = new Table<User>('user', ['id']);
-    userTable.bulkInsert(thirtyItemsUserList);
+    genericTable = new Table<Element>('generic');
+    genericTable.bulkInsert([
+      { id: 1, name: 'Alpha', description: 'The first element' },
+      { id: 2, name: 'Beta', description: 'A secondary component' },
+      { id: 3, name: 'Gamma', description: 'A tertiary element' },
+      { id: 4, name: 'Delta', description: 'The final element' }
+    ]);
   });
 
-  it('should filter records with like operator', async () => {
-    const filterTest: User[] = [
-      { id: 1, fullName: "Huntlee Philpott", gender: "Male", age: 53, email: "hphilpott0@topsy.com", username: "hphilpott0", password: "gW9{L*&AL" },
-      { id: 2, fullName: "Catharina Glandon", gender: "Female", age: 79, email: "cglandon1@facebook.com", username: "cglandon1", password: "uY1&wvYZNg" },
-      { id: 3, fullName: "Reid Espadate", gender: "Male", age: 30, email: "respadate2@eepurl.com", username: "respadate2", password: "eQ0~a)~>O" }
-    ];
-    const table = new Table<User>('user', ['id']);
-    table.bulkInsert(filterTest);
-    const result = await table.select([], { fullName: { like: 'Reid%' } });
-    expect(result).toEqual([filterTest[2]]);
+  it('filter records where string starts with a pattern', async () => {
+    const result = await genericTable.select([], { name: { like: 'Al%' } });
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toEqual('Alpha');
   });
 
+  it('filter records where string ends with a pattern', async () => {
+    const result = await genericTable.select([], { name: { like: '%ta' } });
+    expect(result).toHaveLength(2);
+    expect(result.map(record => record.name)).toEqual(['Beta', 'Delta']);
+  });
+
+  it('filter records where string contains a pattern', async () => {
+    const result = await genericTable.select([], { description: { like: '%element%' } });
+    expect(result).toHaveLength(3);
+    expect(result.map(record => record.description)).toEqual([
+      'The first element',
+      'A tertiary element',
+      'The final element'
+    ]);
+  });
+
+  it('return all records when pattern matches all', async () => {
+    const result = await genericTable.select([], { name: { like: '%' } });
+    expect(result).toHaveLength(4);
+    expect(result.map(record => record.name)).toEqual(['Alpha', 'Beta', 'Gamma', 'Delta']);
+  });
+
+  it('return an empty array when no matches are found', async () => {
+    const result = await genericTable.select([], { name: { like: 'Z%' } });
+    expect(result).toHaveLength(0);
+  });
+
+  it('handle cases with special characters in the pattern', async () => {
+    genericTable.bulkInsert([
+      { id: 5, name: 'Epsilon$', description: 'Special character' },
+      { id: 6, name: 'Zeta%', description: 'Another special character' },
+      { id: 19, name: 'Oblivion$', description: 'Special character' }
+    ]);
+    const result = await genericTable.select([], { name: { like: '%$' } });
+    expect(result).toHaveLength(2);
+    expect(result.map(item => item.name)).toEqual(['Epsilon$', 'Oblivion$']);
+  });
+
+  it('handle patterns with underscores as wildcards', async () => {
+    const result = await genericTable.select([], { name: { like: '_eta' } });
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toEqual('Beta');
+  });
+
+  it('handle patterns with mixed wildcards', async () => {
+    const result = await genericTable.select([], { name: { like: '%a%' } });
+    expect(result).toHaveLength(4);
+    expect(result.map(record => record.name)).toEqual(['Alpha', 'Beta', 'Gamma', 'Delta']);
+  });
+
+  it('return an empty array when searching with an empty pattern', async () => {
+    const result = await genericTable.select([], { name: { like: '' } });
+    expect(result).toHaveLength(0);
+  });
+
+  it('handle patterns with case sensitivity', async () => {
+    genericTable.insert({ id: 7, name: 'ALPHA', description: 'Uppercase match' });
+    const result = await genericTable.select([], { name: { like: 'Alpha' } });
+    expect(result).toHaveLength(2);
+    expect(result.map(item => item.name)).toEqual(['Alpha', 'ALPHA']);
+  });
 });

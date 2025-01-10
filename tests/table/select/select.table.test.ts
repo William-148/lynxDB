@@ -4,7 +4,6 @@ import { User, userPropertyList } from "../../types/user-test.type";
 
 let userTable: Table<User>;
 
-// Tests de la función select() de la clase Table
 describe("Table - select() with fields - should...", () => {
 
   beforeEach(async () => {
