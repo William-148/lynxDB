@@ -1,21 +1,92 @@
 import { Table } from "../../../src/core/table";
-import { thirtyItemsUserList } from "../../data/data-test";
-import { User, userPropertyList } from "../../types/user-test.type";
 
-let userTable: Table<User>;
+type ScoreRecord = {
+  id: number;
+  name: string;
+  age: number;
+  active: boolean;
+  score: number;
+  date: Date;
+}
 
-describe ("Table - select() with conditions - should...", () => {
+const scoreDataList: ScoreRecord[] = [
+  { id: 1, name: 'Alice', age: 25, active: true, score: 50.5, date: new Date('2023-01-01') },
+  { id: 2, name: 'Bob', age: 30, active: false, score: 75.0, date: new Date('2023-06-01') },
+  { id: 3, name: 'Charlie', age: 35, active: true, score: 88.8, date: new Date('2024-01-01') },
+  { id: 4, name: 'Diana', age: 28, active: false, score: 62.2, date: new Date('2022-12-31') }
+];
+
+describe ("Table - select() with gt and gte condition - should...", () => {
   
+  let genericTable: Table<any>;
+
   beforeEach(() => {
-    userTable = new Table<User>('user', ['id']);
-    userTable.bulkInsert(thirtyItemsUserList);
+    genericTable = new Table<ScoreRecord>('generic', []);
+    genericTable.bulkInsert(scoreDataList);
   });
 
-  it('filter records with gt operator', async () => {
-    const valueGreaterThan = 7;
-    const result = await userTable.select([], { id: { gt: valueGreaterThan } });
-    expect(result).toHaveLength(thirtyItemsUserList.length - valueGreaterThan);
-    expect(result.every(user => Number(user.id) > valueGreaterThan)).toBe(true);
+  it('filter records with gt operator for numeric values', async () => {
+    const result = await genericTable.select([], { age: { gt: 28 } });
+    expect(result).toHaveLength(2);
+    expect(result.map(record => record.age)).toEqual([30, 35]);
+  });
+
+  it('filter records with gte operator for numeric values', async () => {
+    const result = await genericTable.select([], { age: { gte: 28 } });
+    expect(result).toHaveLength(3);
+    expect(result.map(record => record.age)).toEqual([30, 35, 28]);
+  });
+
+  it('filter records with gt operator for float values', async () => {
+    const result = await genericTable.select([], { score: { gt: 60.0 } });
+    expect(result).toHaveLength(3);
+    expect(result.map(record => record.score)).toEqual([75.0, 88.8, 62.2]);
+  });
+
+  it('filter records with gte operator for float values', async () => {
+    const result = await genericTable.select([], { score: { gte: 62.2 } });
+    expect(result).toHaveLength(3);
+    expect(result.map(record => record.score)).toEqual([75.0, 88.8, 62.2]);
+  });
+
+  it('filter records with gt operator for dates', async () => {
+    const result = await genericTable.select([], { date: { gt: new Date('2023-01-01') } });
+    expect(result).toHaveLength(2);
+    expect(result.map(record => record.date.toISOString())).toEqual([
+      new Date('2023-06-01').toISOString(),
+      new Date('2024-01-01').toISOString()
+    ]);
+  });
+
+  it('filter records with gte operator for dates', async () => {
+    const result = await genericTable.select([], { date: { gte: new Date('2023-01-01') } });
+    expect(result).toHaveLength(3);
+    expect(result.map(record => record.date.toISOString())).toEqual([
+      new Date('2023-01-01').toISOString(),
+      new Date('2023-06-01').toISOString(),
+      new Date('2024-01-01').toISOString()
+    ]);
+  });
+
+  it('return an empty array when no records match for gt', async () => {
+    const result = await genericTable.select([], { age: { gt: 40 } });
+    expect(result).toHaveLength(0);
+  });
+
+  it('return an empty array when no records match for gte', async () => {
+    const result = await genericTable.select([], { age: { gte: 50 } });
+    expect(result).toHaveLength(0);
+  });
+
+  it('handle edge case with gt operator for boolean values', async () => {
+    const result = await genericTable.select([], { active: { gt: false } });
+    expect(result).toHaveLength(2); // True values
+    expect(result.map(record => record.name)).toEqual(['Alice', 'Charlie']);
+  });
+
+  it('handle edge case with gte operator for boolean values', async () => {
+    const result = await genericTable.select([], { active: { gte: false } });
+    expect(result).toHaveLength(4); // All values since false <= true
   });
 
 });

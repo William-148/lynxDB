@@ -160,11 +160,12 @@ export class Table<T> implements DatabaseTable<T> {
 
   public update(updatedFields: Partial<T>, where: Filter<T>): Promise<number> {
     return new Promise((resolve) => {
+      const compiledFilter = compileFilter(where);
       let affectedRecords = 0;
       let index = 0;
       for (let currentRecord of this._recordsArray) {
-        const matches = Object.keys(where).every(key => currentRecord[key as keyof T] === where[key as keyof T]);
-        if (matches) {
+        const match = matchRecord(currentRecord, compiledFilter);
+        if (match) {
           Object.assign(currentRecord as any, updatedFields);
           affectedRecords++;
         }
