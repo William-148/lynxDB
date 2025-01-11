@@ -40,6 +40,7 @@ export interface DatabaseTable<T> {
    * @params updatedFields The fields to update
    * @params predicate A function that matches the records to be updated
    * @returns The number of records updated
+   * @throws {DuplicatePrimaryKeyValueError} If the primary key is duplicated
    */
   update(updatedFields: Partial<T>, where: Filter<T>): Promise<number>;
 }

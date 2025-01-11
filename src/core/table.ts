@@ -1,14 +1,14 @@
 import { DatabaseTable } from "../types/database-table.type";
 import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
-import { 
-  DuplicatePrimaryKeyDefinitionError, 
-  DuplicatePrimaryKeyValueError, 
-  PrimaryKeyNotDefinedError, 
-  PrimaryKeyValueNullError 
+import {
+  DuplicatePrimaryKeyDefinitionError,
+  DuplicatePrimaryKeyValueError,
+  PrimaryKeyNotDefinedError,
+  PrimaryKeyValueNullError
 } from "./errors/table.error";
 
-export class Table<T> implements DatabaseTable<T> {
+export class Table<T extends {}> implements DatabaseTable<T> {
   private _name: string;
   private _recordsMap: Map<string, T>;
   private _recordsArray: T[];
@@ -52,15 +52,21 @@ export class Table<T> implements DatabaseTable<T> {
     return this._PkDefinition.length > 1;
   }
 
+  private existPkValueInPartialRecord(record: Partial<T>): boolean {
+    if (this.hasNotPkDefinition()) return false;
+    if (this.isSingleKey()) return record[this._PkDefinition[0]] !== undefined;
+    return this._PkDefinition.every(field => record[field] !== undefined);
+  }
+
   /**
    * @throws {PrimaryKeyNotDefinedError} If the primary key is not defined
    */
   private generatePK(record: Partial<T>): string {
-    if (this.hasNotPkDefinition()) 
+    if (this.hasNotPkDefinition())
       throw new PrimaryKeyNotDefinedError(this._name);
 
     // Single key
-    if (this._PkDefinition.length === 1) {
+    if (this.isSingleKey()) {
       const pkValue = record[this._PkDefinition[0]];
       if (!pkValue) throw new PrimaryKeyValueNullError(String(this._PkDefinition[0]));
 
@@ -76,11 +82,15 @@ export class Table<T> implements DatabaseTable<T> {
     }).join('-');
   }
 
-  private insertInMap(record: T): void {
-    if (this.hasNotPkDefinition()) return;
-
-    const primaryKey = this.generatePK(record);
-
+  /**
+   * Checks if the primary key already exists in the records map.
+   * Throws a `DuplicatePrimaryKeyValueError` if the primary key already exists.
+   * @private
+   * @param {string} primaryKey - The primary key to check for existence.
+   * @param {Partial<T>} record - The record that contains the primary key.
+   * @throws {DuplicatePrimaryKeyValueError} If the primary key value is duplicated.
+   */
+  private checkIfExistPK(primaryKey: string, record: Partial<T>): void {
     if (this._recordsMap.has(primaryKey)) {
       const isSingleKey = this.isSingleKey();
       const pkName = isSingleKey
@@ -94,6 +104,13 @@ export class Table<T> implements DatabaseTable<T> {
 
       throw new DuplicatePrimaryKeyValueError(pkName, pkValue);
     }
+  }
+
+  private insertInMap(record: T): void {
+    if (this.hasNotPkDefinition()) return;
+
+    const primaryKey = this.generatePK(record);
+    this.checkIfExistPK(primaryKey, record);
 
     this._recordsMap.set(primaryKey, record);
   }
@@ -121,7 +138,7 @@ export class Table<T> implements DatabaseTable<T> {
   }
 
   public findByPk(primaryKey: Partial<T>): Promise<T | null> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       // throw exception if primary key is not defined
       const generatedPk = this.generatePK(primaryKey);
       const finded = this._recordsMap.get(generatedPk);
@@ -158,15 +175,81 @@ export class Table<T> implements DatabaseTable<T> {
     });
   }
 
+
+  private checkPkBeforeStartingUpdateProcess(updatedFields: Partial<T>): void {
+    if (this.hasNotPkDefinition()) return;
+    const primaryKey = this.generatePK(updatedFields);
+    this.checkIfExistPK(primaryKey, updatedFields);
+  }
+
+  private _IsPartOfPk(record: Partial<T>): boolean {
+    if (this.hasNotPkDefinition()) return false;
+    if (this.isSingleKey()) return record[this._PkDefinition[0]] !== undefined;
+    return this._PkDefinition.some(field => record[field] !== undefined);
+  }
+
   public update(updatedFields: Partial<T>, where: Filter<T>): Promise<number> {
     return new Promise((resolve) => {
+      if (Object.keys(updatedFields).length === 0) resolve(0);
+      const isUpdatedFieldsPartOfPK = this._IsPartOfPk(updatedFields);
+
       const compiledFilter = compileFilter(where);
       let affectedRecords = 0;
       let index = 0;
       for (let currentRecord of this._recordsArray) {
         const match = matchRecord(currentRecord, compiledFilter);
         if (match) {
-          Object.assign(currentRecord as any, updatedFields);
+          // this.updatePkInMap(currentRecord, updatedFields);
+          if (!isUpdatedFieldsPartOfPK){
+            Object.assign<T, Partial<T>>(currentRecord, updatedFields);
+            affectedRecords++;
+            continue;
+          }
+
+          let newPrimaryKey: string;
+          let oldPrimaryKey: string;
+          if (this.isSingleKey()) {
+            let pkValue: any;
+            pkValue = updatedFields[this._PkDefinition[0]] ?? currentRecord[this._PkDefinition[0]];
+            newPrimaryKey = `${pkValue}`;
+            oldPrimaryKey = `${currentRecord[this._PkDefinition[0]]}`;
+
+            if (this._recordsMap.has(newPrimaryKey)) {
+              throw new DuplicatePrimaryKeyValueError(
+                String(this._PkDefinition[0]), 
+                pkValue
+              );
+            }
+
+            this._recordsMap.delete(oldPrimaryKey);
+            Object.assign<T, Partial<T>>(currentRecord, updatedFields);
+            this._recordsMap.set(newPrimaryKey, currentRecord);
+            affectedRecords++;
+            continue;
+          }
+
+          // Composite key
+          const newPkValues: (T[keyof T])[] = [];
+          const oldPkValues: (T[keyof T])[] = [];
+          for (let field of this._PkDefinition) {
+            let pkValue = updatedFields[field] ?? currentRecord[field];
+            newPkValues.push(pkValue);
+            oldPkValues.push(currentRecord[field]);
+          }
+
+          newPrimaryKey = newPkValues.join('-');
+          oldPrimaryKey = oldPkValues.join('-');
+
+          if (this._recordsMap.has(newPrimaryKey)) {
+            throw new DuplicatePrimaryKeyValueError(
+              this._PkDefinition.join(', '), 
+              newPrimaryKey
+            );
+          }
+
+          this._recordsMap.delete(oldPrimaryKey);
+          Object.assign<T, Partial<T>>(currentRecord, updatedFields);
+          this._recordsMap.set(newPrimaryKey, currentRecord);
           affectedRecords++;
         }
         index++;

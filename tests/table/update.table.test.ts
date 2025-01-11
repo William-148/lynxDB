@@ -1,0 +1,447 @@
+import { DuplicatePrimaryKeyValueError } from "../../src/core/errors/table.error";
+import { Table } from "../../src/core/table";
+import { Enrollment, getResultStatus } from "../types/enrollment-test.type";
+
+type Entity = {
+  id: number;
+  name: string;
+  value: number;
+  status: string;
+}
+
+describe('Table with single PK - update() - should...', () => {
+  const defaultData: Entity[] = [
+    { id: 1, name: 'Alpha', value: 10, status: 'active' },
+    { id: 2, name: 'Beta', value: 20, status: 'inactive' },
+    { id: 3, name: 'Gamma', value: 30, status: 'active' },
+    { id: 4, name: 'Delta', value: 40, status: 'inactive' }
+  ];
+
+  let entityTable: Table<Entity>;
+
+  beforeEach(() => {
+    entityTable = new Table<any>('entities', ['id']);
+    entityTable.bulkInsert(defaultData);
+  });
+
+  it('update a single record based on a specific condition', async () => {
+    const affectedRows = await entityTable.update({ status: 'archived' }, { id: { eq: 1 } });
+    expect(affectedRows).toBe(1);
+
+    const updatedRecord = await entityTable.findByPk({ id: 1 });
+    expect(updatedRecord?.status).toBe('archived');
+  });
+
+  it('update multiple records matching a condition', async () => {
+    const affectedRows = await entityTable.update({ status: 'archived' }, { status: { eq: 'inactive' } });
+    expect(affectedRows).toBe(2);
+
+    const updatedRecords = await entityTable.select([], { status: { eq: 'archived' } });
+    expect(updatedRecords).toHaveLength(2);
+    expect(updatedRecords.map(record => record.name)).toEqual(['Beta', 'Delta']);
+  });
+
+  it('update records with numeric fields', async () => {
+    const affectedRows = await entityTable.update({ value: 99 }, { value: { lt: 30 } });
+    expect(affectedRows).toBe(2);
+
+    const updatedRecords = await entityTable.select([], { value: { eq: 99 } });
+    expect(updatedRecords).toHaveLength(2);
+    expect(updatedRecords.map(record => record.name)).toEqual(['Alpha', 'Beta']);
+  });
+
+  it('not update any record if no conditions match', async () => {
+    const affectedRows = await entityTable.update({ status: 'archived' }, { id: { eq: 999 } });
+    expect(affectedRows).toBe(0);
+
+    const records = await entityTable.select([], { status: { eq: 'archived' } });
+    expect(records).toHaveLength(0);
+  });
+
+  it('update all records when no conditions are specified', async () => {
+    const affectedRows = await entityTable.update({ status: 'archived' }, {});
+    expect(affectedRows).toBe(4);
+
+    const updatedRecords = await entityTable.select([], { status: { eq: 'archived' } });
+    expect(updatedRecords).toHaveLength(4);
+  });
+
+  it('update records with partial fields', async () => {
+    const affectedRows = await entityTable.update({ name: 'Updated Name' }, { id: { eq: 3 } });
+    expect(affectedRows).toBe(1);
+
+    const updatedRecord = await entityTable.select([], { id: { eq: 3 } });
+    expect(updatedRecord[0].name).toBe('Updated Name');
+    expect(updatedRecord[0].value).toBe(30); // Ensure other fields are not affected
+  });
+
+  it('update a record PK', async () => {
+    const ItemToTest = defaultData[1];
+    const IdToUpdate = ItemToTest.id;
+    const NewId = 99;
+    const affectedRows = await entityTable.update({ id: NewId }, { id: { eq: IdToUpdate } });
+    expect(affectedRows).toBe(1);
+
+    // Check if the record with the new PK exists
+    const updatedRecord = await entityTable.findByPk({ id: NewId });
+    expect(updatedRecord).toEqual({ ...ItemToTest, id: NewId });
+
+    // Check if the record with the old PK no longer exists
+    const shouldNotExistRecord = await entityTable.findByPk({ id: IdToUpdate });
+    expect(shouldNotExistRecord).toBeNull();
+  });
+
+  it('handle cases with empty updatedFields', async () => {
+    const affectedRows = await entityTable.update({}, { id: { eq: 2 } });
+    expect(affectedRows).toBe(0);
+  });
+
+  it('handle updates when multiple conditions match', async () => {
+    const valuesToUpdate = { status: 'archived', value: 100 };
+    const affectedRows = await entityTable.update(valuesToUpdate, { status: { eq: 'active' } });
+    expect(affectedRows).toBe(2);
+
+    const updatedRecords = await entityTable.select([], { status: { eq: 'archived' } });
+    expect(updatedRecords).toHaveLength(2);
+    expect(updatedRecords.map(record => record.value)).toEqual([100, 100]);
+  });
+
+  it('throw an error when updating a record with an existing PK', async () => {
+    const ItemPkToTest = 2;
+    const pkAlreadyRegistered = 3;
+    const errorUpdate = async () => {
+      await entityTable.update({ id: pkAlreadyRegistered }, { id: { gt: ItemPkToTest } });
+    }
+    expect(errorUpdate)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyValueError);
+  });
+
+  it('throw an error when updating many records with an unregistered PK', async () => {
+    const unregisteredPK = 20;
+    const expectedIdList = defaultData.map(item => item.id);
+    expectedIdList[0] = unregisteredPK;
+
+    const errorUpdate = async () => {
+      await entityTable.update({ id: unregisteredPK }, {});
+    }
+
+    expect(errorUpdate)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyValueError)
+      .finally(async () => {
+        for (let expectedId of expectedIdList) {
+          const record = await entityTable.findByPk({ id: expectedId });
+          expect(record?.id).toBe(expectedId);
+        }
+      });
+  });
+});
+
+
+
+describe('Table with composite PK - update() - should...', () => {
+
+  const enrollmentData: Enrollment[] = [
+    { year: 2025, semester: 'Fall',   courseId: 101, studentId: 1, grade: 60, resultStatus: 'pending', gradeStatus: 'loaded'  }, 
+    { year: 2025, semester: 'Fall',   courseId: 111, studentId: 1, grade: 0,  resultStatus: 'pending', gradeStatus: 'pending' },
+    { year: 2025, semester: 'Spring', courseId: 102, studentId: 2, grade: 30, resultStatus: 'pending', gradeStatus: 'loaded'  },
+    { year: 2025, semester: 'Spring', courseId: 112, studentId: 2, grade: 0,  resultStatus: 'pending', gradeStatus: 'pending' },
+    { year: 2025, semester: 'Summer', courseId: 103, studentId: 3, grade: 87, resultStatus: 'pending', gradeStatus: 'loaded'  },
+    { year: 2025, semester: 'Summer', courseId: 113, studentId: 3, grade: 0,  resultStatus: 'pending', gradeStatus: 'pending' },
+    
+    { year: 2025, semester: 'Fall',   courseId: 104, studentId: 4, grade: 61, resultStatus: 'pending', gradeStatus: 'loaded'  },
+    { year: 2025, semester: 'Fall',   courseId: 114, studentId: 4, grade: 0,  resultStatus: 'pending', gradeStatus: 'pending' },
+    { year: 2025, semester: 'Spring', courseId: 105, studentId: 5, grade: 59, resultStatus: 'pending', gradeStatus: 'loaded'  },
+    { year: 2025, semester: 'Spring', courseId: 115, studentId: 5, grade: 0,  resultStatus: 'pending', gradeStatus: 'pending' }
+  ];
+
+  let enrollmentTable: Table<Enrollment>;
+
+  beforeEach(() => {
+    enrollmentTable = new Table<Enrollment>('enrollments', ['year', 'semester', 'courseId', 'studentId']);
+    enrollmentTable.bulkInsert(enrollmentData);
+  });
+
+  it('update a single record based on a specific condition', async () => {
+    const ItemToTest = enrollmentData[5];
+    const ObtainedGrade = 99;
+    const UpdatedFields: Partial<Enrollment> = { grade: ObtainedGrade, gradeStatus: 'loaded', resultStatus: getResultStatus(ObtainedGrade) };
+
+    const affectedRows = await enrollmentTable.update(UpdatedFields, { 
+      year: { eq: ItemToTest.year },
+      semester: { eq: ItemToTest.semester },
+      courseId: { eq: ItemToTest.courseId },
+      studentId: { eq: ItemToTest.studentId },
+      gradeStatus: { eq: 'pending' },
+      resultStatus: { eq: 'pending' }
+    });
+
+    expect(affectedRows).toBe(1);
+
+    const updatedRecord = await enrollmentTable.findByPk({ 
+      year: ItemToTest.year, 
+      semester: ItemToTest.semester, 
+      courseId: ItemToTest.courseId,
+      studentId: ItemToTest.studentId
+    });
+    expect(updatedRecord).toEqual({ ...ItemToTest, ...UpdatedFields });
+  });
+
+  it('update multiple records matching a condition', async () => {
+    const MinimunGradeToPass = 61;
+    const YearToTest = 2025;
+    const ListApproved: Partial<Enrollment>[] = enrollmentData.filter(item => (
+      item.year === YearToTest
+      && item.grade >= MinimunGradeToPass 
+      && item.gradeStatus === 'loaded' 
+      && item.resultStatus === 'pending'
+    ));
+    const listReproved: Partial<Enrollment>[] = enrollmentData.filter(item => (
+      item.grade < MinimunGradeToPass 
+      && item.gradeStatus === 'loaded' 
+      && item.resultStatus === 'pending'
+    ));
+
+    const countApproved = await enrollmentTable.update({ resultStatus: 'approved' }, { 
+      year: { eq: YearToTest },
+      grade: { gte: MinimunGradeToPass },
+      gradeStatus: { eq: 'loaded' },
+      resultStatus: { eq: 'pending' }
+    });
+    const countReproved = await enrollmentTable.update({ resultStatus: 'reproved' }, { 
+      year: { eq: YearToTest },
+      grade: { lt: MinimunGradeToPass },
+      gradeStatus: { eq: 'loaded' },
+      resultStatus: { eq: 'pending' }
+    });
+
+    expect(countApproved).toBe(ListApproved.length);
+    expect(countReproved).toBe(listReproved.length);
+
+    for(let item of ListApproved) {
+      const updatedRecord = await enrollmentTable.findByPk({ 
+        year: item.year, 
+        semester: item.semester, 
+        courseId: item.courseId,
+        studentId: item.studentId
+      });
+      expect(updatedRecord).toEqual({ ...item, resultStatus: 'approved' });
+    }
+
+    for(let item of listReproved) {
+      const updatedRecord = await enrollmentTable.findByPk({ 
+        year: item.year, 
+        semester: item.semester, 
+        courseId: item.courseId,
+        studentId: item.studentId
+      });
+      expect(updatedRecord).toEqual({ ...item, resultStatus: 'reproved' });
+    }
+  });
+
+  it('update a sigle record where field is part of the composite PK', async () => {
+    const ItemToTest = enrollmentData[1];
+    const UpdateCourseId: Partial<Enrollment> = { courseId: 115 };
+    const affectedRows = await enrollmentTable.update(UpdateCourseId, {
+      year: { eq: ItemToTest.year },
+      courseId: { eq: ItemToTest.courseId },
+      studentId: { eq: ItemToTest.studentId }
+    });
+
+    expect(affectedRows).toBe(1);
+
+    // Check if the record with the new courseId exists
+    const updatedRecord = await enrollmentTable.findByPk({ 
+      year: ItemToTest.year, 
+      semester: ItemToTest.semester, 
+      courseId: UpdateCourseId.courseId, // Updated field
+      studentId: ItemToTest.studentId
+    });
+    expect(updatedRecord).toEqual({ ...ItemToTest, ...UpdateCourseId });
+
+    // Check if the record with the old courseId no longer exists
+    const shouldNotExistRecord = await enrollmentTable.findByPk({ 
+      year: ItemToTest.year, 
+      semester: ItemToTest.semester, 
+      courseId: ItemToTest.courseId, // Old field
+      studentId: ItemToTest.studentId
+    });
+    expect(shouldNotExistRecord).toBeNull();
+  });
+
+  it('update multiple record where field is part of the composite PK', async () => {
+    const YearToTest = 2025;
+    const SemesterToTest = 'Fall';
+    const SemesterToUpdate = 'Summer';
+    const ItemsShoudNotExistAfterUpdate = enrollmentData.filter(item => (
+      item.year === YearToTest 
+      && item.semester === SemesterToTest
+    ));
+
+    const UpdateSemester: Partial<Enrollment> = { semester: SemesterToUpdate };
+    const affectedRows = await enrollmentTable.update(UpdateSemester, {
+      year: { eq: YearToTest },
+      semester: { eq: SemesterToTest }
+    });
+
+    expect(affectedRows).toBe(4);
+
+    // Check if the records with the new semester exist
+    const updatedRecord = await enrollmentTable.select([], {
+      year: { eq: YearToTest },
+      semester: { eq: SemesterToUpdate }
+    });
+    expect(updatedRecord).toHaveLength(6);
+    updatedRecord.forEach(item => {
+      expect(item.year).toBe(YearToTest);
+      expect(item.semester).toBe(SemesterToUpdate);
+    });
+
+    // Check if the records with the old semester no longer exist
+    for (let item of ItemsShoudNotExistAfterUpdate){
+      const record = await enrollmentTable.findByPk({ 
+        year: item.year, 
+        semester: item.semester, 
+        courseId: item.courseId,
+        studentId: item.studentId
+      });
+      expect(record).toBeNull();
+    }
+  });
+
+  it('update a record with a complete composite PK', async () => {
+    const ItemToTest = enrollmentData[6];
+    const UpdatedPK: Partial<Enrollment> = { year: 2026, semester: 'Summer', courseId: 103, studentId: 8 };
+
+    const affectedRows = await enrollmentTable.update(UpdatedPK, { 
+      year: { eq: ItemToTest.year },
+      semester: { eq: ItemToTest.semester },
+      courseId: { eq: ItemToTest.courseId },
+      studentId: { eq: ItemToTest.studentId }
+    });
+
+    expect(affectedRows).toBe(1);
+
+    // Check if the record with the new PK exists
+    const updatedRecord = await enrollmentTable.findByPk({ 
+      year: UpdatedPK.year, 
+      semester: UpdatedPK.semester, 
+      courseId: UpdatedPK.courseId,
+      studentId: UpdatedPK.studentId
+    });
+    expect(updatedRecord).toEqual({ ...ItemToTest, ...UpdatedPK });
+
+    // Check if the record with the old PK no longer exists
+    const shouldNotExist = await enrollmentTable.findByPk({ 
+      year: ItemToTest.year, 
+      semester: ItemToTest.semester, 
+      courseId: ItemToTest.courseId,
+      studentId: ItemToTest.studentId
+    });
+    expect(shouldNotExist).toBeNull();
+
+  });
+
+  it('throw an error when updating the full composite PK of a record with an existing PK', async () => {
+    const ItemToTestA = enrollmentData[4];
+    const ItemToTestB = enrollmentData[7];
+    const ItemPkToTest: Partial<Enrollment> = {
+      year: ItemToTestA.year,
+      semester: ItemToTestA.semester,
+      courseId: ItemToTestA.courseId,
+      studentId: ItemToTestA.studentId
+    };
+    const pkAlreadyRegistered: Partial<Enrollment> = {
+      year: ItemToTestB.year,
+      semester: ItemToTestB.semester,
+      courseId: ItemToTestB.courseId,
+      studentId: ItemToTestB.studentId
+    };
+
+    const errorUpdate = async () => {
+      await enrollmentTable.update(pkAlreadyRegistered, { 
+        year: { eq: ItemPkToTest.year },
+        semester: { eq: ItemPkToTest.semester },
+        courseId: { eq: ItemPkToTest.courseId },
+        studentId: { eq: ItemPkToTest.studentId }
+      });
+    }
+
+    expect(errorUpdate)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyValueError);
+
+  });
+
+  it('throw an error when a part of the composite PK of a record is updated resulting in an existing PK', async () => {
+    /**
+     * ItemToTestA and ItemToTestB have the same year, semester and studentId
+     * only the courseId is different, when updating the courseId of 
+     * ItemToTestA to the courseId of ItemToTestB or vice versa, the PK will 
+     * be duplicated
+     */
+    const ItemToTestA = enrollmentData[6];
+    const ItemToTestB = enrollmentData[7];
+
+    const errorUpdate = async () => {
+      await enrollmentTable.update({ courseId: ItemToTestB.courseId }, { 
+        year: { eq: ItemToTestA.year },
+        semester: { eq: ItemToTestA.semester },
+        courseId: { eq: ItemToTestA.courseId },
+        studentId: { eq: ItemToTestA.studentId }
+      });
+    }
+
+    expect(errorUpdate)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyValueError);
+
+  });
+
+  it('throw an error when updating the full PK of multiple records with an unregistered PK', async () => {
+    const newPk: Partial<Enrollment> = { year: 2026, semester: 'Fall', courseId: 201, studentId: 10 };
+
+    const errorUpdate = async () => {
+      await enrollmentTable.update(newPk, {});
+    }
+
+    expect(errorUpdate)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyValueError)
+      .finally(async () => {
+        const record = await enrollmentTable.select([], {
+          year: { eq: newPk.year },
+          semester: { eq: newPk.semester },
+          courseId: { eq: newPk.courseId },
+          studentId: { eq: newPk.studentId }
+        });
+        expect(record).toHaveLength(1);
+      });
+  });
+
+  it('throw an error when updating a part of the PK of multiple records with an unregistered PK', async () => {
+    const ItemTest = enrollmentData[2];
+    const partialPK: Partial<Enrollment> = { courseId: 500 };
+
+    const errorUpdate = async () => {
+      await enrollmentTable.update({ courseId: 500 }, { studentId: { eq: ItemTest.studentId } });
+    }
+
+    expect(errorUpdate)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyValueError)
+      .finally(async () => {
+        const expectedItem = { ...ItemTest, ...partialPK };
+        const record = await enrollmentTable.select([], {
+          year: { eq: expectedItem.year },
+          semester: { eq: expectedItem.semester },
+          courseId: { eq: expectedItem.courseId },
+          studentId: { eq: expectedItem.studentId }
+        });
+        expect(record).toHaveLength(1);
+        expect(expectedItem).toEqual(record[0]);
+      });
+  });
+  
+});
