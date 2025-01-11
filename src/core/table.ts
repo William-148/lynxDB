@@ -51,29 +51,33 @@ export class Table<T extends {}> implements DatabaseTable<T> {
   }
 
   /**
-   * @throws {PrimaryKeyNotDefinedError} If the primary key is not defined
+   * Generates a primary key (PK) from a partial record.
+   * @param {Partial<T>} record - The partial record containing the primary key fields.
+   * @returns {string} - The generated primary key.
+   * @throws {PrimaryKeyNotDefinedError} - If there is no primary key definition.
+   * @throws {PrimaryKeyValueNullError} - If any primary key values are null or undefined.
    */
   private generatePK(record: Partial<T>): string {
     if (this.hasNotPkDefinition())
       throw new PrimaryKeyNotDefinedError(this._name);
 
-    // Single key
-    if (this.isSingleKey()) {
-      const pkValue = record[this._PkDefinition[0]];
-      if (!pkValue) throw new PrimaryKeyValueNullError(String(this._PkDefinition[0]));
-
-      return String(pkValue);
+    function getPkValue(pkName: keyof T): Partial<T>[keyof T] {
+      const pkValue = record[pkName];
+      if (!pkValue) throw new PrimaryKeyValueNullError(String(pkName));
+      return pkValue;
     }
 
-    // Composite key
-    return this._PkDefinition.map(field => {
-      const pkValue = record[field];
-      if (!pkValue) throw new PrimaryKeyValueNullError(String(field));
-
-      return pkValue;
-    }).join('-');
+    return this.isSingleKey() 
+      ? String(getPkValue(this._PkDefinition[0])) 
+      : this._PkDefinition.map(getPkValue).join('-');
   }
 
+  /**
+   * Generates new and old primary keys (PK) for updating a record.
+   * @param {Partial<T>} updatedFields - The partial record containing the updated fields.
+   * @param {T} registeredRecord - The existing record from which the old primary key is derived.
+   * @returns {{newPk: string, oldPk: string}} - An object containing the new and old primary keys.
+   */
   private generatePkForUpdate(updatedFields: Partial<T>, registeredRecord: T): { newPk: string; oldPk: string } {
     if (this.isSingleKey()) {
       const pkDefinitionName = this._PkDefinition[0];
