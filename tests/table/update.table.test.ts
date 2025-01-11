@@ -149,7 +149,6 @@ describe('Table with composite PK - update() - should...', () => {
     { year: 2025, semester: 'Spring', courseId: 112, studentId: 2, grade: 0,  resultStatus: 'pending', gradeStatus: 'pending' },
     { year: 2025, semester: 'Summer', courseId: 103, studentId: 3, grade: 87, resultStatus: 'pending', gradeStatus: 'loaded'  },
     { year: 2025, semester: 'Summer', courseId: 113, studentId: 3, grade: 0,  resultStatus: 'pending', gradeStatus: 'pending' },
-    
     { year: 2025, semester: 'Fall',   courseId: 104, studentId: 4, grade: 61, resultStatus: 'pending', gradeStatus: 'loaded'  },
     { year: 2025, semester: 'Fall',   courseId: 114, studentId: 4, grade: 0,  resultStatus: 'pending', gradeStatus: 'pending' },
     { year: 2025, semester: 'Spring', courseId: 105, studentId: 5, grade: 59, resultStatus: 'pending', gradeStatus: 'loaded'  },
