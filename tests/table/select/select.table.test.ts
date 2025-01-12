@@ -58,3 +58,21 @@ describe("Table - select() with fields - should...", () => {
   });
 
 });
+
+describe("Table - select() with nonexistent operator as condition - should...", () => {
+  
+  it("throw an error when the operator is not recognized", async () => {
+    const table = new Table<any>('test', ['id']);
+    
+    const tryToFilter = async () => {
+      await table.select([], { 
+        id: { unexistent_operator: 1 } as any 
+      });
+    }
+
+    expect(tryToFilter)
+      .rejects
+      .toThrow(/^Unsupported operator:/);
+    
+  });
+});

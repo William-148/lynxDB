@@ -9,6 +9,7 @@ describe("Table should", () => {
   it("create a table with a primary key", async () => {
     const userTb = new Table<User>('user', ['id']);
     expect(userTb).toBeInstanceOf(Table);
+    expect(userTb.name).toBe('user');
   });
 
   it("throw an error when duplicate fields are provided for the primary key", async () => {
