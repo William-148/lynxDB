@@ -139,6 +139,49 @@ describe('Table with single PK - update() - should...', () => {
 });
 
 
+describe('Table without PK - update() - should...', () => {
+  const defaultData: Entity[] = [
+    { id: 1, name: 'Epsilon', value: 50, status: 'active' },
+    { id: 2, name: 'Zeta', value: 60, status: 'inactive' },
+    { id: 3, name: 'Eta', value: 70, status: 'active' },
+    { id: 4, name: 'Theta', value: 80, status: 'inactive' },
+    { id: 5, name: 'Iota', value: 90, status: 'active' },
+    { id: 6, name: 'Kappa', value: 100, status: 'inactive' }
+  ];
+
+  let entityTable: Table<Entity>;
+
+  beforeEach(() => {
+    entityTable = new Table<any>('entities');
+    entityTable.bulkInsert(defaultData);
+  });
+
+  it('update a single record based on a specific condition', async () => {
+    const ItemToTest = defaultData[0];
+    const NewFieldsValues: Partial<Entity> = { status: 'archived' };
+
+    const affectedRows = await entityTable.update(NewFieldsValues, { id: { eq: ItemToTest.id } });
+    expect(affectedRows).toBe(1);
+
+    const updatedRecord = await entityTable.select([], { id: { eq: ItemToTest.id } });
+    expect(updatedRecord[0]).toEqual({ ...ItemToTest, ...NewFieldsValues });
+  });
+
+  it('update multiple records matching a condition', async () => {
+    const NewFieldsValues: Partial<Entity> = { id: 1, status: 'freeze' };
+
+    const affectedRows = await entityTable.update(NewFieldsValues, { id: { gte: 1 } });
+    expect(affectedRows).toBe(defaultData.length);
+
+    const updatedRecords = await entityTable.select([], { id: { eq: NewFieldsValues.id } });
+    expect(updatedRecords).toHaveLength(defaultData.length);
+    for (const item of updatedRecords){
+      expect(item).toEqual({ ...item, ...NewFieldsValues });
+    }
+  });
+
+});
+
 
 describe('Table with composite PK - update() - should...', () => {
 

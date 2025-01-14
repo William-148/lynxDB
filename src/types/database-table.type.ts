@@ -1,5 +1,7 @@
 import { Filter } from "./filter.type";
 
+export type RecordWithVersion<T> = T & { __version: number };
+
 export interface DatabaseTable<T> {
   /**
    * Return the number of records in the table
