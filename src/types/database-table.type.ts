@@ -2,6 +2,13 @@ import { Filter } from "./filter.type";
 
 export type RecordWithVersion<T> = T & { __version: number };
 
+export type TableTemporaryState<T> = {
+  recordsMap: Map<string, RecordWithVersion<T>>;
+  recordsArray: RecordWithVersion<T>[];
+  tempUpdatedRecordsMap: Map<RecordWithVersion<T>, RecordWithVersion<T>>;
+  tempDeletedRecordsSet: Set<RecordWithVersion<T>>;
+}
+
 export interface DatabaseTable<T> {
   /**
    * Return the number of records in the table

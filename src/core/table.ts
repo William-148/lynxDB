@@ -125,6 +125,7 @@ export class Table<T> implements DatabaseTable<T> {
 
   /**
    * Generates new and old primary keys (PK) for updating a record.
+   * 
    * @protected
    * @param {Partial<T>} updatedFields - The partial record containing the updated fields.
    * @param {T} registeredRecord - The existing record from which the old primary key is derived.
@@ -177,6 +178,13 @@ export class Table<T> implements DatabaseTable<T> {
     );
   }
 
+  /**
+   * Inserts a record into the map if a primary key definition exists.
+   * 
+   * @private
+   * @param {RecordWithVersion<T>} record - The record to be inserted.
+   * @returns {void}
+   */
   private insertInMap(record: RecordWithVersion<T>): void {
     if (this.hasNotPkDefinition()) return;
 
@@ -186,10 +194,24 @@ export class Table<T> implements DatabaseTable<T> {
     this.addRecordToMap(primaryKey, record);
   }
 
+  /**
+   * Creates a new record with an initial version.
+   * 
+   * @protected
+   * @param {T} record - The original record.
+   * @returns {RecordWithVersion<T>} - The new record with an initial version.
+   */
+  protected createNewRecordWithVersion(record: T): RecordWithVersion<T> {
+    return {
+      ...record,
+      __version: 1
+    };
+  }
+
   public size(): number { return this._recordsArray.length; }
 
   public async insert(record: T): Promise<T> {
-    const newRecord: RecordWithVersion<T> = { ...record, __version: 1 };
+    const newRecord = this.createNewRecordWithVersion(record);
     this.insertInMap(newRecord);
     this.addRecordToArray(newRecord);
     return { ...record };
@@ -197,7 +219,7 @@ export class Table<T> implements DatabaseTable<T> {
 
   public async bulkInsert(records: T[]): Promise<void> {
     for (let record of records) {
-      const newRecord = { ...record, __version: 1 };
+      const newRecord = this.createNewRecordWithVersion(record);
       this.insertInMap(newRecord);
       this.addRecordToArray(newRecord);
     }
