@@ -1,4 +1,4 @@
-import { DatabaseTable, RecordWithVersion } from "../types/database-table.type";
+import { LocalTable, RecordWithVersion } from "../types/database-table.type";
 import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import {
@@ -8,8 +8,9 @@ import {
   PrimaryKeyValueNullError
 } from "./errors/table.error";
 
-export class Table<T> implements DatabaseTable<T> {
+export class Table<T> implements LocalTable<T> {
   private _name: string;
+  private _isLocked: boolean;
   protected _recordsMap: Map<string, RecordWithVersion<T>>;
   protected _recordsArray: RecordWithVersion<T>[];
   protected _pkDefinition: (keyof T)[];
@@ -20,6 +21,7 @@ export class Table<T> implements DatabaseTable<T> {
    */
   constructor(name: string, pkDefinition: (keyof T)[] = []) {
     this._name = name;
+    this._isLocked = false;
     this._recordsMap = new Map();
     this._recordsArray = [];
     this._pkDefinition = this.validatePKDefinition(pkDefinition);
@@ -29,6 +31,8 @@ export class Table<T> implements DatabaseTable<T> {
   get sizeMap(): number { return this._recordsMap.size; }
   get recordsMap(): Map<string, RecordWithVersion<T>> { return this._recordsMap; }
   get recordsArray(): RecordWithVersion<T>[] { return this._recordsArray; }
+  get pkDefinition(): (keyof T)[] { return this._pkDefinition; }
+  get isLocked(): boolean { return this._isLocked; }
 
   private validatePKDefinition(pkDefinition: (keyof T)[]): (keyof T)[] {
     const uniqueKeys = new Set(pkDefinition);
@@ -37,6 +41,9 @@ export class Table<T> implements DatabaseTable<T> {
     }
     return pkDefinition;
   }
+
+  public lock(): void { this._isLocked = true; }
+  public unlock(): void { this._isLocked = false; }
 
   private addRecordToMap(primaryKey: string, record: RecordWithVersion<T>): void {
     this._recordsMap.set(primaryKey, record);

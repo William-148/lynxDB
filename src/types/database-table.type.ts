@@ -9,7 +9,7 @@ export type TableTemporaryState<T> = {
   tempDeletedRecordsSet: Set<RecordWithVersion<T>>;
 }
 
-export interface DatabaseTable<T> {
+export interface LocalTable<T> {
   /**
    * Return the number of records in the table
    */

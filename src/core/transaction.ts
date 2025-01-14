@@ -1,0 +1,74 @@
+import { Table } from "./table";
+import { TransactionTable } from "./transaction-table";
+import { TableNotFoundError } from "./errors/data-base.error";
+import { TableManager } from "./table-manager";
+import { LocalTable } from "../types/database-table.type";
+import { TransactionCompletedError } from "./errors/transaction.error";
+
+export class Transaction  {
+  private transactionTables: Map<string, TransactionTable<any>>;
+  private tableManagers: Map<string, TableManager<any>>;
+  private isActive: boolean;
+
+  constructor(private tables: Map<string, Table<any>>) {
+    this.transactionTables = new Map();
+    this.tableManagers = new Map();
+    this.isActive = true;
+  }
+
+  private createTransactionTable<T>(name: string): LocalTable<T> {
+    const table: Table<T> | undefined = this.tables.get(name);
+    if (!table) throw new TableNotFoundError(name);
+    
+    const transactionTable = new TransactionTable<T>(
+      table.name, 
+      table.recordsMap, 
+      table.recordsArray, 
+      table.pkDefinition
+    );
+    const tableManager = new TableManager(transactionTable);
+
+    this.transactionTables.set(name, transactionTable);
+    this.tableManagers.set(name, tableManager);
+    return tableManager;
+  }
+
+  public getTable<T>(name: string): LocalTable<T> {
+    if (!this.isActive) throw new TransactionCompletedError();
+
+    const found = this.transactionTables.get(name);
+    if (found) return found as TransactionTable<T>;
+
+    return this.createTransactionTable(name);    
+  }
+
+  private clearTransactionTables(): void {
+    for (const transactionTable of this.transactionTables.values()) {
+      transactionTable.clearTemporaryState();
+    }
+    this.transactionTables.clear();
+  }
+
+  private onFinishTransaction(): void {
+    this.clearTransactionTables();
+    this.tableManagers.clear();
+    this.isActive = false;
+  }
+
+  public commit(): void {
+    if (!this.isActive) throw new TransactionCompletedError();
+
+    // Manage the commit process
+
+    this.onFinishTransaction();
+  }
+
+  public rollback(): void {
+    if (!this.isActive) throw new TransactionCompletedError();
+
+    // Manage the rollback process
+
+    this.onFinishTransaction();
+  }
+
+}
