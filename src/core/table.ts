@@ -1,12 +1,10 @@
 import { LocalTable, RecordWithId, RecordWithVersion } from "../types/database-table.type";
 import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
-import { TableLockManager } from "./lock-manager";
 import {
   DuplicatePrimaryKeyDefinitionError,
   DuplicatePrimaryKeyValueError,
   PrimaryKeyValueNullError,
-  LockConflictError
 } from "./errors/table.error";
 import { generateId } from "../utils/generate-id";
 
@@ -15,7 +13,7 @@ export class Table<T> implements LocalTable<T> {
   protected _recordsMap: Map<string, RecordWithVersion<T>>;
   protected _recordsArray: RecordWithVersion<T>[];
   protected _pkDefinition: (keyof T)[];
-  protected _lockManager: TableLockManager;
+  // protected _lockManager: TableLockManager;
 
   /**
    * @param name Name of the table
@@ -26,7 +24,7 @@ export class Table<T> implements LocalTable<T> {
     this._recordsMap = new Map();
     this._recordsArray = [];
     this._pkDefinition = this.validatePKDefinition(pkDefinition);
-    this._lockManager = new TableLockManager();
+    // this._lockManager = new TableLockManager();
   }
 
   get name(): string { return this._name; }
@@ -34,7 +32,7 @@ export class Table<T> implements LocalTable<T> {
   get recordsMap(): Map<string, RecordWithVersion<T>> { return this._recordsMap; }
   get recordsArray(): RecordWithVersion<T>[] { return this._recordsArray; }
   get pkDefinition(): (keyof T)[] { return this._pkDefinition; }
-  get lockManager(): TableLockManager { return this._lockManager; }
+  // get lockManager(): TableLockManager { return this._lockManager; }
 
   private validatePKDefinition(pkDefinition: (keyof T)[]): (keyof T)[] {
     const uniqueKeys = new Set(pkDefinition);
@@ -92,7 +90,7 @@ export class Table<T> implements LocalTable<T> {
    * @returns {boolean} - Returns true if the record contains any primary key fields, otherwise false.
    */
   protected isPartialRecordPartOfPk(record: Partial<T>): boolean {
-    if (this.hasNotPkDefinition()) return false;
+    if (this.hasNotPkDefinition()) return (("_id" in record) && record['_id'] !== undefined);
     if (this.isSingleKey()) return record[this._pkDefinition[0]] !== undefined;
     return this._pkDefinition.some(field => record[field] !== undefined);
   }
@@ -119,14 +117,20 @@ export class Table<T> implements LocalTable<T> {
   }
 
   /**
-   * Generates new and old primary keys (PK) with Pk definition for updating a record.
+   * Generates new and old primary keys (PK) for updating a record.
    * 
    * @protected
    * @param {Partial<T>} updatedFields - The partial record containing the updated fields.
    * @param {T} registeredRecord - The existing record from which the old primary key is derived.
    * @returns {{newPk: string, oldPk: string}} - An object containing the new and old primary keys.
    */
-  protected generatePkForUpdate(updatedFields: Partial<T>, registeredRecord: T): { newPk: string; oldPk: string } {
+  protected generatePkForUpdate(updatedFields: Partial<T>, registeredRecord: RecordWithVersion<T>): { newPk: string; oldPk: string } {
+    if (this.hasNotPkDefinition()) {
+      return {
+        newPk: String((updatedFields as any)["_id"] ?? registeredRecord._id),
+        oldPk: String(registeredRecord._id)
+      };
+    }
     if (this.isSingleKey()) {
       const pkDefinitionName = this._pkDefinition[0];
       return {
@@ -175,7 +179,7 @@ export class Table<T> implements LocalTable<T> {
   }
 
   /**
-   * Inserts a record into the map if a primary key definition exists.
+   * Inserts a record into the record map.
    * 
    * @private
    * @param {RecordWithVersion<T>} record - The record to be inserted.

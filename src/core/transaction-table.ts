@@ -1,4 +1,4 @@
-import { RecordWithVersion, TableTemporaryState } from "../types/database-table.type";
+import { RecordWithId, RecordWithVersion, TableTemporaryState } from "../types/database-table.type";
 import { Filter } from "../types/filter.type";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
@@ -22,33 +22,36 @@ export class TransactionTable<T> extends Table<T> {
    * 
    * This saves updated records that have not yet been applied.
    * 
-   * The key is the original record and the value is the updated record.
+   * The key is the Pk and the value is the updated record.
    */
-  private _tempUpdatedRecordsMap: Map<RecordWithVersion<T>, RecordWithVersion<T>>;
+  private _tempUpdatedRecordsMap: Map<string, RecordWithVersion<T>>;
   /**
    * Temporary Set that stores the records that will be deleted in the original Map and Array.
    * 
    * This saves deleted records that have not yet been applied.
    */
-  private _tempDeletedRecordsSet: Set<RecordWithVersion<T>>;
+  private _tempDeletedRecordsSet: Set<string>;
 
   constructor(
     name: string,
     recordsMap: Map<string, RecordWithVersion<T>>,
     recordsArray: RecordWithVersion<T>[],
-    pkDefinition: (keyof T)[] = []
+    // lockManager: TableLockManager,
+    pkDefinition: (keyof T)[]
   ) {
     super(name, pkDefinition);
-    this._tempRecordsArray = [];
-    this._tempRecordsMap = new Map();
     this._recordsArray = recordsArray;
     this._recordsMap = recordsMap;
+    // this._lockManager = lockManager;
+
+    this._tempRecordsArray = [];
+    this._tempRecordsMap = new Map();
+
     this._tempUpdatedRecordsMap = new Map();
     this._tempDeletedRecordsSet = new Set();
   }
 
   override get sizeMap(): number { 
-    if (this.hasNotPkDefinition()) return 0;
     // In this case, _tempRecordsArray is used to complement the size of the Map, because 
     // the Temporary Map stores new and updated records, so its size is not real. Instead, 
     // the size of the Temporary Array is used because it will only store new records.
@@ -99,32 +102,31 @@ export class TransactionTable<T> extends Table<T> {
     );
   }
   /**
-   * Inserts a record into the temporary map if a primary key definition exists.
+   * Inserts a record into the temporary map.
    * 
    * @private
    * @param {RecordWithVersion<T>} record - The record to be inserted.
    * @returns {void}
    */
   private insertInTemporaryMap(record: RecordWithVersion<T>): void {
-    if (this.hasNotPkDefinition()) return;
-
-    const primaryKey = this.generatePK(record);
+    const primaryKey = this.buildPkFromRecord(record);
     this.checkIfPkExistsInMaps(primaryKey);
 
     this._tempRecordsMap.set(primaryKey, record);
   }
 
   /**
-   * Get the most recent record found in the temporary updated Map, if it exists.
+   * Get the temporary changes of a record found in the temporary updated Map, if it exists.
    * 
-   * @param record The record of the original Map or Array
-   * @returns The most recent record found in the temporary Map, if it exists. 
+   * @param baseRecord The basic record of the original Map or Array
+   * @returns The temporary changes of a record found in the temporary Map, if it exists. 
    * Otherwise, the original record is returned. If the record is in the deleted 
    * Map, null is returned.
    */
-  private getMostRecentRecord(record: RecordWithVersion<T>): RecordWithVersion<T> | null {
-    if (this._tempDeletedRecordsSet.has(record)) return null;
-    return this._tempUpdatedRecordsMap.get(record) ?? record;
+  private getTemporaryRecordChanges(baseRecord: RecordWithVersion<T>): RecordWithVersion<T> | null {
+    const primaryKey = this.buildPkFromRecord(baseRecord);
+    if (this._tempDeletedRecordsSet.has(primaryKey)) return null;
+    return this._tempUpdatedRecordsMap.get(primaryKey) ?? baseRecord;
   }
 
   /**
@@ -150,7 +152,7 @@ export class TransactionTable<T> extends Table<T> {
     const newRecord = this.createNewRecordWithVersion(record);
     this.insertInTemporaryMap(newRecord);
     this._tempRecordsArray.push(newRecord);
-    return { ...record };
+    return this.mapRecordVersionToRecord(newRecord);
   }
 
   override async bulkInsert(records: T[]): Promise<void> {
@@ -161,44 +163,45 @@ export class TransactionTable<T> extends Table<T> {
     }
   }
 
-  override async findByPk(primaryKey: Partial<T>): Promise<T | null> {
-    const generatedPk = this.generatePK(primaryKey);
+  override async findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
+    const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
 
-    const newestInsertedRecord = this._tempRecordsMap.get(generatedPk);
-    if (newestInsertedRecord) return this.mapRecordVersionToRecord(newestInsertedRecord);
+    const temporaryRecord = this._tempRecordsMap.get(primaryKeyBuilt);
+    if (temporaryRecord) return this.mapRecordVersionToRecord(temporaryRecord);
 
-    const oldestRecord = this._recordsMap.get(generatedPk);
-    if (!oldestRecord) return null;
+    const baseRecord = this._recordsMap.get(primaryKeyBuilt);
+    if (!baseRecord) return null;
 
-    const mostRecentRecord = this.getMostRecentRecord(oldestRecord);
-    if (!mostRecentRecord) return null;
+    const recordWithTempChanges = this.getTemporaryRecordChanges(baseRecord);
+    if (!recordWithTempChanges) return null;
 
-    return this.mapRecordVersionToRecord(mostRecentRecord);
+    return this.mapRecordVersionToRecord(recordWithTempChanges);
   }
 
-  override async select(fields: (keyof T)[], where: Filter<T>): Promise<Partial<T>[]> {
+  // REFACTOR
+  override async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
     const compiledFilter = compileFilter(where);
     const result: Partial<T>[] = [];
     const areFieldsToSelectEmpty = (fields.length === 0);
 
-    const processSelect = (currentRecord: RecordWithVersion<T>, verifyLastChanges: boolean) => {
-      if (!matchRecord(currentRecord, compiledFilter)) return;
+    const processSelect = (record: RecordWithVersion<T>, verifyTemporaryChanges: boolean) => {
+      if (!matchRecord(record, compiledFilter)) return;
 
       let selectedRecord: Partial<T> | null = null;
 
-      if (verifyLastChanges) {
-        const mostRecentRecord = this.getMostRecentRecord(currentRecord);
+      if (verifyTemporaryChanges) {
+        const recordWithTempChanges = this.getTemporaryRecordChanges(record);
         // The function execution is finished because the record is null, 
         // which means that it was deleted and should not be added to the result.
-        if (mostRecentRecord === null) return;
+        if (recordWithTempChanges === null) return;
 
         selectedRecord = areFieldsToSelectEmpty
-          ? this.mapRecordVersionToRecord(mostRecentRecord)
-          : this.extractSelectedFields(fields, mostRecentRecord);
+          ? this.mapRecordVersionToRecord(recordWithTempChanges)
+          : this.extractSelectedFields(fields, recordWithTempChanges);
       } else {
         selectedRecord = areFieldsToSelectEmpty
-          ? this.mapRecordVersionToRecord(currentRecord)
-          : this.extractSelectedFields(fields, currentRecord);
+          ? this.mapRecordVersionToRecord(record)
+          : this.extractSelectedFields(fields, record);
       }
 
       result.push(selectedRecord);
@@ -216,18 +219,19 @@ export class TransactionTable<T> extends Table<T> {
     return result;
   }
 
-  public async update(updatedFields: Partial<T>, where: Filter<T>): Promise<number> {
+  public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
     const willPkBeModified = this.isPartialRecordPartOfPk(updatedFields);
     const compiledFilter = compileFilter(where);
     let affectedRecords = 0;
 
-    for (let record of this._recordsArray) {
-      if (!matchRecord(record, compiledFilter) || this._tempDeletedRecordsSet.has(record)) continue;
+    for (let baseRecord of this._recordsArray) {
+      if (!matchRecord(baseRecord, compiledFilter) 
+        || this._tempDeletedRecordsSet.has(this.buildPkFromRecord(baseRecord))) continue;
 
-      if (willPkBeModified) { this.updateWithPKChange(record, updatedFields); } 
-      else { this.updateWithoutPKChange(record, updatedFields); }
+      if (willPkBeModified) { this.updateWithPKChange(baseRecord, updatedFields); } 
+      else { this.updateWithoutPKChange(baseRecord, updatedFields); }
 
       affectedRecords++;
     }
@@ -253,7 +257,9 @@ export class TransactionTable<T> extends Table<T> {
   }
 
   private updateWithPKChange(record: RecordWithVersion<T>, updatedFields: Partial<T>): void {
-    const recordAlreadyUpdated = this._tempUpdatedRecordsMap.get(record);
+    const baseRecordPk = this.buildPkFromRecord(record);
+    const recordAlreadyUpdated = this._tempUpdatedRecordsMap.get(baseRecordPk);
+
     const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, recordAlreadyUpdated ?? record);
     this.checkIfPkExistsInMaps(newPk);
 
@@ -272,12 +278,14 @@ export class TransactionTable<T> extends Table<T> {
       // records Map and the temporary records Map.
       const newRecordUpdated = this.createNewUpdatedRecord(record, updatedFields);
       this._tempRecordsMap.set(newPk, newRecordUpdated);
-      this._tempUpdatedRecordsMap.set(record, newRecordUpdated);
+      this._tempUpdatedRecordsMap.set(newPk, newRecordUpdated);
     }
   }
 
-  private updateWithoutPKChange(originalRecord: RecordWithVersion<T>, updatedFields: Partial<T>): void {
-    const recordAlreadyUpdated = this._tempUpdatedRecordsMap.get(originalRecord);
+  private updateWithoutPKChange(record: RecordWithVersion<T>, updatedFields: Partial<T>): void {
+    const baseRecordPk = this.buildPkFromRecord(record);
+    const recordAlreadyUpdated = this._tempUpdatedRecordsMap.get(baseRecordPk);
+
     if(recordAlreadyUpdated) {
       // The original record was already updated previously, that's why it exists
       // in the tempUpdatedRecordsMap. To update it, the updated fields are assigned to it.
@@ -288,11 +296,11 @@ export class TransactionTable<T> extends Table<T> {
     // exist in the temporary updated Map. The original record is not modified, to update it,
     // a new record is created with the updated fields and added to the temporary updated
     // records Map and the temporary records Map (If a Pk is defined).
-    const newRecordUpdated = this.createNewUpdatedRecord(originalRecord, updatedFields);
-    if (this.hasPkDefinition()) {
-      this._tempRecordsMap.set(this.generatePK(newRecordUpdated), newRecordUpdated);
-    }
-    this._tempUpdatedRecordsMap.set(originalRecord, newRecordUpdated);
+    const newRecordUpdated = this.createNewUpdatedRecord(record, updatedFields);
+    const newRecordPk = this.buildPkFromRecord(newRecordUpdated);
+
+    this._tempRecordsMap.set(newRecordPk, newRecordUpdated);
+    this._tempUpdatedRecordsMap.set(newRecordPk, newRecordUpdated);
   }
 
 }

@@ -11,8 +11,8 @@ export type RecordWithVersion<T> = RecordWithId<T> & { __version: number };
 export type TableTemporaryState<T> = {
   recordsMap: Map<string, RecordWithVersion<T>>;
   recordsArray: RecordWithVersion<T>[];
-  tempUpdatedRecordsMap: Map<RecordWithVersion<T>, RecordWithVersion<T>>;
-  tempDeletedRecordsSet: Set<RecordWithVersion<T>>;
+  tempUpdatedRecordsMap: Map<string, RecordWithVersion<T>>;
+  tempDeletedRecordsSet: Set<string>;
 }
 
 export interface LocalTable<T> {
