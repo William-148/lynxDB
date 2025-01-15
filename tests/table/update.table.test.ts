@@ -139,8 +139,9 @@ describe('Table with single PK - update() - should...', () => {
 });
 
 
-describe('Table without PK - update() - should...', () => {
-  const defaultData: Entity[] = [
+describe('Table without PK definition - update() - should...', () => {
+  type EntityWithDefaultId = Entity & { _id?: string };
+  const defaultData: EntityWithDefaultId[] = [
     { id: 1, name: 'Epsilon', value: 50, status: 'active' },
     { id: 2, name: 'Zeta', value: 60, status: 'inactive' },
     { id: 3, name: 'Eta', value: 70, status: 'active' },
@@ -149,10 +150,10 @@ describe('Table without PK - update() - should...', () => {
     { id: 6, name: 'Kappa', value: 100, status: 'inactive' }
   ];
 
-  let entityTable: Table<Entity>;
+  let entityTable: Table<EntityWithDefaultId>;
 
   beforeEach(() => {
-    entityTable = new Table<Entity>('entities');
+    entityTable = new Table<EntityWithDefaultId>('entities');
     entityTable.bulkInsert(defaultData);
   });
 
@@ -164,9 +165,13 @@ describe('Table without PK - update() - should...', () => {
     expect(affectedRows).toBe(1);
 
     const updatedRecords = await entityTable.select([], { id: { eq: ItemToTest.id } });
-    const {_id, ...updateRecord} = updatedRecords[0] as any;
-    expect(_id).not.toBeUndefined();
-    expect(updateRecord).toEqual({ ...ItemToTest, ...NewFieldsValues });
+    const updatedRecord = updatedRecords[0];
+    expect(updatedRecord._id).not.toBeUndefined();
+    expect(updatedRecord).toEqual({ 
+      ...ItemToTest, 
+      ...NewFieldsValues, 
+      _id: updatedRecord._id 
+    });
   });
 
   it('update multiple records matching a condition', async () => {
@@ -181,6 +186,50 @@ describe('Table without PK - update() - should...', () => {
       expect(item.id).toBe(NewFieldsValues.id);
       expect(item.status).toBe(NewFieldsValues.status);
     }
+  });
+
+  it('update the "_id" field of a record', async () => {
+    const ItemToTest = defaultData[2];
+    const NewDefaultId = 'new-id';
+    const NewFieldsValues: Partial<EntityWithDefaultId> = { _id: NewDefaultId };
+
+    const findBeforUpdate = await entityTable.select([], { id: { eq: ItemToTest.id } });
+    const beforeUpdate = findBeforUpdate[0];
+    expect(beforeUpdate?._id).not.toBeUndefined();
+
+    const affectedRows = await entityTable.update(NewFieldsValues, { id: { eq: ItemToTest.id } });
+    expect(affectedRows).toBe(1);
+
+    const updatedRecord = await entityTable.findByPk({ _id: NewDefaultId });
+    const nonexistRecord = await entityTable.findByPk({ _id: beforeUpdate._id });
+
+    expect(updatedRecord).toEqual({ ...ItemToTest, ...NewFieldsValues, _id: NewDefaultId });
+    expect(nonexistRecord).toBeNull();
+  });
+
+  it('throw an error when updating records with an existing "_id"', async () => {
+    const ItemToTest = await entityTable.insert(defaultData[3]);
+    async function tryToUpdate(){
+      await entityTable.update({ _id: ItemToTest._id }, {});
+    }
+
+    expect(tryToUpdate)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyValueError);
+  });
+
+  it('throw an error when updating records with an unregistered "_id"', async () => {
+    const UnregisteredDefaultId = 'unregistered-id';
+    async function tryToUpdate(){
+      await entityTable.update({ _id: UnregisteredDefaultId }, {});
+    }
+
+    expect(tryToUpdate)
+    .rejects
+    .toThrow(DuplicatePrimaryKeyValueError).then(async () => {
+      const updated = await entityTable.select([], { _id: { eq: UnregisteredDefaultId } });
+      expect(updated).toHaveLength(1);
+    });
   });
 
 });
