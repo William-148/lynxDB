@@ -34,8 +34,8 @@ export class DuplicatePrimaryKeyValueError extends Error {
   }
 }
 
-export class PrimaryKeyNotDefinedError extends Error {
-  constructor(tableName: string) {
-    super(`Primary key is not defined in table "${tableName}"`);
+export class LockConflictError extends Error {
+  constructor() {
+    super(`Lock conflict`);
   }
 }

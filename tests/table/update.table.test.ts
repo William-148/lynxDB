@@ -152,7 +152,7 @@ describe('Table without PK - update() - should...', () => {
   let entityTable: Table<Entity>;
 
   beforeEach(() => {
-    entityTable = new Table<any>('entities');
+    entityTable = new Table<Entity>('entities');
     entityTable.bulkInsert(defaultData);
   });
 
@@ -163,8 +163,10 @@ describe('Table without PK - update() - should...', () => {
     const affectedRows = await entityTable.update(NewFieldsValues, { id: { eq: ItemToTest.id } });
     expect(affectedRows).toBe(1);
 
-    const updatedRecord = await entityTable.select([], { id: { eq: ItemToTest.id } });
-    expect(updatedRecord[0]).toEqual({ ...ItemToTest, ...NewFieldsValues });
+    const updatedRecords = await entityTable.select([], { id: { eq: ItemToTest.id } });
+    const {_id, ...updateRecord} = updatedRecords[0] as any;
+    expect(_id).not.toBeUndefined();
+    expect(updateRecord).toEqual({ ...ItemToTest, ...NewFieldsValues });
   });
 
   it('update multiple records matching a condition', async () => {
@@ -176,7 +178,8 @@ describe('Table without PK - update() - should...', () => {
     const updatedRecords = await entityTable.select([], { id: { eq: NewFieldsValues.id } });
     expect(updatedRecords).toHaveLength(defaultData.length);
     for (const item of updatedRecords){
-      expect(item).toEqual({ ...item, ...NewFieldsValues });
+      expect(item.id).toBe(NewFieldsValues.id);
+      expect(item.status).toBe(NewFieldsValues.status);
     }
   });
 

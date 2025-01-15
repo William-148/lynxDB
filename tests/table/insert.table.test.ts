@@ -111,28 +111,41 @@ describe("Table with composite PK - insert() - should...", () => {
 
 
 describe("Table without PK - insert() - should...", () => {
-  let userTable: Table<User>;
+  type UserWithDefaultId = User & { _id?: string };
+  let userTable: Table<UserWithDefaultId>;
 
   beforeEach(() => {
-    userTable = new Table<User>('user');
+    userTable = new Table<UserWithDefaultId>('user');
   });
 
   it("insert a register correctly", async () => {
+    const DataInserted: UserWithDefaultId[] = [];
     for (let item of thirtyItemsUserList) {
-      await userTable.insert(item);
+      const inserted = await userTable.insert(item);
+      DataInserted.push(inserted);
     }
 
     expect(userTable.size()).toBe(thirtyItemsUserList.length);
-    expect(userTable.sizeMap).toBe(0);
+    expect(userTable.sizeMap).toBe(thirtyItemsUserList.length);
+    for (let inserted of DataInserted) {
+      expect(inserted._id).not.toBeUndefined();
+    }
   });
 
   it("insert the same register many times correctly", async () => {
-    await userTable.insert(defaultUser);
-    await userTable.insert(defaultUser);
-    await userTable.insert(defaultUser);
+    const NumberOfInserts = 3;
+    const DataInserted: any[] = [];
+    for (let i = 0; i < NumberOfInserts; i++) {
+      const inserted = await userTable.insert(defaultUser);
+      DataInserted.push(inserted);
+    }
 
-    expect(userTable.size()).toBe(3);
-    expect(userTable.sizeMap).toBe(0);
+    expect(userTable.size()).toBe(NumberOfInserts);
+    expect(userTable.sizeMap).toBe(NumberOfInserts);
+    
+    for (let inserted of DataInserted) {
+      expect(inserted._id).not.toBeUndefined();
+    }
   });
 
 });

@@ -1,19 +1,21 @@
-import { LocalTable, RecordWithVersion } from "../types/database-table.type";
+import { LocalTable, RecordWithId, RecordWithVersion } from "../types/database-table.type";
 import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
+import { TableLockManager } from "./lock-manager";
 import {
   DuplicatePrimaryKeyDefinitionError,
   DuplicatePrimaryKeyValueError,
-  PrimaryKeyNotDefinedError,
-  PrimaryKeyValueNullError
+  PrimaryKeyValueNullError,
+  LockConflictError
 } from "./errors/table.error";
+import { generateId } from "../utils/generate-id";
 
 export class Table<T> implements LocalTable<T> {
   private _name: string;
-  private _isLocked: boolean;
   protected _recordsMap: Map<string, RecordWithVersion<T>>;
   protected _recordsArray: RecordWithVersion<T>[];
   protected _pkDefinition: (keyof T)[];
+  protected _lockManager: TableLockManager;
 
   /**
    * @param name Name of the table
@@ -21,10 +23,10 @@ export class Table<T> implements LocalTable<T> {
    */
   constructor(name: string, pkDefinition: (keyof T)[] = []) {
     this._name = name;
-    this._isLocked = false;
     this._recordsMap = new Map();
     this._recordsArray = [];
     this._pkDefinition = this.validatePKDefinition(pkDefinition);
+    this._lockManager = new TableLockManager();
   }
 
   get name(): string { return this._name; }
@@ -32,7 +34,7 @@ export class Table<T> implements LocalTable<T> {
   get recordsMap(): Map<string, RecordWithVersion<T>> { return this._recordsMap; }
   get recordsArray(): RecordWithVersion<T>[] { return this._recordsArray; }
   get pkDefinition(): (keyof T)[] { return this._pkDefinition; }
-  get isLocked(): boolean { return this._isLocked; }
+  get lockManager(): TableLockManager { return this._lockManager; }
 
   private validatePKDefinition(pkDefinition: (keyof T)[]): (keyof T)[] {
     const uniqueKeys = new Set(pkDefinition);
@@ -40,21 +42,6 @@ export class Table<T> implements LocalTable<T> {
       throw new DuplicatePrimaryKeyDefinitionError(pkDefinition.toString());
     }
     return pkDefinition;
-  }
-
-  public lock(): void { this._isLocked = true; }
-  public unlock(): void { this._isLocked = false; }
-
-  private addRecordToMap(primaryKey: string, record: RecordWithVersion<T>): void {
-    this._recordsMap.set(primaryKey, record);
-  }
-
-  private removeRecordFromMap(primaryKey: string): void {
-    this._recordsMap.delete(primaryKey);
-  }
-
-  private addRecordToArray(record: RecordWithVersion<T>): void {
-    this._recordsArray.push(record);
   }
 
   protected hasPkDefinition(): boolean {
@@ -77,9 +64,9 @@ export class Table<T> implements LocalTable<T> {
    * @param {RecordWithVersion<T>} recordWithVersion - The record that includes version information.
    * @returns {T} - The record without version information.
    */
-  protected mapRecordVersionToRecord(recordWithVersion: RecordWithVersion<T>): T {
+  protected mapRecordVersionToRecord(recordWithVersion: RecordWithVersion<T>): RecordWithId<T> {
     const { __version, ...record } = recordWithVersion;
-    return record as unknown as T;
+    return record as unknown as RecordWithId<T>;
   }
 
   /**
@@ -111,17 +98,18 @@ export class Table<T> implements LocalTable<T> {
   }
 
   /**
-   * Generates a primary key (PK) from a partial record.
+   * Build a primary key (PK) from a partial record.
    * 
    * @protected
    * @param {Partial<T>} record - The partial record containing the primary key fields.
-   * @returns {string} - The generated primary key.
-   * @throws {PrimaryKeyNotDefinedError} - If there is no primary key definition.
+   * @returns {string} - The built primary key.
    * @throws {PrimaryKeyValueNullError} - If any primary key values are null or undefined.
    */
-  protected generatePK(record: Partial<T>): string {
-    if (this.hasNotPkDefinition())
-      throw new PrimaryKeyNotDefinedError(this._name);
+  protected buildPkFromRecord(record: Partial<RecordWithId<T>>): string {
+    if (this.hasNotPkDefinition()){
+      if (!record._id) throw new PrimaryKeyValueNullError('_id');
+      return record._id;
+    }
 
     return this._pkDefinition.map((pkName: keyof T) => {
       const pkValue = record[pkName];
@@ -131,7 +119,7 @@ export class Table<T> implements LocalTable<T> {
   }
 
   /**
-   * Generates new and old primary keys (PK) for updating a record.
+   * Generates new and old primary keys (PK) with Pk definition for updating a record.
    * 
    * @protected
    * @param {Partial<T>} updatedFields - The partial record containing the updated fields.
@@ -162,8 +150,8 @@ export class Table<T> implements LocalTable<T> {
    * @param {T} record - The record from which to extract the fields.
    * @returns {Partial<T>} - A new partial record containing only the specified fields.
    */
-  protected extractSelectedFields(fields: (keyof T)[], record: T): Partial<T> {
-    const newRecord: Partial<T> = {};
+  protected extractSelectedFields(fields: (keyof T)[], record: RecordWithId<T>): Partial<RecordWithId<T>> {
+    const newRecord: Partial<RecordWithId<T>> = {};
     for (let field of fields) {
       newRecord[field] = record[field];
     }
@@ -179,8 +167,9 @@ export class Table<T> implements LocalTable<T> {
    */
   protected checkIfPkIsInUse(primaryKey: string): void {
     if (!this._recordsMap.has(primaryKey)) return;
+    
     throw new DuplicatePrimaryKeyValueError(
-      this._pkDefinition.join(', '),
+      this.hasPkDefinition() ? this._pkDefinition.join(', ') : '_id',
       primaryKey
     );
   }
@@ -190,60 +179,67 @@ export class Table<T> implements LocalTable<T> {
    * 
    * @private
    * @param {RecordWithVersion<T>} record - The record to be inserted.
-   * @returns {void}
    */
   private insertInMap(record: RecordWithVersion<T>): void {
-    if (this.hasNotPkDefinition()) return;
-
-    const primaryKey = this.generatePK(record);
+    const primaryKey = this.buildPkFromRecord(record);
     this.checkIfPkIsInUse(primaryKey);
 
-    this.addRecordToMap(primaryKey, record);
+    this._recordsMap.set(primaryKey, record);
   }
 
   /**
-   * Creates a new record with an initial version.
+   * Creates a new record with an initial version. Generates a new primary key 
+   * if no primary key definition exists.
    * 
    * @protected
    * @param {T} record - The original record.
    * @returns {RecordWithVersion<T>} - The new record with an initial version.
    */
   protected createNewRecordWithVersion(record: T): RecordWithVersion<T> {
-    return {
-      ...record,
-      __version: 1
+    const newRecord: RecordWithVersion<T> = { 
+      ...record, 
+      __version: 1 
     };
+
+    if (this.hasNotPkDefinition() && !newRecord._id) {
+      newRecord._id = generateId();
+    }
+
+    return newRecord;
   }
 
-  public size(): number { return this._recordsArray.length; }
 
+  public size(): number { return this._recordsArray.length; }
+  
   public async insert(record: T): Promise<T> {
     const newRecord = this.createNewRecordWithVersion(record);
     this.insertInMap(newRecord);
-    this.addRecordToArray(newRecord);
-    return { ...record };
+    this._recordsArray.push(newRecord);
+    return this.mapRecordVersionToRecord(newRecord);
   }
 
   public async bulkInsert(records: T[]): Promise<void> {
     for (let record of records) {
       const newRecord = this.createNewRecordWithVersion(record);
       this.insertInMap(newRecord);
-      this.addRecordToArray(newRecord);
+      this._recordsArray.push(newRecord);
     }
   }
-  
-  public async findByPk(primaryKey: Partial<T>): Promise<T | null> {
-    const generatedPk = this.generatePK(primaryKey);
-    const result = this._recordsMap.get(generatedPk);
 
-    return result 
-      ? this.mapRecordVersionToRecord(result) 
+  public async findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
+    const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
+    // await this._lockManager.waitUntilUnlocked(generatedPk);
+
+    const recordFound = this._recordsMap.get(primaryKeyBuilt);
+
+    return recordFound 
+      ? this.mapRecordVersionToRecord(recordFound) 
       : null;
   }
 
-  public async select(fields: (keyof T)[], where: Filter<T>): Promise<Partial<T>[]> {
+  public async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
     const compiledFilter = compileFilter(where);
-    const result: Partial<T>[] = [];
+    const result: Partial<RecordWithId<T>>[] = [];
     const areFieldsToSelectEmpty = fields.length === 0;
 
     for (let currentRecord of this._recordsArray) {
@@ -258,7 +254,7 @@ export class Table<T> implements LocalTable<T> {
     return result;
   }
 
-  public async update(updatedFields: Partial<T>, where: Filter<T>): Promise<number> {
+  public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
     const willPkBeModified = this.isPartialRecordPartOfPk(updatedFields);
@@ -273,9 +269,9 @@ export class Table<T> implements LocalTable<T> {
         const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, currentRecord);
         this.checkIfPkIsInUse(newPk);
         
-        this.removeRecordFromMap(oldPk);
+        this._recordsMap.delete(oldPk);
         this.updateRecordAndVersion(currentRecord, updatedFields);
-        this.addRecordToMap(newPk, currentRecord);
+        this._recordsMap.set(newPk, currentRecord);
       }
       else {
         this.updateRecordAndVersion(currentRecord, updatedFields);

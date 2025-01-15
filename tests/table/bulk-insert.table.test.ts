@@ -120,7 +120,7 @@ describe("Table without PK - bulkInsert() - should...", () => {
     await userTable.bulkInsert(thirtyItemsUserList);
 
     expect(userTable.size()).toBe(thirtyItemsUserList.length);
-    expect(userTable.sizeMap).toBe(0);
+    expect(userTable.sizeMap).toBe(thirtyItemsUserList.length);
   });
 
   it("insert the same register many times correctly", async () => {
@@ -128,7 +128,7 @@ describe("Table without PK - bulkInsert() - should...", () => {
     await userTable.bulkInsert(thirtyItemsUserList);
 
     expect(userTable.size()).toBe(thirtyItemsUserList.length * 2);
-    expect(userTable.sizeMap).toBe(0);
+    expect(userTable.sizeMap).toBe(thirtyItemsUserList.length * 2);
   });
 
 });

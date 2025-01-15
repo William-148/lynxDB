@@ -3,7 +3,6 @@ import { defaultUser, thirtyItemsUserList, twentyOrderDetails } from "../data/da
 import { User } from "../types/user-test.type";
 import { OrderDetail } from "../types/order-test.type";
 import { 
-  PrimaryKeyNotDefinedError,
   PrimaryKeyValueNullError
 } from "../../src/core/errors/table.error";
 
@@ -18,9 +17,9 @@ describe("Table with single PK - findByPk() - should...", () => {
     await userTable.bulkInsert(thirtyItemsUserList);
 
     for (let item of thirtyItemsUserList) {
-      const finded = await userTable.findByPk({ id: item.id });
-      expect(finded).not.toBe(item);
-      expect(finded).toEqual(item);
+      const found = await userTable.findByPk({ id: item.id });
+      expect(found).not.toBe(item);
+      expect(found).toEqual(item);
     }
   });
 
@@ -48,12 +47,12 @@ describe("Table with composite PK - findByPk() - should...", () => {
     await orderDetailTable.bulkInsert(twentyOrderDetails);
 
     for (let item of twentyOrderDetails) {
-      const finded = await orderDetailTable.findByPk({ 
+      const found = await orderDetailTable.findByPk({ 
         orderId: item.orderId, 
         productId: item.productId 
       });
-      expect(finded).not.toBe(item);
-      expect(finded).toEqual(item);
+      expect(found).not.toBe(item);
+      expect(found).toEqual(item);
     }
   });
 
@@ -86,10 +85,20 @@ describe("Table with composite PK - findByPk() - should...", () => {
 
 
 describe("Table without PK - findByPk() - should...", () => {
-  let userTable: Table<User>;
+  type UserWithDefaultId = User & { _id?: string };
+
+  let userTable: Table<UserWithDefaultId>;
 
   beforeEach(() => {
-    userTable = new Table<User>('user');
+    userTable = new Table<UserWithDefaultId>('user');
+  });
+
+  it("find a register with the default '_id' created", async () => {
+    const insertedData = await userTable.insert(defaultUser);
+    const found = await userTable.findByPk({ _id: insertedData._id });
+    expect(found?._id).toBeDefined();
+    expect(found).toEqual({ ...defaultUser, _id: insertedData._id });
+
   });
 
   it("throw an error because the table do not have a PK", async () => {
@@ -100,7 +109,7 @@ describe("Table without PK - findByPk() - should...", () => {
 
     expect(tryToFind())
       .rejects
-      .toThrow(PrimaryKeyNotDefinedError);
+      .toThrow(PrimaryKeyValueNullError);
   });
 
 });
