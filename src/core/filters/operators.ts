@@ -22,11 +22,11 @@ export function getOperatorHandler<T>(operatorType: OperatorType): OperatorHandl
       [OperatorType.like]: likeComparison<T>
     });
   }
-  const operatorHandlerFinded = operators[operatorType];
-  if (!operatorHandlerFinded) {
+  const operatorHandlerFound = operators[operatorType];
+  if (!operatorHandlerFound) {
     throw new Error(`Unsupported operator: ${operatorType}`);
   }
-  return operatorHandlerFinded as OperatorHandler<T>;
+  return operatorHandlerFound as OperatorHandler<T>;
 }
 
 
