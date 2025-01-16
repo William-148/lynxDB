@@ -126,22 +126,23 @@ export class Table<T> implements LocalTable<T> {
    * @returns {{newPk: string, oldPk: string}} - An object containing the new and old primary keys.
    */
   protected generatePkForUpdate(updatedFields: Partial<T>, registeredRecord: RecordWithVersion<T>): { newPk: string; oldPk: string } {
+    const getPkValue = (field: keyof T) => String(updatedFields[field] ?? registeredRecord[field]);
     if (this.hasNotPkDefinition()) {
       return {
-        newPk: String((updatedFields as any)["_id"] ?? registeredRecord._id),
+        newPk: getPkValue("_id" as keyof T),
         oldPk: String(registeredRecord._id)
       };
     }
     if (this.isSingleKey()) {
       const pkDefinitionName = this._pkDefinition[0];
       return {
-        newPk: String(updatedFields[pkDefinitionName] ?? registeredRecord[pkDefinitionName]),
+        newPk: getPkValue(pkDefinitionName),
         oldPk: String(registeredRecord[pkDefinitionName])
       };
     }
     // Composite key
     return {
-      newPk: this._pkDefinition.map(pkName => updatedFields[pkName] ?? registeredRecord[pkName]).join('-'),
+      newPk: this._pkDefinition.map(getPkValue).join('-'),
       oldPk: this._pkDefinition.map(pkName => registeredRecord[pkName]).join('-')
     }
   }
