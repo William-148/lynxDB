@@ -2,6 +2,7 @@ import { RecordWithId, RecordWithVersion, TableTemporaryState } from "../types/d
 import { Filter } from "../types/filter.type";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
+import { RecordLockManager } from "./record-lock-manager";
 import { Table } from "./table";
 
 export class TransactionTable<T> extends Table<T> {
@@ -36,13 +37,13 @@ export class TransactionTable<T> extends Table<T> {
     name: string,
     recordsMap: Map<string, RecordWithVersion<T>>,
     recordsArray: RecordWithVersion<T>[],
-    // lockManager: TableLockManager,
+    lockManager: RecordLockManager,
     pkDefinition: (keyof T)[]
   ) {
     super(name, pkDefinition);
     this._recordsArray = recordsArray;
     this._recordsMap = recordsMap;
-    // this._lockManager = lockManager;
+    this._lockManager = lockManager;
 
     this._tempRecordsArray = [];
     this._tempRecordsMap = new Map();

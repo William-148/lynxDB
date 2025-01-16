@@ -7,13 +7,14 @@ import {
   PrimaryKeyValueNullError,
 } from "./errors/table.error";
 import { generateId } from "../utils/generate-id";
+import { RecordLockManager } from "./record-lock-manager";
 
 export class Table<T> implements LocalTable<T> {
   private _name: string;
   protected _recordsMap: Map<string, RecordWithVersion<T>>;
   protected _recordsArray: RecordWithVersion<T>[];
   protected _pkDefinition: (keyof T)[];
-  // protected _lockManager: TableLockManager;
+  protected _lockManager: RecordLockManager;
 
   /**
    * @param name Name of the table
@@ -24,7 +25,7 @@ export class Table<T> implements LocalTable<T> {
     this._recordsMap = new Map();
     this._recordsArray = [];
     this._pkDefinition = this.validatePKDefinition(pkDefinition);
-    // this._lockManager = new TableLockManager();
+    this._lockManager = new RecordLockManager();
   }
 
   get name(): string { return this._name; }
@@ -32,7 +33,7 @@ export class Table<T> implements LocalTable<T> {
   get recordsMap(): Map<string, RecordWithVersion<T>> { return this._recordsMap; }
   get recordsArray(): RecordWithVersion<T>[] { return this._recordsArray; }
   get pkDefinition(): (keyof T)[] { return this._pkDefinition; }
-  // get lockManager(): TableLockManager { return this._lockManager; }
+  get lockManager(): RecordLockManager { return this._lockManager; }
 
   private validatePKDefinition(pkDefinition: (keyof T)[]): (keyof T)[] {
     const uniqueKeys = new Set(pkDefinition);
@@ -212,7 +213,6 @@ export class Table<T> implements LocalTable<T> {
     return newRecord;
   }
 
-
   public size(): number { return this._recordsArray.length; }
   
   public async insert(record: T): Promise<T> {
@@ -232,7 +232,8 @@ export class Table<T> implements LocalTable<T> {
 
   public async findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
     const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
-    // await this._lockManager.waitUntilUnlocked(generatedPk);
+
+    await this._lockManager.ensureUnlockedOnRead(primaryKeyBuilt);
 
     const recordFound = this._recordsMap.get(primaryKeyBuilt);
 
@@ -247,6 +248,10 @@ export class Table<T> implements LocalTable<T> {
     const areFieldsToSelectEmpty = fields.length === 0;
 
     for (let currentRecord of this._recordsArray) {
+      
+      await this._lockManager.ensureUnlockedOnRead(
+        this.buildPkFromRecord(currentRecord)
+      );
 
       if (!matchRecord(currentRecord, compiledFilter)) continue;
 
@@ -268,6 +273,10 @@ export class Table<T> implements LocalTable<T> {
     for (let currentRecord of this._recordsArray) {
 
       if (!matchRecord(currentRecord, compiledFilter)) continue;
+
+      await this._lockManager.ensureUnlockedOnWrite(
+        this.buildPkFromRecord(currentRecord)
+      );
   
       if (willPkBeModified) { 
         const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, currentRecord);
