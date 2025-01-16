@@ -27,7 +27,7 @@ describe("Table with single PK - findByPk() - should...", () => {
     const findByPkWithoutPk = async () => {
       await userTable.findByPk({} as any);
     }
-    expect(findByPkWithoutPk())
+    await expect(findByPkWithoutPk())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });
@@ -60,7 +60,7 @@ describe("Table with composite PK - findByPk() - should...", () => {
     const findByPkWithoutPk = async () => {
       await orderDetailTable.findByPk({} as any);
     }
-    expect(findByPkWithoutPk())
+    await expect(findByPkWithoutPk())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });
@@ -72,10 +72,10 @@ describe("Table with composite PK - findByPk() - should...", () => {
     const findByPkIncompletePkB = async () => {
       await orderDetailTable.findByPk({ productId: 1 } as any);
     }
-    expect(findByPkIncompletePkA())
+    await expect(findByPkIncompletePkA())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
-    expect(findByPkIncompletePkB())
+    await expect(findByPkIncompletePkB())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });
@@ -107,7 +107,7 @@ describe("Table without PK - findByPk() - should...", () => {
       await userTable.findByPk({ id: defaultUser.id });
     };
 
-    expect(tryToFind())
+    await expect(tryToFind())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });

@@ -31,7 +31,7 @@ describe("Table with single PK - insert() - should...", () => {
       );
     }
 
-    expect(insertDuplicated())
+    await expect(insertDuplicated())
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError);
   });
@@ -41,7 +41,7 @@ describe("Table with single PK - insert() - should...", () => {
     const insertWithoutPk = async () => {
       await userTable.insert(userWrong);
     }
-    expect(insertWithoutPk())
+    await expect(insertWithoutPk())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });
@@ -77,7 +77,7 @@ describe("Table with composite PK - insert() - should...", () => {
       await orderDetailTable.insert(orderDetails[0]);
     }
 
-    expect(insertDuplicated())
+    await expect(insertDuplicated())
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError);
   });
@@ -86,7 +86,7 @@ describe("Table with composite PK - insert() - should...", () => {
     const insertWithoutPk = async () => {
       await orderDetailTable.insert({} as OrderDetail);
     }
-    expect(insertWithoutPk())
+    await expect(insertWithoutPk())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });
@@ -98,10 +98,10 @@ describe("Table with composite PK - insert() - should...", () => {
     const insertIncompletePkB = async () => {
       await orderDetailTable.insert({ productId: 1 } as OrderDetail);
     }
-    expect(insertIncompletePkA())
+    await expect(insertIncompletePkA())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
-    expect(insertIncompletePkB())
+    await expect(insertIncompletePkB())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });

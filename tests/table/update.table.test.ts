@@ -112,7 +112,7 @@ describe('Table with single PK - update() - should...', () => {
     const errorUpdate = async () => {
       await entityTable.update({ id: pkAlreadyRegistered }, { id: { gt: ItemPkToTest } });
     }
-    expect(errorUpdate)
+    await expect(errorUpdate)
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError);
   });
@@ -126,15 +126,14 @@ describe('Table with single PK - update() - should...', () => {
       await entityTable.update({ id: unregisteredPK }, {});
     }
 
-    expect(errorUpdate)
+    await expect(errorUpdate)
       .rejects
-      .toThrow(DuplicatePrimaryKeyValueError)
-      .finally(async () => {
-        for (let expectedId of expectedIdList) {
-          const record = await entityTable.findByPk({ id: expectedId });
-          expect(record?.id).toBe(expectedId);
-        }
-      });
+      .toThrow(DuplicatePrimaryKeyValueError);
+
+    for (let expectedId of expectedIdList) {
+      const record = await entityTable.findByPk({ id: expectedId });
+      expect(record?.id).toBe(expectedId);
+    }
   });
 });
 
@@ -213,7 +212,7 @@ describe('Table without PK definition - update() - should...', () => {
       await entityTable.update({ _id: ItemToTest._id }, {});
     }
 
-    expect(tryToUpdate)
+    await expect(tryToUpdate)
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError);
   });
@@ -224,12 +223,12 @@ describe('Table without PK definition - update() - should...', () => {
       await entityTable.update({ _id: UnregisteredDefaultId }, {});
     }
 
-    expect(tryToUpdate)
-    .rejects
-    .toThrow(DuplicatePrimaryKeyValueError).then(async () => {
-      const updated = await entityTable.select([], { _id: { eq: UnregisteredDefaultId } });
-      expect(updated).toHaveLength(1);
-    });
+    await expect(tryToUpdate)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyValueError);
+
+    const updated = await entityTable.select([], { _id: { eq: UnregisteredDefaultId } });
+    expect(updated).toHaveLength(1);
   });
 
 });
@@ -462,7 +461,7 @@ describe('Table with composite PK - update() - should...', () => {
       });
     }
 
-    expect(errorUpdate)
+    await expect(errorUpdate)
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError);
 
@@ -487,7 +486,7 @@ describe('Table with composite PK - update() - should...', () => {
       });
     }
 
-    expect(errorUpdate)
+    await expect(errorUpdate)
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError);
 
@@ -500,18 +499,18 @@ describe('Table with composite PK - update() - should...', () => {
       await enrollmentTable.update(newPk, {});
     }
 
-    expect(errorUpdate)
+    await expect(errorUpdate)
       .rejects
-      .toThrow(DuplicatePrimaryKeyValueError)
-      .finally(async () => {
-        const record = await enrollmentTable.select([], {
-          year: { eq: newPk.year },
-          semester: { eq: newPk.semester },
-          courseId: { eq: newPk.courseId },
-          studentId: { eq: newPk.studentId }
-        });
-        expect(record).toHaveLength(1);
-      });
+      .toThrow(DuplicatePrimaryKeyValueError);
+
+    const record = await enrollmentTable.select([], {
+      year: { eq: newPk.year },
+      semester: { eq: newPk.semester },
+      courseId: { eq: newPk.courseId },
+      studentId: { eq: newPk.studentId }
+    });
+    expect(record).toHaveLength(1);
+
   });
 
   it('throw an error when updating a part of the PK of multiple records with an unregistered PK', async () => {
@@ -522,20 +521,19 @@ describe('Table with composite PK - update() - should...', () => {
       await enrollmentTable.update({ courseId: 500 }, { studentId: { eq: ItemTest.studentId } });
     }
 
-    expect(errorUpdate)
+    await expect(errorUpdate)
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError)
-      .finally(async () => {
-        const expectedItem = { ...ItemTest, ...partialPK };
-        const record = await enrollmentTable.select([], {
-          year: { eq: expectedItem.year },
-          semester: { eq: expectedItem.semester },
-          courseId: { eq: expectedItem.courseId },
-          studentId: { eq: expectedItem.studentId }
-        });
-        expect(record).toHaveLength(1);
-        expect(expectedItem).toEqual(record[0]);
-      });
+
+    const expectedItem = { ...ItemTest, ...partialPK };
+    const record = await enrollmentTable.select([], {
+      year: { eq: expectedItem.year },
+      semester: { eq: expectedItem.semester },
+      courseId: { eq: expectedItem.courseId },
+      studentId: { eq: expectedItem.studentId }
+    });
+    expect(record).toHaveLength(1);
+    expect(expectedItem).toEqual(record[0]);
   });
   
 });

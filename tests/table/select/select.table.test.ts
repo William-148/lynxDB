@@ -70,7 +70,7 @@ describe("Table - select() with nonexistent operator as condition - should...", 
       });
     }
 
-    expect(tryToFilter)
+    await expect(tryToFilter)
       .rejects
       .toThrow(/^Unsupported operator:/);
     

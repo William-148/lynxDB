@@ -27,8 +27,7 @@ describe("Table with single PK - bulkInsert() - should...", () => {
         thirtyItemsUserList.map((item) => ({ ...item, id: 1 }) )
       );
     }
-
-    expect(insertDuplicated())
+    await expect(insertDuplicated())
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError);
   });
@@ -39,7 +38,7 @@ describe("Table with single PK - bulkInsert() - should...", () => {
         thirtyItemsUserList.map((item) => ({ ...item, id: undefined } as any) )
       );
     }
-    expect(bulkInsertWithoutPk())
+    await expect(bulkInsertWithoutPk())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });
@@ -73,7 +72,7 @@ describe("Table with composite PK - bulkInsert() - should...", () => {
       await orderDetailTable.bulkInsert(orderDetails);
     }
 
-    expect(insertDuplicated())
+    await expect(insertDuplicated())
       .rejects
       .toThrow(DuplicatePrimaryKeyValueError);
   });
@@ -85,7 +84,7 @@ describe("Table with composite PK - bulkInsert() - should...", () => {
         {} as any,
       ]);
     }
-    expect(bulkInsertWithoutPk())
+    await expect(bulkInsertWithoutPk())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });
@@ -97,10 +96,10 @@ describe("Table with composite PK - bulkInsert() - should...", () => {
     const insertIncompletePkB = async () => {
       await orderDetailTable.bulkInsert([{ productId: 1 } as OrderDetail]);
     }
-    expect(insertIncompletePkA())
+    await expect(insertIncompletePkA())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
-    expect(insertIncompletePkB())
+    await expect(insertIncompletePkB())
       .rejects
       .toThrow(PrimaryKeyValueNullError);
   });

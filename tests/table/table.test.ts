@@ -16,7 +16,9 @@ describe("Table should", () => {
     const createTableWrong = async () => {
       new Table<User>('user', ['id', 'id', 'email', 'email']);
     }
-    expect(createTableWrong).rejects.toThrow(DuplicatePrimaryKeyDefinitionError);
+    await expect(createTableWrong)
+      .rejects
+      .toThrow(DuplicatePrimaryKeyDefinitionError);
   });
 
 });
