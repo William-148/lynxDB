@@ -12,7 +12,7 @@ export class RecordLockManager extends EventEmitter {
   public acquireLock(key: string, lockType: LockType): boolean {
     const existingLock = this.locks.get(key);
 
-    if (!existingLock || (existingLock === LockType.Shared && lockType === LockType.Shared)) {
+    if (existingLock === undefined || (existingLock === LockType.Shared && lockType === LockType.Shared)) {
       this.locks.set(key, lockType);
       return true;
     }
@@ -26,25 +26,27 @@ export class RecordLockManager extends EventEmitter {
 
   public canItBeRead(key: string): boolean {
     const existingLock = this.locks.get(key);
-    return !existingLock || existingLock === LockType.Shared;
+    return existingLock === undefined || existingLock === LockType.Shared;
   }
 
   public canItBeWritten(key: string): boolean {
     const existingLock = this.locks.get(key);
-    return !existingLock;
+    return existingLock === undefined;
   }
 
-  public async waitUntilUnlocked(key: string, timeoutMs: number = 500): Promise<void> {
+  private async waitForUnlock(key: string, timeoutMs: number): Promise<void> {
     return new Promise((resolve, reject) => {
+      const onUnlock = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+
       const timeout = setTimeout(() => {
-        this.off(key, resolve);
+        this.off(key, onUnlock);
         reject(new Error(`Timeout waiting for lock on ${key}`));
       }, timeoutMs);
 
-      this.once(key, () => {
-          clearTimeout(timeout);
-          resolve();
-      });
+      this.once(key, onUnlock);
     });
   }
 
@@ -53,13 +55,18 @@ export class RecordLockManager extends EventEmitter {
     this.emit(key);
   }
 
-  public async ensureUnlockedOnRead(key: string): Promise<void> {
-    if (this.canItBeRead(key)) return;
-    await this.waitUntilUnlocked(key)
+  public async ensureUnlocked(key: string, timeoutMs: number = 500): Promise<void> {
+    if (!this.isLocked(key)) return;
+    await this.waitForUnlock(key, timeoutMs);
   }
 
-  public async ensureUnlockedOnWrite(key: string): Promise<void> {
+  public async ensureUnlockedOnRead(key: string, timeoutMs: number = 500): Promise<void> {
+    if (this.canItBeRead(key)) return;
+    await this.waitForUnlock(key, timeoutMs)
+  }
+
+  public async ensureUnlockedOnWrite(key: string, timeoutMs: number = 500): Promise<void> {
     if (this.canItBeWritten(key)) return;
-    await this.waitUntilUnlocked(key)
+    await this.waitForUnlock(key, timeoutMs)
   }
 }
