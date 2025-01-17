@@ -1,4 +1,4 @@
-import { LocalTable, RecordWithId, RecordWithVersion } from "../types/database-table.type";
+import { LocalTable, RecordWithId, RecordWithVersion, RecordVersionPropertyName } from "../types/database-table.type";
 import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import {
@@ -214,6 +214,16 @@ export class Table<T> implements LocalTable<T> {
     return newRecord;
   }
 
+  /**
+   * Removes the properties that cannot be updated from records.
+   * 
+   * @protected
+   * @param updatedFields Object containing the updated fields to be applied to some record.
+   */
+  protected clearUpdatedFields(updatedFields: Partial<T>): void {
+    if(RecordVersionPropertyName in updatedFields) delete updatedFields[RecordVersionPropertyName];
+  }
+
   public size(): number { return this._recordsArray.length; }
   
   public async insert(record: T): Promise<T> {
@@ -266,6 +276,7 @@ export class Table<T> implements LocalTable<T> {
 
   public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
+    this.clearUpdatedFields(updatedFields);
 
     const willPkBeModified = this.isPartialRecordPartOfPk(updatedFields);
     const compiledFilter = compileFilter(where);
