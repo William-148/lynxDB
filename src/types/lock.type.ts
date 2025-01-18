@@ -4,3 +4,16 @@ export enum LockType {
   /** Prevent other processes from reading or modifying the table while it is locked. */
   Exclusive = 2
 }
+
+export enum LockRequestType {
+  WaitToRead = 1,
+  WaitToWrite = 2,
+  Acquire = 3
+}
+
+export interface LockRequest {
+  hasExpired: boolean;
+  type: LockRequestType,
+  lockType: LockType;
+  resolve: () => void;
+}

@@ -244,7 +244,7 @@ export class Table<T> implements LocalTable<T> {
   public async findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
     const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
 
-    await this._lockManager.ensureUnlockedOnRead(primaryKeyBuilt);
+    await this._lockManager.waitUnlockToRead(primaryKeyBuilt);
 
     const recordFound = this._recordsMap.get(primaryKeyBuilt);
 
@@ -260,7 +260,7 @@ export class Table<T> implements LocalTable<T> {
 
     for (let currentRecord of this._recordsArray) {
       
-      await this._lockManager.ensureUnlockedOnRead(
+      await this._lockManager.waitUnlockToRead(
         this.buildPkFromRecord(currentRecord)
       );
 
@@ -286,7 +286,7 @@ export class Table<T> implements LocalTable<T> {
 
       if (!matchRecord(currentRecord, compiledFilter)) continue;
 
-      await this._lockManager.ensureUnlockedOnWrite(
+      await this._lockManager.waitUnlockToWrite(
         this.buildPkFromRecord(currentRecord)
       );
   

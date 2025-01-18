@@ -1,105 +1,99 @@
 import { RecordLockManager } from "../src/core/record-lock-manager";
-import { LockType } from "../src/types/lock.enum";
-import { LockNotFoundOnReleaseError, LockTimeoutError } from "../src/core/errors/record-lock-manager.error";
+import { LockType } from '../src/types/lock.type';
+import { LockNotFoundOnReleaseError, LockTimeoutError } from '../src/core/errors/record-lock-manager.error';
 
-describe("RecordLockManager", () => {
+describe('RecordLockManager', () => {
   let lockManager: RecordLockManager;
 
   beforeEach(() => {
     lockManager = new RecordLockManager();
   });
 
-  test("should acquire a lock when no other lock exists", () => {
-    const result = lockManager.acquireLock("key1", LockType.Shared);
+  test('initial state should have no locks or waiting queues', () => {
+    expect(lockManager.getLockCount('key1')).toBe(0);
+    expect(lockManager.getWaitingQueueLength('key1')).toBe(0);
+    expect(lockManager.isLocked('key1')).toBe(false);
+  });
+
+  test('acquireLock should add a new lock', () => {
+    const result = lockManager.acquireLock('key1', LockType.Shared);
     expect(result).toBe(true);
-    expect(lockManager.isLocked("key1")).toBe(true);
+    expect(lockManager.getLockCount('key1')).toBe(1);
+    expect(lockManager.isLocked('key1')).toBe(true);
   });
 
-  test("should not acquire a conflicting lock", () => {
-    lockManager.acquireLock("key1", LockType.Exclusive);
-    const result = lockManager.acquireLock("key1", LockType.Shared);
+  test('acquireLock should increment count for shared locks', () => {
+    lockManager.acquireLock('key1', LockType.Shared);
+    const result = lockManager.acquireLock('key1', LockType.Shared);
+    expect(result).toBe(true);
+    expect(lockManager.getLockCount('key1')).toBe(2);
+  });
+
+  test('acquireLock should return false for conflicting lock types', () => {
+    lockManager.acquireLock('key1', LockType.Exclusive);
+    const result = lockManager.acquireLock('key1', LockType.Shared);
     expect(result).toBe(false);
+    expect(lockManager.getLockCount('key1')).toBe(1);
   });
 
-  test("should allow multiple shared locks on the same key", () => {
-    expect(lockManager.acquireLock("key1", LockType.Shared)).toBe(true);
-    expect(lockManager.acquireLock("key1", LockType.Shared)).toBe(true);
-    expect(lockManager.acquireLock("key1", LockType.Shared)).toBe(true);
-    expect(lockManager.acquireLock("key1", LockType.Shared)).toBe(true);
-    expect(lockManager.getLockCount("key1")).toBe(4);
+  test('releaseLock should remove locks correctly', async () => {
+    lockManager.acquireLock('key1', LockType.Shared);
+    expect(lockManager.getLockCount('key1')).toBe(1);
+    
+    await lockManager.releaseLock('key1');
+    expect(lockManager.getLockCount('key1')).toBe(0);
+    expect(lockManager.isLocked('key1')).toBe(false);
   });
 
-  test("should release a shared lock properly", () => {
-    lockManager.acquireLock("key1", LockType.Shared);
-    lockManager.acquireLock("key1", LockType.Shared);
-    expect(lockManager.getLockCount("key1")).toBe(2);
-    lockManager.releaseLock("key1");
-    expect(lockManager.isLocked("key1")).toBe(true);
-    expect(lockManager.getLockCount("key1")).toBe(1);
-    lockManager.releaseLock("key1");
-    expect(lockManager.isLocked("key1")).toBe(false);
-    expect(lockManager.getLockCount("key1")).toBe(0);
+  test('releaseLock should throw error if no lock exists', async () => {
+    await expect(lockManager.releaseLock('key1')).rejects.toThrow(LockNotFoundOnReleaseError);
   });
 
-  test("should release an exclusive lock properly", () => {
-    lockManager.acquireLock("key1", LockType.Exclusive);
-    expect(lockManager.getLockCount("key1")).toBe(1);
-    lockManager.releaseLock("key1");
-    expect(lockManager.isLocked("key1")).toBe(false);
-    expect(lockManager.getLockCount("key1")).toBe(0);
+  test('acquireLockWithTimeout should acquire lock if available', async () => {
+    await lockManager.acquireLockWithTimeout('key1', LockType.Shared, 500);
+    expect(lockManager.getLockCount('key1')).toBe(1);
   });
 
-  test("should throw error when releasing a non-existent lock", () => {
-    expect(() => lockManager.releaseLock("key1")).toThrow(LockNotFoundOnReleaseError);
+  test('acquireLockWithTimeout should throw error if timeout expires', async () => {
+    lockManager.acquireLock('key1', LockType.Exclusive);
+    await expect(
+      lockManager.acquireLockWithTimeout('key1', LockType.Shared, 100)
+    ).rejects.toThrow(LockTimeoutError);
   });
 
-  test("should acquire a lock with timeout", async () => {
-    const promise = lockManager.acquireLockWithTimeout("key1", LockType.Shared, 1000);
-    await expect(promise).resolves.not.toThrow();
-    expect(lockManager.isLocked("key1")).toBe(true);
+  test('ensureUnlockedOnRead should resolve if lock is readable', async () => {
+    await lockManager.waitUnlockToRead('key1');
+    expect(lockManager.getWaitingQueueLength('key1')).toBe(0);
   });
 
-  test("should throw timeout error when lock cannot be acquired", async () => {
-    lockManager.acquireLock("key1", LockType.Exclusive);
-    await expect(lockManager.acquireLockWithTimeout("key1", LockType.Shared, 500))
-      .rejects.toThrow(LockTimeoutError);
-  });
-
-  test("should correctly check if a key can be read", () => {
-    expect(lockManager.canItBeRead("key1")).toBe(true);
-    lockManager.acquireLock("key1", LockType.Shared);
-    expect(lockManager.canItBeRead("key1")).toBe(true);
-
-    lockManager.acquireLock("key2", LockType.Exclusive);
-    expect(lockManager.canItBeRead("key2")).toBe(false);
-  });
-
-  test("should correctly check if a key can be written", () => {
-    expect(lockManager.canItBeWritten("key1")).toBe(true);
-    lockManager.acquireLock("key1", LockType.Shared);
-    expect(lockManager.canItBeWritten("key1")).toBe(false);
-  });
-
-  test("should ensure unlocked within a timeout", async () => {
-    lockManager.acquireLock("key1", LockType.Exclusive);
-    setTimeout(() => lockManager.releaseLock("key1"), 200);
-    await expect(lockManager.ensureUnlocked("key1", 500)).resolves.not.toThrow();
-  });
-
-  test("should throw timeout error when ensureUnlocked exceeds timeout", async () => {
-    lockManager.acquireLock("key1", LockType.Exclusive);
-    await expect(lockManager.ensureUnlocked("key1", 500)).rejects.toThrow(LockTimeoutError);
+  test('ensureUnlockedOnWrite should resolve if lock is writable', async () => {
+    await lockManager.waitUnlockToWrite('key1');
+    expect(lockManager.getWaitingQueueLength('key1')).toBe(0);
   });
 
   test("should ensure unlocked on read", async () => {
     lockManager.acquireLock("key1", LockType.Exclusive);
     setTimeout(() => lockManager.releaseLock("key1"), 200);
-    await expect(lockManager.ensureUnlockedOnRead("key1", 500)).resolves.not.toThrow();
+    await expect(lockManager.waitUnlockToRead("key1", 500)).resolves.not.toThrow();
   });
 
   test("should ensure unlocked on write", async () => {
     lockManager.acquireLock("key1", LockType.Shared);
     setTimeout(() => lockManager.releaseLock("key1"), 200);
-    await expect(lockManager.ensureUnlockedOnWrite("key1", 500)).resolves.not.toThrow();
+    await expect(lockManager.waitUnlockToWrite("key1", 500)).resolves.not.toThrow();
+  });
+
+  test('proccessWaitingQueue should resolve waiting requests correctly', async () => {
+    lockManager.acquireLock('key1', LockType.Exclusive);
+
+    const promise1 = lockManager.acquireLockWithTimeout('key1', LockType.Shared, 500);
+    const promise2 = lockManager.acquireLockWithTimeout('key1', LockType.Shared, 500);
+
+    await lockManager.releaseLock('key1');
+
+    await expect(promise1).resolves.not.toThrow();
+    await expect(promise2).resolves.not.toThrow();
+    expect(lockManager.getLockCount('key1')).toBe(2);
   });
 });
+
