@@ -135,6 +135,46 @@ describe('Table with single PK - update() - should...', () => {
       expect(record?.id).toBe(expectedId);
     }
   });
+
+  it("update the PK of a record and insert a new record with the old PK", async () => {
+      const InitialRegisteredPk = 2;
+      const LoopCount = 5;
+      const InitialUnregisteredPk = 1000;
+      const EntityToInsert: Entity = { id: InitialRegisteredPk, name: "Kappa", value: 90, status: "active" };
+  
+      let currentUnregisteredPK = InitialUnregisteredPk;
+      for (let i = 1; i <= LoopCount; i++) {
+        currentUnregisteredPK++;
+        // Update a field different from the PK
+        const firstUpdateAffectedRows = await entityTable.update(
+          { name: `Iota ${i}`}, 
+          { id: { eq: InitialRegisteredPk } }
+        );
+        
+        // Update the PK
+        const updatedPkAffectedRows = await entityTable.update(
+          { id: currentUnregisteredPK },
+          { id: { eq: InitialRegisteredPk } }
+        );
+  
+        // Find the record with the new PK
+        const updatedPkRecord = await entityTable.findByPk({ id: currentUnregisteredPK });
+        
+        // Find the record with the old PK
+        const oldPkRecord = await entityTable.findByPk({ id: InitialRegisteredPk });
+        expect(firstUpdateAffectedRows).toBe(1);
+        expect(updatedPkAffectedRows).toBe(1);
+        expect(updatedPkRecord).not.toBeNull();
+        expect(oldPkRecord).toBeNull();
+        // Insert a new record with the old PK
+        await expect(entityTable.insert(EntityToInsert)).resolves.not.toThrow();
+        await expect(entityTable.insert(EntityToInsert)).rejects.toThrow(DuplicatePrimaryKeyValueError);
+        // Find the recent inserted record with the old PK
+        await expect(entityTable.findByPk({ id: InitialRegisteredPk })).not.toBeNull();
+      }
+      expect(entityTable.size()).toBe(defaultData.length + LoopCount);
+    });
+
 });
 
 

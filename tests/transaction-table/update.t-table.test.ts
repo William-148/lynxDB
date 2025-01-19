@@ -55,7 +55,7 @@ describe("Transaction Table Update", () => {
       currentUnregisteredPK++;
       // Update a field different from the PK
       const firstUpdateAffectedRows = await transactionTable.update(
-        {fullName: `Bob Marley ${i}`}, 
+        { fullName: `Bob Marley ${i}`}, 
         { id: { eq: InitialRegisteredPk } }
       );
       
