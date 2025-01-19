@@ -98,6 +98,23 @@ export class TransactionTable<T> extends Table<T> {
   }
 
   /**
+   * Checks if the primary key of a committed record has been updated.
+   *
+   * @private
+   * @param {string} commitedPk - The primary key of the committed record.
+   * @returns {boolean} - Returns true if the primary key has been updated, otherwise false.
+   */
+  private isCommitedRecordPkUpdated(commitedPk: string): boolean {
+    // Retrieve the temporarily updated committed record
+    const commitedRecordUpdated = this._tempUpdatedRecordsMap.get(commitedPk);
+    if (!commitedRecordUpdated) return false;
+
+    // If the record exists and its primary key has changed, return true
+    const commitedRecordUpdatedPk = this.buildPkFromRecord(commitedRecordUpdated);
+    return commitedPk !== commitedRecordUpdatedPk;
+  }
+
+  /**
    * Verifies if the primary key value already exists in the temporary Map or in the
    * committed Map.
    * 
@@ -106,6 +123,7 @@ export class TransactionTable<T> extends Table<T> {
    * - The PK exist in the updated Map, the PK is available only when the PK is 
    *  different from the PK of the updated record.
    * 
+   * @private
    * @param primaryKey Primary key value
    * @throws {DuplicatePrimaryKeyValueError} If the primary key value already exists 
    * in the committed Map or in the temporary Map
@@ -125,21 +143,15 @@ export class TransactionTable<T> extends Table<T> {
     // At this point the PK exists in the committed Map. Before throwing an error, 
     // it must be checked if the committed record has been deleted or updated.
 
-    // Check if the committed record with the PK is in the deleted Set.
     if (this._tempDeletedRecordsSet.has(primaryKey)) {
       // The PK is available because the committed record is deleted.
       return;
     }
 
-    // Check if the committed record with the PK is in the temp updated Map.
-    const updatedRecord = this._tempUpdatedRecordsMap.get(primaryKey);
-    if (updatedRecord) {
-      const updatedPK = this.buildPkFromRecord(updatedRecord);
-      if (primaryKey !== updatedPK) {
-        // The PK is available because the PK of the committed record has been updated and 
-        // now it is different, therefore the committed record will be deleted.
-        return;
-      }
+    if (this.isCommitedRecordPkUpdated(primaryKey)) {
+      // The PK is available because the PK of the committed record has been updated and 
+      // now it is different, therefore the committed record will be deleted.
+      return;
     }
 
     // Throw error because the PK already exists in the committed Map and has not been 
@@ -149,7 +161,6 @@ export class TransactionTable<T> extends Table<T> {
       primaryKey
     );
   }
-
 
   /**
    * Inserts a record into the temporary map.
@@ -161,7 +172,6 @@ export class TransactionTable<T> extends Table<T> {
   private insertInTemporaryMap(record: RecordWithVersion<T>): void {
     const primaryKey = this.buildPkFromRecord(record);
     this.checkIfPkExistsInMaps(primaryKey);
-
     this._tempRecordsMap.set(primaryKey, record);
   }
 
@@ -224,11 +234,13 @@ export class TransactionTable<T> extends Table<T> {
     // Try to find a permanent/committed record from the committed Map.
     const committedRecord = this._recordsMap.get(primaryKeyBuilt);
 
-    // * Check if the committed record is in the deleted Set. Return null if it is.
-    // * Check if the committed record is in the temporary updated Map. If it does not exist in the 
-    //   temporary Map but does exist in the temporary update Map, it means that the PK of the 
-    //   committed record has been modified, therefore null must be returned, because the committed record 
-    //   no longer exists with this PK because it will be deleted from the committed Map in the commit operation.
+    // * Check if the committed record was deleted.
+    // * Check if the committed record was updated. If it does not exist in the temporary Map 
+    //   but does exist in the temporary update Map, it means that the PK of the committed 
+    //   record has been modified. Therefore, null must be returned because the committed record 
+    //   no longer exists with this PK and will be deleted from the committed Map during the 
+    //   commit operation.
+
     if (!committedRecord 
       || this._tempDeletedRecordsSet.has(primaryKeyBuilt) 
       || this._tempUpdatedRecordsMap.has(primaryKeyBuilt)) return null;
@@ -241,12 +253,12 @@ export class TransactionTable<T> extends Table<T> {
     const result: Partial<T>[] = [];
     const areFieldsToSelectEmpty = (fields.length === 0);
 
-    const processSelect = (record: RecordWithVersion<T>, verifyTemporaryChanges: boolean) => {
+    const processSelect = (record: RecordWithVersion<T>, verifyCommittedRecordChanges: boolean) => {
       if (!matchRecord(record, compiledFilter)) return;
 
       let selectedRecord: Partial<T> | null = null;
 
-      if (verifyTemporaryChanges) {
+      if (verifyCommittedRecordChanges) {
         const recordWithTempChanges = this.getTempChangesFromCommittedRecord(record);
         // The function execution is finished because the record is null, 
         // which means that it was deleted and should not be added to the result.
@@ -284,16 +296,6 @@ export class TransactionTable<T> extends Table<T> {
     const compiledFilter = compileFilter(where);
     let affectedRecords = 0;
 
-    for (const committedRecord of this._recordsArray) {
-      if (!matchRecord(committedRecord, compiledFilter)
-        || this._tempDeletedRecordsSet.has(this.buildPkFromRecord(committedRecord))) continue;
-
-      if (willPkBeModified) { this.updateWithPKChange(committedRecord, updatedFields); }
-      else { this.updateWithoutPKChange(committedRecord, updatedFields); }
-
-      affectedRecords++;
-    }
-
     for (const newestRecord of this._tempRecordsArray) {
       if (!matchRecord(newestRecord, compiledFilter)) continue;
 
@@ -308,6 +310,22 @@ export class TransactionTable<T> extends Table<T> {
       else {
         Object.assign(newestRecord, updatedFields);
       }
+      affectedRecords++;
+    }
+
+    for (const committedRecord of this._recordsArray) {
+      if (!matchRecord(committedRecord, compiledFilter)) continue;
+
+      // Check if the committed record was deleted or PK was updated.
+      // If the primary key (PK) of the committed record has changed, the record will be deleted 
+      // during the commit operation. Therefore, the update should be ignored and not proceed.
+      const committedPK = this.buildPkFromRecord(committedRecord);
+      if ( this._tempDeletedRecordsSet.has(committedPK)
+        || this.isCommitedRecordPkUpdated(committedPK)) continue;
+
+      if (willPkBeModified) { this.updateWithPKChange(committedRecord, updatedFields); }
+      else { this.updateWithoutPKChange(committedRecord, updatedFields); }
+
       affectedRecords++;
     }
 

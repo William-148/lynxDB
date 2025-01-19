@@ -1,3 +1,4 @@
+import { DuplicatePrimaryKeyValueError } from "../../src/core/errors/table.error";
 import { Table } from "../../src/core/table";
 import { TransactionTable } from "../../src/core/transaction-table";
 import { User } from "../types/user-test.type";
@@ -45,35 +46,41 @@ describe("Transaction Table Update", () => {
 
   it("should update the PK of a record and insert a new record with the old PK", async () => {
     const InitialRegisteredPk = 4;
-    const newUnregisteredPk = 1000;
+    const LoopCount = 5;
+    const InitialUnregisteredPk = 1000;
     const userToInsert: User = { id: InitialRegisteredPk, fullName: "Arnold", gender: "Male", age: 42, email: "arnold@some.com", username: "arnold", password: "456" };
 
-    // Update a field different from the PK
-    const firstUpdateAffectedRows = await transactionTable.update(
-      {fullName: "Bob Marley"}, 
-      { id: { eq: InitialRegisteredPk } }
-    );
+    let currentUnregisteredPK = InitialUnregisteredPk;
+    for (let i = 1; i <= LoopCount; i++) {
+      currentUnregisteredPK++;
+      // Update a field different from the PK
+      const firstUpdateAffectedRows = await transactionTable.update(
+        {fullName: `Bob Marley ${i}`}, 
+        { id: { eq: InitialRegisteredPk } }
+      );
+      
+      // Update the PK
+      const updatedPkAffectedRows = await transactionTable.update(
+        { id: currentUnregisteredPK },
+        { id: { eq: InitialRegisteredPk } }
+      );
 
-    // Update the PK
-    const updatedPkAffectedRows = await transactionTable.update(
-      { id: newUnregisteredPk },
-      { id: { eq: InitialRegisteredPk } }
-    );
-
-    // Find the record with the new PK
-    const updatedPkRecord = await transactionTable.findByPk({ id: newUnregisteredPk });
-
-    // Find the record with the old PK
-    const oldPkRecord = await transactionTable.findByPk({ id: InitialRegisteredPk });
-
-    expect(firstUpdateAffectedRows).toBe(1);
-    expect(updatedPkAffectedRows).toBe(1);
-    expect(updatedPkRecord).not.toBeNull();
-    expect(oldPkRecord).toBeNull();
-    // Insert a new record with the old PK
-    await expect(transactionTable.insert(userToInsert)).resolves.not.toThrow();
-
-
+      // Find the record with the new PK
+      const updatedPkRecord = await transactionTable.findByPk({ id: currentUnregisteredPK });
+      
+      // Find the record with the old PK
+      const oldPkRecord = await transactionTable.findByPk({ id: InitialRegisteredPk });
+      expect(firstUpdateAffectedRows).toBe(1);
+      expect(updatedPkAffectedRows).toBe(1);
+      expect(updatedPkRecord).not.toBeNull();
+      expect(oldPkRecord).toBeNull();
+      // Insert a new record with the old PK
+      await expect(transactionTable.insert(userToInsert)).resolves.not.toThrow();
+      await expect(transactionTable.insert(userToInsert)).rejects.toThrow(DuplicatePrimaryKeyValueError);
+      // Find the recent inserted record with the old PK
+      await expect(transactionTable.findByPk({ id: InitialRegisteredPk })).not.toBeNull();
+    }
+    expect(transactionTable.size()).toBe(TestData.length + LoopCount);
   });
 
 });
