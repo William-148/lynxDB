@@ -1,13 +1,13 @@
 import { Filter } from "./filter.type";
 
-export const RecordVersionPropertyName = "__version";
-
 export type RecordWithId<T> = T & { 
   /** Default primary key if not defined */
   _id ?: string 
 };
 
-export type RecordWithVersion<T> = RecordWithId<T> & { [RecordVersionPropertyName]: number };
+export const RecordVersionPropertyName = "__version";
+
+export type RecordWithVersion<T> = RecordWithId<T> & { __version: number };
 
 export type TableTemporaryState<T> = {
   recordsMap: Map<string, RecordWithVersion<T>>;

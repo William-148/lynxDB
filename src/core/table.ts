@@ -1,13 +1,18 @@
-import { LocalTable, RecordWithId, RecordWithVersion, RecordVersionPropertyName } from "../types/database-table.type";
 import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
+import { generateId } from "../utils/generate-id";
+import { RecordLockManager } from "./record-lock-manager";
+import { 
+  LocalTable,
+  RecordWithId,
+  RecordWithVersion,
+  RecordVersionPropertyName 
+} from "../types/database-table.type";
 import {
   DuplicatePrimaryKeyDefinitionError,
   DuplicatePrimaryKeyValueError,
   PrimaryKeyValueNullError,
 } from "./errors/table.error";
-import { generateId } from "../utils/generate-id";
-import { RecordLockManager } from "./record-lock-manager";
 
 export class Table<T> implements LocalTable<T> {
   private _name: string;
@@ -165,6 +170,19 @@ export class Table<T> implements LocalTable<T> {
   }
 
   /**
+   * Creates a new error object for a duplicate primary key value.
+   * 
+   * @param primaryKey - Primary key value that is duplicated.
+   * @returns {DuplicatePrimaryKeyValueError} - The error object.
+   */
+  protected createDuplicatePkValueError(primaryKey: string): DuplicatePrimaryKeyValueError {
+    return new DuplicatePrimaryKeyValueError(
+      this.hasPkDefinition() ? this._pkDefinition.join(', ') : '_id',
+      primaryKey
+    );
+  }
+
+  /**
    * Checks if the primary key is already in use and throws an error if it is.
    *
    * @protected
@@ -174,10 +192,7 @@ export class Table<T> implements LocalTable<T> {
   protected checkIfPkIsInUse(primaryKey: string): void {
     if (!this._recordsMap.has(primaryKey)) return;
     
-    throw new DuplicatePrimaryKeyValueError(
-      this.hasPkDefinition() ? this._pkDefinition.join(', ') : '_id',
-      primaryKey
-    );
+    throw this.createDuplicatePkValueError(primaryKey);
   }
 
   /**

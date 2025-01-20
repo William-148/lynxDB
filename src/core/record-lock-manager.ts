@@ -96,7 +96,7 @@ export class RecordLockManager {
    * @param key - The key to lock.
    * @param lockType - The type of lock to acquire (shared or exclusive).
    * @param timeoutMs - The maximum time to wait for the lock in milliseconds.
-   * @throws LockTimeoutError if the lock cannot be acquired within the timeout.
+   * @throws {LockTimeoutError} if the lock cannot be acquired within the timeout.
    */
   public async acquireLockWithTimeout(key: string, lockType: LockType, timeoutMs: number): Promise<void> {
       if (this.acquireLock(key, lockType)) return;
@@ -113,7 +113,7 @@ export class RecordLockManager {
    * 
    * @param key - The key to check.
    * @param timeoutMs - The maximum time to wait for the key to be unlocked in milliseconds.
-   * @throws LockTimeoutError if the key cannot be unlocked within the timeout.
+   * @throws {LockTimeoutError} if the key cannot be unlocked within the timeout.
    */
   public async waitUnlockToRead(key: string, timeoutMs: number = 500): Promise<void> {
     if (this.canItBeRead(key)) return;
@@ -130,7 +130,7 @@ export class RecordLockManager {
    * 
    * @param key - The key to check.
    * @param timeoutMs - The maximum time to wait for the key to be unlocked in milliseconds.
-   * @throws LockTimeoutError if the key cannot be unlocked within the timeout.
+   * @throws {LockTimeoutError} if the key cannot be unlocked within the timeout.
    */
   public async waitUnlockToWrite(key: string, timeoutMs: number = 500): Promise<void> {
       if (this.canItBeWritten(key)) return;
@@ -149,7 +149,7 @@ export class RecordLockManager {
    * @param type - The type of lock request (acquire, wait to read, or wait to write).
    * @param lockType - The type of lock to acquire (shared or exclusive).
    * @param timeoutMs - The maximum time to wait for the request to be resolved in milliseconds.
-   * @throws LockTimeoutError if the request cannot be resolved within the timeout.
+   * @throws {LockTimeoutError} if the request cannot be resolved within the timeout.
    */
   private async enqueueLockRequest(key: string, type: LockRequestType, lockType: LockType, timeoutMs: number): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -184,7 +184,7 @@ export class RecordLockManager {
    * Releases a lock for a given key.
    * 
    * @param key - The key to unlock.
-   * @throws LockNotFoundOnReleaseError if no lock exists for the key.
+   * @throws {LockNotFoundOnReleaseError} if no lock exists for the key.
    */
   public async releaseLock(key: string): Promise<void> {
     const existingLock = this.locks.get(key);
