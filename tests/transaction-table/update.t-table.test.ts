@@ -21,6 +21,7 @@ describe("Transaction Table Update", () => {
     table.bulkInsert(TestData);
 
     transactionTable = new TransactionTable<User>(
+      crypto.randomUUID(),
       table.name,
       table.recordsMap,
       table.recordsArray,

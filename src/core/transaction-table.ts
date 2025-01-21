@@ -10,6 +10,7 @@ import {
   RecordWithVersion,
   TableTemporaryState
 } from "../types/database-table.type";
+import { ExternalModificationError } from "./errors/transaction-table.error";
 
 export class TransactionTable<T> extends Table<T> {
   /**
@@ -49,6 +50,7 @@ export class TransactionTable<T> extends Table<T> {
   private _tempDeletedRecordsSet: Set<string>;
 
   constructor(
+    id: string,
     name: string,
     recordsMap: Map<string, RecordWithVersion<T>>,
     recordsArray: RecordWithVersion<T>[],
@@ -226,6 +228,7 @@ export class TransactionTable<T> extends Table<T> {
   override async findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
     const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
 
+    await this._lockManager.waitUnlockToRead(primaryKeyBuilt);
     // At this point, an attempt is made to find a recently inserted or updated record.
     const temporaryRecord = this._tempRecordsMap.get(primaryKeyBuilt);
     if (temporaryRecord) return this.mapRecordVersionToRecord(temporaryRecord);
@@ -252,7 +255,11 @@ export class TransactionTable<T> extends Table<T> {
     const result: Partial<T>[] = [];
     const areFieldsToSelectEmpty = (fields.length === 0);
 
-    const processSelect = (record: RecordWithVersion<T>, verifyCommittedRecordChanges: boolean) => {
+    const processSelect = async (record: RecordWithVersion<T>, verifyCommittedRecordChanges: boolean) => {
+      await this._lockManager.waitUnlockToRead(
+        this.buildPkFromRecord(record)
+      );
+
       if (!matchRecord(record, compiledFilter)) return;
 
       let selectedRecord: Partial<T> | null = null;
@@ -277,12 +284,16 @@ export class TransactionTable<T> extends Table<T> {
 
     // Loop through the committed and temporary Array to access 
     // the committed and newer records.
-    for (let committedRecord of this._recordsArray) {
-      processSelect(committedRecord, true);
-    }
-    for (let uncommittedRecord of this._tempRecordsArray) {
-      processSelect(uncommittedRecord, false);
-    }
+    const committedPromises = Promise.all(
+      this._recordsArray.map(async (committedRecord) => processSelect(committedRecord, true))
+    );
+
+    const uncommitedPromises = Promise.all(
+      this._tempRecordsArray.map(async (uncommittedRecord) => processSelect(uncommittedRecord, false))
+    );
+
+    await committedPromises;
+    await uncommitedPromises;
 
     return result;
   }
@@ -297,6 +308,10 @@ export class TransactionTable<T> extends Table<T> {
 
     for (const newestRecord of this._tempRecordsArray) {
       if (!matchRecord(newestRecord, compiledFilter)) continue;
+
+      await this._lockManager.waitUnlockToWrite(
+        this.buildPkFromRecord(newestRecord)
+      );
 
       if (willPkBeModified) {
         const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, newestRecord);
@@ -314,6 +329,10 @@ export class TransactionTable<T> extends Table<T> {
 
     for (const committedRecord of this._recordsArray) {
       if (!matchRecord(committedRecord, compiledFilter)) continue;
+
+      await this._lockManager.waitUnlockToWrite(
+        this.buildPkFromRecord(committedRecord)
+      );
 
       // Check if the committed record was deleted or PK was updated.
       // If the primary key (PK) of the committed record has changed, the record will be deleted 
@@ -406,6 +425,7 @@ export class TransactionTable<T> extends Table<T> {
     ]
     await this.ValidationPhase(keysToLock);
     await this.WritingPhase(keysToLock);
+    this.clearTemporaryRecords();
   }
 
   /**
@@ -447,6 +467,8 @@ export class TransactionTable<T> extends Table<T> {
    * @param {string[]} keysToLock - The keys for which to acquire shared locks.
    * @throws {LockTimeoutError} If the locks cannot be acquired within the timeout.
    * @throws {DuplicatePrimaryKeyValueError} If there are duplicate primary keys.
+   * @throws {ExternalModificationError} If the version of the updated records does not match 
+   * the committed version.
    */
   private async ValidationPhase(keysToLock: string[]): Promise<void> {
     //** Acquire shared locks for updated and deleted records **
@@ -467,9 +489,7 @@ export class TransactionTable<T> extends Table<T> {
       for (const [pk, updatedRecord] of this._tempUpdatedRecordsMap) {
         const existingRecord = this._recordsMap.get(pk);
         if (!existingRecord || existingRecord.__version !== updatedRecord.__version) {
-          throw new Error(
-            `Validation failed: Record with PK ${pk} has been modified externally.`
-          );
+          throw new ExternalModificationError(pk);
         }
       }
     }
@@ -499,6 +519,7 @@ export class TransactionTable<T> extends Table<T> {
       this.applyNewInsertions();
     }
     finally {
+      
       // Release all acquired locks
       keysLocked.forEach(key => this._lockManager.releaseLock(key));
     }
@@ -520,6 +541,7 @@ export class TransactionTable<T> extends Table<T> {
       // Update the reference of the committed record with the updated record,
       // this way the changes of the committed record are reflected in the committed array.
       Object.assign(committedRecord, updatedRecord);
+      committedRecord.__version++;
       
       // Delete from the Map because there is a possibility that the PK has changed
       this._recordsMap.delete(pk);
