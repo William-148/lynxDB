@@ -1,11 +1,11 @@
-import { LockRequest, LockRequestType, LockType } from "../types/lock.type";
-import { LockNotFoundOnReleaseError, LockTimeoutError } from "./errors/record-lock-manager.error";
+import { LockDetail, LockRequest, LockRequestType, LockType } from "../types/lock.type";
+import { LockTimeoutError } from "./errors/record-lock-manager.error";
 
 /**
  * Manages locks for records, supporting shared and exclusive lock types.
  */
 export class RecordLockManager {
-  private locks: Map<string, { lockType: LockType, count: number }>;
+  private locks: Map<string, LockDetail>;
   private waitingQueues: Map<string, LockRequest[]>;
 
   constructor() {
@@ -21,7 +21,10 @@ export class RecordLockManager {
    */
   public getLockCount(key: string): number {
     const existingLock = this.locks.get(key);
-    return !existingLock ? 0 : existingLock.count
+    if (!existingLock) return 0;
+    return existingLock.lockType === LockType.Shared 
+      ? existingLock.sharedLocks.size
+      : 1;
   }
 
   /**
@@ -36,13 +39,39 @@ export class RecordLockManager {
   }
 
   /**
-   * Checks if the given key is locked.
-   * 
-   * @param pk - The key to check.
-   * @returns True if the key is locked, otherwise false.
+   * Checks if a transaction is holding a lock on a given record.
+   *
+   * @param {LockDetail} lock - The lock detail object containing lock information.
+   * @param {string} transactionId - The ID of the transaction to check.
+   * @returns {boolean} - Returns true if the transaction is holding the lock, false otherwise.
    */
-  isLocked(key: string): boolean {
-    return this.locks.has(key);
+  private isTransactionHoldingLock(lock: LockDetail, transactionId: string): boolean {
+    switch (lock.lockType) {
+      case LockType.Shared:
+        return lock.sharedLocks.has(transactionId);
+
+      case LockType.Exclusive:
+        return lock.exclusiveLock === transactionId;
+
+      default: return false;
+    }
+  }
+
+  /**
+   * Checks if a transaction holds a lock on a given key.
+   *
+   * @param {string} transactionId - The ID of the transaction to check.
+   * @param {string} key - The key to check for a lock.
+   * @param {LockType} [lockType] - The type of lock to check (optional).
+   * @returns {boolean} - Returns true if the transaction holds the lock, false otherwise.
+   */
+  public isLocked(transactionId: string, key: string, lockType?: LockType): boolean {
+    const lock = this.locks.get(key);
+    if (!lock) return false;
+    if (lockType === undefined || lock.lockType === lockType) {
+      return this.isTransactionHoldingLock(lock, transactionId);
+    }
+    return false;
   }
 
   /**
@@ -68,44 +97,55 @@ export class RecordLockManager {
   }
 
   /**
-   * Attempts to acquire a lock for a given key and lock type.
-   * 
-   * @param key - The key to lock.
-   * @param lockType - The type of lock to acquire (shared or exclusive).
-   * @returns True if the lock is successfully acquired, otherwise false.
+   * Acquires a lock on a given key for a specific transaction.
+   *
+   * @param {string} transactionId - The ID of the transaction requesting the lock.
+   * @param {string} key - The key to lock.
+   * @param {LockType} lockType - The type of lock to acquire (Shared or Exclusive).
+   * @returns {boolean} - Returns true if the lock was successfully acquired, false otherwise.
    */
-  public acquireLock(key: string, lockType: LockType): boolean {
+  public acquireLock(transactionId: string, key: string, lockType: LockType): boolean {
     const existingLock = this.locks.get(key);
 
     if (existingLock === undefined) {
-      this.locks.set(key, { lockType, count: 1 });
+      const lockDetail: LockDetail = (lockType === LockType.Shared)
+        ? { lockType, sharedLocks: new Set([transactionId]) }
+        : { lockType, exclusiveLock: transactionId };
+
+      this.locks.set(key, lockDetail);
       return true;
     }
 
     if (existingLock.lockType === LockType.Shared && lockType === LockType.Shared) {
-      existingLock.count++;
+      existingLock.sharedLocks.add(transactionId);
       return true;
+    }
+
+    if (existingLock.lockType === LockType.Exclusive && lockType === LockType.Exclusive) {
+      return existingLock.exclusiveLock === transactionId;
     }
 
     return false; // Lock conflict
   }
 
   /**
-   * Attempts to acquire a lock with a timeout.
-   * 
-   * @param key - The key to lock.
-   * @param lockType - The type of lock to acquire (shared or exclusive).
-   * @param timeoutMs - The maximum time to wait for the lock in milliseconds.
-   * @throws {LockTimeoutError} if the lock cannot be acquired within the timeout.
+   * Attempts to acquire a lock on a given key for a specific transaction within a specified timeout.
+   *
+   * @param {string} transactionId - The ID of the transaction requesting the lock.
+   * @param {string} key - The key to lock.
+   * @param {LockType} lockType - The type of lock to acquire (Shared or Exclusive).
+   * @param {number} timeoutMs - The maximum time to wait for the lock in milliseconds.
+   * @throws {LockTimeoutError} if the key cannot be unlocked within the timeout.
    */
-  public async acquireLockWithTimeout(key: string, lockType: LockType, timeoutMs: number): Promise<void> {
-      if (this.acquireLock(key, lockType)) return;
-      return this.enqueueLockRequest(
-        key, 
-        LockRequestType.Acquire, 
-        lockType, 
-        timeoutMs
-      );
+  public async acquireLockWithTimeout(transactionId: string, key: string, lockType: LockType, timeoutMs: number): Promise<void> {
+    if (this.acquireLock(transactionId, key, lockType)) return;
+    return this.enqueueLockRequest(
+      transactionId,
+      key,
+      LockRequestType.Acquire,
+      lockType,
+      timeoutMs
+    );
   }
 
   /**
@@ -117,10 +157,11 @@ export class RecordLockManager {
    */
   public async waitUnlockToRead(key: string, timeoutMs: number = 500): Promise<void> {
     if (this.canItBeRead(key)) return;
-    await this.enqueueLockRequest(
+    return this.enqueueLockRequest(
+      '', // In this case, the transaction ID is not important
       key, 
       LockRequestType.WaitToRead, 
-      LockType.Shared, // In this case doesn't matter the lock type
+      LockType.Shared, // In this case, the lock type is not important 
       timeoutMs
     );
   }
@@ -133,27 +174,27 @@ export class RecordLockManager {
    * @throws {LockTimeoutError} if the key cannot be unlocked within the timeout.
    */
   public async waitUnlockToWrite(key: string, timeoutMs: number = 500): Promise<void> {
-      if (this.canItBeWritten(key)) return;
-      await this.enqueueLockRequest(
-        key, 
-        LockRequestType.WaitToWrite, 
-        LockType.Shared, // In this case doesn't matter the lock type
-        timeoutMs
-      );
+    if (this.canItBeWritten(key)) return;
+    return this.enqueueLockRequest(
+      '', // In this case, the transaction ID is not important
+      key, 
+      LockRequestType.WaitToWrite, 
+      LockType.Shared, // In this case, the lock type is not important 
+      timeoutMs
+    );
   }
 
   /**
-   * Adds a lock request to the waiting queue and manages its resolution or expiration.
-   * 
-   * @param key - The key for the lock request.
-   * @param type - The type of lock request (acquire, wait to read, or wait to write).
-   * @param lockType - The type of lock to acquire (shared or exclusive).
-   * @param timeoutMs - The maximum time to wait for the request to be resolved in milliseconds.
-   * @throws {LockTimeoutError} if the request cannot be resolved within the timeout.
+   * Enqueues a lock request for a given key and transaction, with a specified timeout.
+   *
+   * @param {string} transactionId - The ID of the transaction requesting the lock.
+   * @param {string} key - The key to lock.
+   * @param {LockRequestType} type - The type of lock request (Acquire, WaitToRead, WaitToWrite).
+   * @param {LockType} lockType - The type of lock to acquire (Shared or Exclusive).
+   * @param {number} timeoutMs - The maximum time to wait for the lock in milliseconds.
    */
-  private async enqueueLockRequest(key: string, type: LockRequestType, lockType: LockType, timeoutMs: number): Promise<void> {
+  private async enqueueLockRequest(transactionId: string, key: string, type: LockRequestType, lockType: LockType, timeoutMs: number): Promise<void> {
     return new Promise((resolve, reject) => {
-
       let queue = this.waitingQueues.get(key);
       if (!queue) {
         queue = [];
@@ -162,6 +203,7 @@ export class RecordLockManager {
 
       const lockRequest: LockRequest = {
         hasExpired: false,
+        transactionId,
         type,
         lockType,
         resolve: () => {
@@ -176,22 +218,28 @@ export class RecordLockManager {
         lockRequest.hasExpired = true;
         reject(new LockTimeoutError(key));
       }, timeoutMs);
-      
     });
   }
 
   /**
-   * Releases a lock for a given key.
-   * 
-   * @param key - The key to unlock.
-   * @throws {LockNotFoundOnReleaseError} if no lock exists for the key.
+   * Releases a lock on a given key for a specific transaction.
+   *
+   * @param {string} transactionId - The ID of the transaction releasing the lock.
+   * @param {string} key - The key to unlock.
    */
-  public async releaseLock(key: string): Promise<void> {
+  public async releaseLock(transactionId: string, key: string): Promise<void> {
     const existingLock = this.locks.get(key);
-    if (!existingLock) throw new LockNotFoundOnReleaseError(key);
+    if (!existingLock) return;
 
-    existingLock.count--;
-    if (existingLock.count === 0) {
+    if (existingLock.lockType === LockType.Shared){
+      existingLock.sharedLocks.delete(transactionId);
+      if (existingLock.sharedLocks.size === 0) {
+        this.locks.delete(key);
+      }
+    }
+
+    if (existingLock.lockType === LockType.Exclusive 
+      && existingLock.exclusiveLock === transactionId) {
       this.locks.delete(key);
     }
 
@@ -199,14 +247,14 @@ export class RecordLockManager {
   }
 
   /**
-   * Processes the waiting queue for a given key, resolving or rejecting requests as appropriate.
-   * 
-   * @param key - The key whose waiting queue should be processed.
+   * Processes the waiting queue for a given key.
+   *
+   * @param {string} key - The key to process the waiting queue for.
    */
   private proccessWaitingQueue(key: string): void {
     const queue = this.waitingQueues.get(key);
     if (!queue) return;
-    if (queue.length === 0){
+    if (queue.length === 0) {
       this.waitingQueues.delete(key);
       return;
     }
@@ -215,15 +263,15 @@ export class RecordLockManager {
     for (const currentRequest of queue) {
       if (currentRequest.hasExpired) continue;
 
-      switch(currentRequest.type) {
+      switch (currentRequest.type) {
         case LockRequestType.WaitToRead:
-          if(this.canItBeRead(key)) {
+          if (this.canItBeRead(key)) {
             currentRequest.resolve();
           } else {
             remainingRequests.push(currentRequest);
           }
           break;
-        
+
         case LockRequestType.WaitToWrite:
           if (this.canItBeWritten(key)) {
             currentRequest.resolve();
@@ -233,7 +281,7 @@ export class RecordLockManager {
           break;
 
         case LockRequestType.Acquire:
-          if (this.acquireLock(key, currentRequest.lockType)) {
+          if (this.acquireLock(currentRequest.transactionId, key, currentRequest.lockType)) {
             currentRequest.resolve();
           } else {
             remainingRequests.push(currentRequest);
@@ -244,7 +292,7 @@ export class RecordLockManager {
 
     if (remainingRequests.length > 0) {
       this.waitingQueues.set(key, remainingRequests);
-    }else {
+    } else {
       this.waitingQueues.delete(key);
     }
   }
