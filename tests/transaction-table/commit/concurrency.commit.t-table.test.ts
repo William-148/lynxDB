@@ -13,7 +13,7 @@ describe("Transaction Table - Concurrency Commit", () => {
 
   let table: Table<Product>;
   let transactionTables: TransactionTable<Product>[];
-  const TransactionCount = 5;
+  const TransactionCount = 200;
 
   beforeEach(() => {
     table = new Table<Product>("products", ["id"]);
@@ -34,17 +34,14 @@ describe("Transaction Table - Concurrency Commit", () => {
 
   it("should commit update and insert operations without errors", async () => {
     const CommitedProduct = TestData[2];
-    const TableSizeAtStart = TestData.length;
-    const NewTableSize = TableSizeAtStart + 1;
-    const NewProduct: Product = { id: 100, name: "Tablet", price: 800, stock: 10 };
-    const UpdateProduct: Partial<Product> = { price: 1100, stock: 10 };
-
-    await Promise.all(transactionTables.map(async (transactionTable, index) => {
+    await Promise.all(transactionTables.map(async (transactionTable) => {
       const product = await transactionTable.findByPk({ id: CommitedProduct.id });
       if (!product) return;
-      if (product.stock === 0) return;
       const newStock = product.stock - 1;
-      if (newStock < 0) return;
+      if (newStock < 0) {
+        transactionTable.rollback();
+        return;
+      }
 
       const affected = await transactionTable.update({ stock: newStock }, { id: { eq: CommitedProduct.id }});
       expect(affected).toBe(1);

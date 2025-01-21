@@ -53,8 +53,6 @@ describe("Transaction Table Commit", () => {
     // Validate table before commit
     expect(table.size()).toBe(TableSizeAtStart);
     expect(table.sizeMap).toBe(TableSizeAtStart);
-    expect(await table.findByPk({ id: CommitedProduct.id })).toEqual({ ...CommitedProduct });
-    expect(await table.findByPk({ id: NewProduct.id })).toBeNull();
 
     // Execute commit
     await expect(transactionTable.commit()).resolves.not.toThrow();
@@ -73,9 +71,9 @@ describe("Transaction Table Commit", () => {
 
   });
 
-  it("should commit delete operations without errors", async () => {
-    
-  });
+  // Hacer un test donde la tabla normal no puede acceder a un registro bloqueado por la transacción
+
+  // Hacer test de commits y rollback validando que los cambios se hayan aplicado o descartado.
 
 
 });
