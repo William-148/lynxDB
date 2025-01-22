@@ -20,7 +20,10 @@ let genericTable: Table<GenericData>;
 describe("Table - select() with eq operator - should...", () => {
 
   beforeEach(() => {
-    genericTable = new Table<GenericData>('generic', ['id']);
+    genericTable = new Table<GenericData>({
+      name: 'generic',
+      primaryKey: ['id']
+    });
     genericTable.bulkInsert(genericDataList);
   });
 
@@ -62,13 +65,13 @@ describe("Table - select() with eq operator - should...", () => {
   });
 
   it("handle edge case with empty table", async () => {
-    const emptyTable = new Table<GenericData>('empty', ['id']);
+    const emptyTable = new Table<GenericData>({ name: 'empty', primaryKey: ['id'] });
     const result = await emptyTable.select([], { id: { eq: 1 } });
     expect(result).toHaveLength(0);
   });
 
   it("handle null or undefined values gracefully", async () => {
-    const tableWithNulls = new Table<any>('nullTable', ['id']);
+    const tableWithNulls = new Table<any>({ name: 'nulls', primaryKey: ['id'] });
     tableWithNulls.bulkInsert([
       { id: 1, name: null },
       { id: 2, name: undefined },
@@ -89,7 +92,7 @@ describe("Table - select() with eq operator - should...", () => {
 describe("Table - select() with eq operator with objects  - should ...", () => {
 
   beforeEach(() => {
-    genericTable = new Table<GenericData>('generic', ['id']);
+    genericTable = new Table<GenericData>({ name: 'generic', primaryKey: ['id'] });
   });
 
   it("filter records with array fields", async () => {
@@ -108,7 +111,7 @@ describe("Table - select() with eq operator with objects  - should ...", () => {
   });
   
   it("filter records with nested object fields", async () => {
-    const nestedTable = new Table<any>('nested', ['id']);
+    const nestedTable = new Table<any>({ name: 'nested', primaryKey: ['id'] });
     nestedTable.bulkInsert([
       { id: 1, profile: { name: "Alice", age: 25 } },
       { id: 2, profile: { name: "Bob", age: 30 } },
@@ -125,7 +128,7 @@ describe("Table - select() with eq operator with objects  - should ...", () => {
       project: string;
       team: { name: string, age: number }[];
     }
-    const nestedTable = new Table<Projects>('nested', ['id']);
+    const nestedTable = new Table<Projects>({ name: 'nested', primaryKey: ['id'] });
     const listdata: Projects[] = [
       { id: 1, project: "road", team: [{ name: "Alice", age: 25 }, { name: "Marcus", age: 35 }] },
       { id: 2, project: "hospital", team: [{ name: "Rob", age: 30 }, { name: "Tom", age: 41 }] },

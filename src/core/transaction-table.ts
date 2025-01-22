@@ -1,15 +1,11 @@
 import { Filter } from "../types/filter.type";
 import { LockType } from "../types/lock.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
-import { RecordLockManager } from "./record-lock-manager";
 import { Table } from "./table";
+import { RecordWithId } from "../types/database-table.type";
+import { RecordLockManager } from "./record-lock-manager";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
-import { 
-  RecordWithId,
-  RecordWithVersion,
-  TableTemporaryState
-} from "../types/database-table.type";
 import { ExternalModificationError } from "./errors/transaction-table.error";
 
 export class TransactionTable<T> extends Table<T> {
@@ -24,7 +20,7 @@ export class TransactionTable<T> extends Table<T> {
    *   These records have the most recently updated PK as the map key.
    * 
    */
-  private _tempRecordsMap: Map<string, RecordWithVersion<T>>;
+  private _tempRecordsMap: Map<string, RecordWithId<T>>;
   /**
    * Temporal Array that stores the new inserted records that will be inserted 
    * in the committed Array.
@@ -32,7 +28,7 @@ export class TransactionTable<T> extends Table<T> {
    * This array stores:
    * - New records inserted that have not yet been applied.
    */
-  private _tempRecordsArray: RecordWithVersion<T>[];
+  private _tempRecordsArray: RecordWithId<T>[];
   /**
    * Temporal Map that stores the updates of the committed records that will be 
    * applied in the committed Map and Array.
@@ -41,7 +37,7 @@ export class TransactionTable<T> extends Table<T> {
    * - Committed records that have been updated and have not yet been applied.
    *   These records have the committed/oldest PK as the map key.
    */
-  private _tempUpdatedRecordsMap: Map<string, RecordWithVersion<T>>;
+  private _tempUpdatedRecordsMap: Map<string, RecordWithId<T>>;
   /**
    * Temporal Set that stores the PK of the committed records that will be deleted in the committed Map and Array.
    * 
@@ -55,19 +51,16 @@ export class TransactionTable<T> extends Table<T> {
   /** Contain the PKs that have an exclusive lock in the current transaction. */
   private _exclusiveLocks: Set<string>;
 
-  constructor(
-    transactionId: string,
-    name: string,
-    recordsMap: Map<string, RecordWithVersion<T>>,
-    recordsArray: RecordWithVersion<T>[],
-    lockManager: RecordLockManager,
-    pkDefinition: (keyof T)[]
-  ) {
-    super(name, pkDefinition);
+  /**
+   * @param transactionId The ID of the transaction.
+   * @param table The table to be used in the transaction.
+   */
+  constructor(transactionId: string, table: Table<T>) {
+    super({ name: table.name, primaryKey: table.pkDefinition });
     this._transactionId = transactionId;
-    this._recordsArray = recordsArray;
-    this._recordsMap = recordsMap;
-    this._lockManager = lockManager;
+    this._recordsArray = table.recordsArray;
+    this._recordsMap = table.recordsMap;
+    this._lockManager = table.lockManager;
 
     this._tempRecordsArray = [];
     this._tempRecordsMap = new Map();
@@ -86,25 +79,6 @@ export class TransactionTable<T> extends Table<T> {
     return this._recordsMap.size + this._tempRecordsArray.length;
   }
 
-  /**
-   * Retrieves the temporary state of the table.
-   * 
-   * @returns {TableTemporaryState<T>} - The current temporary state of the table.
-   */
-  public getTemporaryState(): TableTemporaryState<T> {
-    return {
-      recordsMap: this._tempRecordsMap,
-      recordsArray: this._tempRecordsArray,
-      tempUpdatedRecordsMap: this._tempUpdatedRecordsMap,
-      tempDeletedRecordsSet: this._tempDeletedRecordsSet
-    };
-  }
-
-  /**
-   * Clears the temporary state of the table.
-   * 
-   * @returns {void}
-   */
   public clearTemporaryRecords(): void {
     this._tempRecordsMap.clear();
     this._tempRecordsArray = [];
@@ -121,22 +95,23 @@ export class TransactionTable<T> extends Table<T> {
 
   /**
    * Acquires a shared lock for the specified primary key.
+   * 
    * @param key The primary key of the record to be locked.
    * @throws {LockTimeoutError} If the lock cannot be acquired within the timeout.
    */
-  private async acquireSharedLock(key: string): Promise<void> 
-  private async acquireSharedLock(record: RecordWithVersion<T>): Promise<void> 
-  private async acquireSharedLock(args: string | RecordWithVersion<T>): Promise<void> {
-    const key = typeof args === 'string' ? args : this.buildPkFromRecord(args);
+  private async acquireSharedLock(key: string): Promise<void>;
+  private async acquireSharedLock(record: RecordWithId<T>): Promise<void> 
+  private async acquireSharedLock(arg: string | RecordWithId<T>): Promise<void> {
+    const key = typeof arg === 'string' ? arg : this.buildPkFromRecord(arg);
     if (this._sharedLocks.has(key) || this._exclusiveLocks.has(key)) return;
     await this._lockManager.acquireLockWithTimeout(this._transactionId, key, LockType.Shared, 1000);
     this._sharedLocks.add(key);
   }
 
   private async acquireExclusiveLock(key: string): Promise<void> 
-  private async acquireExclusiveLock(record: RecordWithVersion<T>): Promise<void> 
-  private async acquireExclusiveLock(args: string | RecordWithVersion<T>): Promise<void> {
-    const key = typeof args === 'string' ? args : this.buildPkFromRecord(args);
+  private async acquireExclusiveLock(record: RecordWithId<T>): Promise<void> 
+  private async acquireExclusiveLock(arg: string | RecordWithId<T>): Promise<void> {
+    const key = typeof arg === 'string' ? arg : this.buildPkFromRecord(arg);
     if (this._exclusiveLocks.has(key)) return;
     if (this._sharedLocks.has(key)) {
       this._lockManager.releaseLock(this._transactionId, key);
@@ -207,10 +182,10 @@ export class TransactionTable<T> extends Table<T> {
    * Inserts a record into the temporary map.
    * 
    * @private
-   * @param {RecordWithVersion<T>} record - The record to be inserted.
+   * @param {RecordWithId<T>} record - The record to be inserted.
    * @returns {void}
    */
-  private insertInTemporaryMap(record: RecordWithVersion<T>): void {
+  private insertInTemporaryMap(record: RecordWithId<T>): void {
     const primaryKey = this.buildPkFromRecord(record);
     this.checkIfPkExistsInMaps(primaryKey);
     this._tempRecordsMap.set(primaryKey, record);
@@ -220,11 +195,11 @@ export class TransactionTable<T> extends Table<T> {
    * Retrieves the temporary changes from a committed record.
    *
    * @private
-   * @param {RecordWithVersion<T>} committedRecord - The committed record to check for temporary changes.
-   * @returns {RecordWithVersion<T> | null} - The temporary changes if they exist, or null if the record 
+   * @param {RecordWithId<T>} committedRecord - The committed record to check for temporary changes.
+   * @returns {RecordWithId<T> | null} - The temporary changes if they exist, or null if the record 
    * has been deleted or the committed record if no changes are found.
    */
-  private getTempChangesFromCommittedRecord(committedRecord: RecordWithVersion<T>): RecordWithVersion<T> | null {
+  private getTempChangesFromCommittedRecord(committedRecord: RecordWithId<T>): RecordWithId<T> | null {
     const primaryKey = this.buildPkFromRecord(committedRecord);
     if (this._tempDeletedRecordsSet.has(primaryKey)) return null;
     return this._tempUpdatedRecordsMap.get(primaryKey) ?? committedRecord;
@@ -234,15 +209,14 @@ export class TransactionTable<T> extends Table<T> {
    * Creates a new updated record by merging the committed record with the updated fields.
    * 
    * @private
-   * @param {RecordWithVersion<T>} committedRecord - The committed record.
+   * @param {RecordWithId<T>} committedRecord - The committed record.
    * @param {Partial<T>} updatedFields - The fields to update in the record.
-   * @returns {RecordWithVersion<T>} - The new updated record.
+   * @returns {RecordWithId<T>} - The new updated record.
    */
-  private createNewUpdatedRecord(committedRecord: RecordWithVersion<T>, updatedFields: Partial<T>): RecordWithVersion<T> {
+  private createNewUpdatedRecord(committedRecord: RecordWithId<T>, updatedFields: Partial<T>): RecordWithId<T> {
     return {
       ...committedRecord,
-      ...updatedFields,
-      __version: committedRecord.__version
+      ...updatedFields
     }
   }
 
@@ -251,15 +225,15 @@ export class TransactionTable<T> extends Table<T> {
   }
 
   override async insert(record: T): Promise<T> {
-    const newRecord = this.createNewRecordWithVersion(record);
+    const newRecord = this.createNewRecordWithId(record);
     this.insertInTemporaryMap(newRecord);
     this._tempRecordsArray.push(newRecord);
-    return this.mapRecordVersionToRecord(newRecord);
+    return { ...newRecord };
   }
 
   override async bulkInsert(records: T[]): Promise<void> {
     for (let record of records) {
-      const newRecord = this.createNewRecordWithVersion(record);
+      const newRecord = this.createNewRecordWithId(record);
       this.insertInTemporaryMap(newRecord);
       this._tempRecordsArray.push(newRecord);
     }
@@ -271,8 +245,8 @@ export class TransactionTable<T> extends Table<T> {
     // At this point, an attempt is made to find a recently inserted or updated record.
     const temporaryRecord = this._tempRecordsMap.get(primaryKeyBuilt);
     if (temporaryRecord) {
-      await this.acquireExclusiveLock(primaryKeyBuilt);
-      return this.mapRecordVersionToRecord(temporaryRecord);
+      await this.acquireSharedLock(primaryKeyBuilt);
+      return { ...temporaryRecord };
     }
 
     // Try to find a permanent/committed record from the committed Map.
@@ -286,11 +260,11 @@ export class TransactionTable<T> extends Table<T> {
     //   record has been modified. Therefore, null must be returned because the committed record 
     //   no longer exists with this PK and will be deleted from the committed Map during the 
     //   commit operation.
-    await this.acquireExclusiveLock(primaryKeyBuilt);
+    await this.acquireSharedLock(primaryKeyBuilt);
     if (this._tempDeletedRecordsSet.has(primaryKeyBuilt)
       || this._tempUpdatedRecordsMap.has(primaryKeyBuilt)) return null;
 
-    return this.mapRecordVersionToRecord(committedRecord);
+    return { ...committedRecord };
   }
 
   override async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
@@ -298,7 +272,7 @@ export class TransactionTable<T> extends Table<T> {
     const result: Partial<T>[] = [];
     const areFieldsToSelectEmpty = (fields.length === 0);
 
-    const processSelect = async (record: RecordWithVersion<T>, verifyCommittedRecordChanges: boolean) => {
+    const processSelect = async (record: RecordWithId<T>, verifyCommittedRecordChanges: boolean) => {
       if (!matchRecord(record, compiledFilter)) return;
 
       let selectedRecord: Partial<T> | null = null;
@@ -312,11 +286,11 @@ export class TransactionTable<T> extends Table<T> {
         if (recordWithTempChanges === null) return;
 
         selectedRecord = areFieldsToSelectEmpty
-          ? this.mapRecordVersionToRecord(recordWithTempChanges)
+          ? { ...recordWithTempChanges }
           : this.extractSelectedFields(fields, recordWithTempChanges);
       } else {
         selectedRecord = areFieldsToSelectEmpty
-          ? this.mapRecordVersionToRecord(record)
+          ? { ...record}
           : this.extractSelectedFields(fields, record);
       }
 
@@ -341,7 +315,6 @@ export class TransactionTable<T> extends Table<T> {
 
   public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
-    this.clearUpdatedFields(updatedFields);
 
     const willPkBeModified = this.isPartialRecordPartOfPk(updatedFields);
     const compiledFilter = compileFilter(where);
@@ -386,7 +359,7 @@ export class TransactionTable<T> extends Table<T> {
     return affectedRecords;
   }
 
-  private updateWithPKChange(committedRecord: RecordWithVersion<T>, updatedFields: Partial<T>): void {
+  private updateWithPKChange(committedRecord: RecordWithId<T>, updatedFields: Partial<T>): void {
     const committedRecordPk = this.buildPkFromRecord(committedRecord);
     const recordAlreadyUpdated = this._tempUpdatedRecordsMap.get(committedRecordPk);
 
@@ -412,7 +385,7 @@ export class TransactionTable<T> extends Table<T> {
     }
   }
 
-  private updateWithoutPKChange(committedRecord: RecordWithVersion<T>, updatedFields: Partial<T>): void {
+  private updateWithoutPKChange(committedRecord: RecordWithId<T>, updatedFields: Partial<T>): void {
     const committedRecordPk = this.buildPkFromRecord(committedRecord);
     const recordAlreadyUpdated = this._tempUpdatedRecordsMap.get(committedRecordPk);
 
@@ -464,12 +437,13 @@ export class TransactionTable<T> extends Table<T> {
       await this.acquireExclusiveLocks(keysToLock);
       await this.ValidationPhase();
       await this.WritingPhase();
-    }
-    finally {
       this.releaseCurrentLocks();
       this.clearTemporaryRecords();
     }
-
+    catch (error) {
+      this.rollback();
+      throw error;
+    }
   }
 
   private async acquireExclusiveLocks(keys: string[]): Promise<void[]> {
@@ -490,25 +464,14 @@ export class TransactionTable<T> extends Table<T> {
    *
    * @throws {LockTimeoutError} If the locks cannot be acquired within the timeout.
    * @throws {DuplicatePrimaryKeyValueError} If there are duplicate primary keys.
-   * @throws {ExternalModificationError} If the version of the updated records does not match 
-   * the committed version.
    */
   private async ValidationPhase(): Promise<void> {
-    //** Validate data integrity **
     // Validate that there are no duplicate PKs
     for (let pk of this._tempRecordsMap.keys()) {
       if (this._recordsMap.has(pk) 
         && !this._tempUpdatedRecordsMap.has(pk) 
         && !this._tempDeletedRecordsSet.has(pk)) {
         throw this.createDuplicatePkValueError(pk);
-      }
-    }
-
-    // Validate if the version of the updated records is the same as the committed
-    for (const [pk, updatedRecord] of this._tempUpdatedRecordsMap) {
-      const existingRecord = this._recordsMap.get(pk);
-      if (!existingRecord || existingRecord.__version !== updatedRecord.__version) {
-        throw new ExternalModificationError(pk);
       }
     }
   }
@@ -543,7 +506,6 @@ export class TransactionTable<T> extends Table<T> {
       const updatedPk = this.buildPkFromRecord(updatedRecord);
       // Update the reference of the committed record with the updated record,
       // this way the changes of the committed record are reflected in the committed array.
-      updatedRecord.__version++;
       Object.assign(committedRecord, updatedRecord);
       
       // Delete from the Map because there is a possibility that the PK has changed

@@ -1,20 +1,16 @@
 import { Filter } from "./filter.type";
 
+export type TableDefinition<T> = {
+  /** Name of the table */
+  name: string;
+  /** Definition of the primary key. Optional. */
+  primaryKey?: (keyof T)[];
+}
+
 export type RecordWithId<T> = T & { 
   /** Default primary key if not defined */
   _id ?: string 
 };
-
-export const RecordVersionPropertyName = "__version";
-
-export type RecordWithVersion<T> = RecordWithId<T> & { __version: number };
-
-export type TableTemporaryState<T> = {
-  recordsMap: Map<string, RecordWithVersion<T>>;
-  recordsArray: RecordWithVersion<T>[];
-  tempUpdatedRecordsMap: Map<string, RecordWithVersion<T>>;
-  tempDeletedRecordsSet: Set<string>;
-}
 
 export interface LocalTable<T> {
   /**

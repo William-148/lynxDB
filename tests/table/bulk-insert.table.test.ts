@@ -11,7 +11,7 @@ describe("Table with single PK - bulkInsert() - should...", () => {
   let userTable: Table<User>;
 
   beforeEach(() => {
-    userTable = new Table<User>('user', ['id']);
+    userTable = new Table<User>({ name: 'user', primaryKey: ['id'] });
   });
 
   it("insert many registers correctly", async () => {
@@ -56,7 +56,7 @@ describe("Table with composite PK - bulkInsert() - should...", () => {
   ];
 
   beforeEach(() => {
-    orderDetailTable = new Table<OrderDetail>('orderDetail', ["orderId", "productId"]);
+    orderDetailTable = new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ["orderId", "productId"] });
   });
 
   it("insert many registers correctly", async () => {
@@ -112,7 +112,7 @@ describe("Table without PK - bulkInsert() - should...", () => {
   let userTable: Table<User>;
 
   beforeEach(() => {
-    userTable = new Table<User>('user');
+    userTable = new Table<User>({ name: 'user' });
   });
 
   it("insert a register correctly", async () => {

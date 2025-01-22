@@ -21,7 +21,7 @@ describe ("Table - select() with gt and gte condition - should...", () => {
   let genericTable: Table<any>;
 
   beforeEach(() => {
-    genericTable = new Table<ScoreRecord>('generic', []);
+    genericTable = new Table<ScoreRecord>({ name: 'generic' });
     genericTable.bulkInsert(scoreDataList);
   });
 

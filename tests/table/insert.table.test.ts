@@ -11,7 +11,7 @@ describe("Table with single PK - insert() - should...", () => {
   let userTable: Table<User>;
 
   beforeEach(() => {
-    userTable = new Table<User>('user', ['id']);
+    userTable = new Table<User>({ name: 'user', primaryKey: ['id'] });
   });
 
   it("insert a register correctly", async () => {
@@ -59,7 +59,7 @@ describe("Table with composite PK - insert() - should...", () => {
   ];
 
   beforeEach(() => {
-    orderDetailTable = new Table<OrderDetail>('orderDetail', ["orderId", "productId"]);
+    orderDetailTable = new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ["orderId", "productId"] });
   });
 
   it("insert a register correctly", async () => {
@@ -115,7 +115,7 @@ describe("Table without PK - insert() - should...", () => {
   let userTable: Table<UserWithDefaultId>;
 
   beforeEach(() => {
-    userTable = new Table<UserWithDefaultId>('user');
+    userTable = new Table<UserWithDefaultId>({ name: 'user' });
   });
 
   it("insert a register correctly", async () => {

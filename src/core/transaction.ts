@@ -4,13 +4,18 @@ import { TableNotFoundError } from "./errors/data-base.error";
 import { TableManager } from "./table-manager";
 import { LocalTable } from "../types/database-table.type";
 import { TransactionCompletedError } from "./errors/transaction.error";
+import { generateId } from "../utils/generate-id";
 
 export class Transaction  {
+  private transactionId: string;
   private transactionTables: Map<string, TransactionTable<any>>;
   private tableManagers: Map<string, TableManager<any>>;
   private isActive: boolean;
 
-  constructor(private tables: Map<string, Table<any>>) {
+  constructor(
+    private tables: Map<string, Table<any>>
+  ) {
+    this.transactionId = generateId();
     this.transactionTables = new Map();
     this.tableManagers = new Map();
     this.isActive = true;
@@ -20,12 +25,7 @@ export class Transaction  {
     const table: Table<T> | undefined = this.tables.get(name);
     if (!table) throw new TableNotFoundError(name);
     
-    const transactionTable = new TransactionTable<T>(
-      table.name, 
-      table.recordsMap, 
-      table.recordsArray, 
-      table.pkDefinition
-    );
+    const transactionTable = new TransactionTable<T>(this.transactionId, table);
     const tableManager = new TableManager(transactionTable);
 
     this.transactionTables.set(name, transactionTable);
@@ -44,7 +44,7 @@ export class Transaction  {
 
   private clearTransactionTables(): void {
     for (const transactionTable of this.transactionTables.values()) {
-      transactionTable.clearTemporaryState();
+      transactionTable.clearTemporaryRecords();
     }
     this.transactionTables.clear();
   }
@@ -55,10 +55,14 @@ export class Transaction  {
     this.isActive = false;
   }
 
-  public commit(): void {
+  public async commit(): Promise<void> {
     if (!this.isActive) throw new TransactionCompletedError();
 
-    // Manage the commit process
+    const promises: Promise<void>[] = [];
+    for (const transactionTable of this.transactionTables.values()) {
+      transactionTable.commit();
+    }
+    await Promise.all(promises);
 
     this.onFinishTransaction();
   }

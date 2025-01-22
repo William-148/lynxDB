@@ -10,7 +10,7 @@ describe ("Table - select() with like condition - should...", () => {
   let genericTable: Table<Element>;
 
   beforeEach(() => {
-    genericTable = new Table<Element>('generic');
+    genericTable = new Table<Element>({ name: 'generic' });
     genericTable.bulkInsert([
       { id: 1, name: 'Alpha', description: 'The first element' },
       { id: 2, name: 'Beta', description: 'A secondary component' },

@@ -1,12 +1,13 @@
 import { Table } from "../../../src/core/table";
 import { TransactionTable } from "../../../src/core/transaction-table";
+import { generateId } from "../../../src/utils/generate-id";
 import { Product } from "../../types/product-test.type";
 
 describe("Transaction Table - Concurrency Commit", () => {
   const TestData: Product[] = [
     { id: 1, name: "Laptop", price: 1500, stock: 30 },
     { id: 2, name: "Mouse",  price: 20, stock: 100 },
-    { id: 3, name: "Keyboard", price: 50, stock: 50 },
+    { id: 3, name: "Keyboard", price: 17, stock: 50 },
     { id: 4, name: "Monitor", price: 900, stock: 20 },
     { id: 5, name: "Headset", price: 100, stock: 30 },
   ];
@@ -16,19 +17,12 @@ describe("Transaction Table - Concurrency Commit", () => {
   const TransactionCount = 200;
 
   beforeEach(() => {
-    table = new Table<Product>("products", ["id"]);
+    table = new Table<Product>({ name: "products", primaryKey: ["id"] });
     table.bulkInsert(TestData);
     transactionTables = [];
 
     for (let i = 0; i < TransactionCount; i++) {  
-      transactionTables.push( new TransactionTable<Product>(
-        crypto.randomUUID(),
-        table.name,
-        table.recordsMap,
-        table.recordsArray,
-        table.lockManager,
-        table.pkDefinition
-      ));
+      transactionTables.push(new TransactionTable<Product>(generateId(), table));
     }
   });
 

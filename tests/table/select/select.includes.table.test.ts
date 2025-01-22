@@ -11,7 +11,7 @@ describe("Table - select() with include condition - should...", () => {
   let genericTable: Table<UserTags>;
 
   beforeEach(() => {
-    genericTable = new Table<any>('generic');
+    genericTable = new Table<any>({ name: 'generic' });
     genericTable.bulkInsert([
       { id: 1, tag: 'red', number: 1, name: 'Alpha' },
       { id: 2, tag: 'blue', number: 2, name: 'Beta' },

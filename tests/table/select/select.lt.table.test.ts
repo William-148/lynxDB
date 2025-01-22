@@ -5,7 +5,7 @@ describe ("Table - select() with lt and lte conditions - should...", () => {
   let genericTable: Table<any>;
 
   beforeEach(() => {
-    genericTable = new Table<any>('generic', ['id']);
+    genericTable = new Table<any>({ name: 'generic', primaryKey: ['id'] });
     genericTable.bulkInsert([
       { id: 1, name: 'Alpha', value: 100, active: true, score: 45.6, date: new Date('2022-01-01') },
       { id: 2, name: 'Beta', value: 200, active: false, score: 78.9, date: new Date('2023-01-01') },

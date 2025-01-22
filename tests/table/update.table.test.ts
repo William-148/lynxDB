@@ -20,7 +20,7 @@ describe('Table with single PK - update() - should...', () => {
   let entityTable: Table<Entity>;
 
   beforeEach(() => {
-    entityTable = new Table<any>('entities', ['id']);
+    entityTable = new Table<any>({ name: 'entities', primaryKey: ['id'] });
     entityTable.bulkInsert(defaultData);
   });
 
@@ -192,7 +192,7 @@ describe('Table without PK definition - update() - should...', () => {
   let entityTable: Table<EntityWithDefaultId>;
 
   beforeEach(() => {
-    entityTable = new Table<EntityWithDefaultId>('entities');
+    entityTable = new Table<EntityWithDefaultId>({ name: 'entities' });
     entityTable.bulkInsert(defaultData);
   });
 
@@ -292,7 +292,7 @@ describe('Table with composite PK - update() - should...', () => {
   let enrollmentTable: Table<Enrollment>;
 
   beforeEach(() => {
-    enrollmentTable = new Table<Enrollment>('enrollments', ['year', 'semester', 'courseId', 'studentId']);
+    enrollmentTable = new Table<Enrollment>({ name: 'enrollments', primaryKey: ['year', 'semester', 'courseId', 'studentId'] });
     enrollmentTable.bulkInsert(enrollmentData);
   });
 

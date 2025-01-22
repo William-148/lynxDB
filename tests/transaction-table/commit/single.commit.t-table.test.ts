@@ -15,7 +15,7 @@ describe("Transaction Table Commit", () => {
   let transactionTable: TransactionTable<Product>;
 
   beforeEach(() => {
-    table = new Table<Product>("products", ["id"]);
+    table = new Table<Product>({ name: "products", primaryKey: ["id"] });
     table.bulkInsert(TestData);
 
     transactionTable = new TransactionTable<Product>(

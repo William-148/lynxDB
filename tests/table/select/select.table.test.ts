@@ -7,7 +7,7 @@ let userTable: Table<User>;
 describe("Table - select() with fields - should...", () => {
 
   beforeEach(async () => {
-    userTable = new Table<User>('user', ['id']);
+    userTable = new Table<User>({ name: 'user', primaryKey: ['id'] });
     await userTable.bulkInsert(thirtyItemsUserList);
   });
 
@@ -62,7 +62,7 @@ describe("Table - select() with fields - should...", () => {
 describe("Table - select() with nonexistent operator as condition - should...", () => {
   
   it("throw an error when the operator is not recognized", async () => {
-    const table = new Table<any>('test', ['id']);
+    const table = new Table<any>({ name: 'test', primaryKey: ['id'] });
     
     const tryToFilter = async () => {
       await table.select([], { 

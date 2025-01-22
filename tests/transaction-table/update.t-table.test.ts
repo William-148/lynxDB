@@ -17,7 +17,7 @@ describe("Transaction Table Update", () => {
   let transactionTable: TransactionTable<User>;
 
   beforeEach(() => {
-    table = new Table<User>("user", ["id"]);
+    table = new Table<User>({ name: "users", primaryKey: ["id"] });
     table.bulkInsert(TestData);
 
     transactionTable = new TransactionTable<User>(

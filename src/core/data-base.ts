@@ -1,10 +1,10 @@
 import { TableAlreadyExistsError, TableNotFoundError } from "./errors/data-base.error";
 import { Transaction } from "./transaction";
 import { Table } from "./table";
-import { LocalTable } from "../types/database-table.type";
+import { LocalTable, TableDefinition } from "../types/database-table.type";
 import { TableManager } from "./table-manager";
 
-export class LocalDatabase {
+export class LynxDB {
   private tablesMap: Map<string, Table<any>>;
   private tableManagersMap: Map<string, TableManager<any>>;
 
@@ -13,11 +13,11 @@ export class LocalDatabase {
     this.tableManagersMap = new Map();
   }
 
-  public createTable<T>(name: string, pkDefinition: (keyof T)[]): void {
-    if (this.tablesMap.has(name)) throw new TableAlreadyExistsError(name);
-    const table = new Table<T>(name, pkDefinition);
-    this.tablesMap.set(name, table);
-    this.tableManagersMap.set(name, new TableManager(table));
+  public createTable<T>(definition: TableDefinition<T>): void {
+    if (this.tablesMap.has(definition.name)) throw new TableAlreadyExistsError(definition.name);
+    const table = new Table<T>(definition);
+    this.tablesMap.set(definition.name, table);
+    this.tableManagersMap.set(definition.name, new TableManager(table));
   }
   
   public getTable<T>(name: string): LocalTable<T> {
