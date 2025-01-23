@@ -12,20 +12,14 @@ import {
 findByPkTestWithSinglePK("Transaction table with single PK - findByPk() - should...", (testData) => {
   const table = new Table<User>({ name: 'user', primaryKey: ['id'] });
   table.bulkInsert(testData);
-  return new TransactionTable<User>(
-    generateId(),
-    table
-  );
+  return new TransactionTable<User>(generateId(), table);
 });
 
 
 findByPkTestWithCompositePK("Transaction table with composite PK - findByPk() - should...", (testData) => {
   const table =  new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
   table.bulkInsert(testData);
-  return new TransactionTable<OrderDetail>(
-    generateId(),
-    table
-  );
+  return new TransactionTable<OrderDetail>(generateId(), table);
 });
 
 
@@ -33,8 +27,5 @@ type UserWithDefaultId = User & { _id?: string };
 findByPkTestWithoutPK("Transaction table without PK - findByPk() - should...", (testData) => {
   const table =  new Table<UserWithDefaultId>({ name: 'user' });
   table.bulkInsert(testData);
-  return new TransactionTable<UserWithDefaultId>(
-    generateId(),
-    table
-  );
+  return new TransactionTable<UserWithDefaultId>(generateId(), table);
 });
