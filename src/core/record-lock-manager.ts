@@ -1,5 +1,5 @@
 import { LockDetail, LockRequest, LockRequestType, LockType } from "../types/lock.type";
-import { LockTimeoutError } from "./errors/record-lock-manager.error";
+import { InvalidLockTypeError, LockTimeoutError } from "./errors/record-lock-manager.error";
 
 /**
  * Manages locks for records, supporting shared and exclusive lock types.
@@ -52,8 +52,6 @@ export class RecordLockManager {
 
       case LockType.Exclusive:
         return lock.exclusiveLock === transactionId;
-
-      default: return false;
     }
   }
 
@@ -103,14 +101,22 @@ export class RecordLockManager {
    * @param {string} key - The key to lock.
    * @param {LockType} lockType - The type of lock to acquire (Shared or Exclusive).
    * @returns {boolean} - Returns true if the lock was successfully acquired, false otherwise.
+   * @throws {InvalidLockTypeError} if the lock type is invalid.
    */
   public acquireLock(transactionId: string, key: string, lockType: LockType): boolean {
     const existingLock = this.locks.get(key);
 
     if (existingLock === undefined) {
-      const lockDetail: LockDetail = (lockType === LockType.Shared)
-        ? { lockType, sharedLocks: new Set([transactionId]) }
-        : { lockType, exclusiveLock: transactionId };
+      let lockDetail: LockDetail;
+      switch (lockType) {
+        case LockType.Shared: 
+          lockDetail = { lockType, sharedLocks: new Set([transactionId]) };
+          break;
+        case LockType.Exclusive:
+          lockDetail = { lockType, exclusiveLock: transactionId };
+          break;
+        default: throw new InvalidLockTypeError(lockType);
+      }
 
       this.locks.set(key, lockDetail);
       return true;
@@ -254,10 +260,6 @@ export class RecordLockManager {
   private proccessWaitingQueue(key: string): void {
     const queue = this.waitingQueues.get(key);
     if (!queue) return;
-    if (queue.length === 0) {
-      this.waitingQueues.delete(key);
-      return;
-    }
 
     const remainingRequests: LockRequest[] = [];
     for (const currentRequest of queue) {
