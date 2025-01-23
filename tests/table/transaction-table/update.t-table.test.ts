@@ -1,103 +1,27 @@
-import { DuplicatePrimaryKeyValueError } from "../../../src/core/errors/table.error";
 import { Table } from "../../../src/core/table";
 import { TransactionTable } from "../../../src/core/transaction-table";
 import { generateId } from "../../../src/utils/generate-id";
-import { Enrollment, getResultStatus } from "../../types/enrollment-test.type";
-import { User } from "../../types/user-test.type";
+import { Enrollment } from "../../types/enrollment-test.type";
+import { 
+  updateTestWithCompositePK,
+  updateTestWithoutPK,
+  updateTestWithSinglePK
+} from "../common-tests/update.table";
 
+updateTestWithSinglePK("Transaction table with single PK - update() - should...", (testData) => {
+  const table = new Table<any>({ name: 'entities', primaryKey: ['id'] });
+  table.bulkInsert(testData);
+  return new TransactionTable<any>(generateId(), table);
+});
 
-describe("Transaction Table Update", () => {
-  const TestData: User[] = [
-    { id: 1, fullName: "John", gender: "Male", age: 20, email: "jhon@some.com", username: "jhon", password: "123" },
-    { id: 2, fullName: "Jane", gender: "Female", age: 25, email: "jane@some.com", username: "jane", password: "456" },
-    { id: 3, fullName: "Alice", gender: "Female", age: 30, email: "alice@some.com", username: "alice", password: "789" },
-    { id: 4, fullName: "Bob", gender: "Male", age: 35, email: "bob@some.com", username: "bob", password: "101" },
-    { id: 5, fullName: "Charlie", gender: "Male", age: 40, email: "charlie@some.com", username: "charlie", password: "112" }
-  ];
+updateTestWithoutPK("Transaction table without PK - update() - should...", (testData) => {
+  const table = new Table<any>({ name: 'entities' });
+  table.bulkInsert(testData);
+  return new TransactionTable<any>(generateId(), table);
+});
 
-  let table: Table<User>;
-  let transactionTable: TransactionTable<User>;
-
-  beforeEach(() => {
-    table = new Table<User>({ name: "users", primaryKey: ["id"] });
-    table.bulkInsert(TestData);
-
-    transactionTable = new TransactionTable<User>(
-      generateId(),
-      table
-    );
-  });
-
-  it("should update a record", async () => {
-    const RecordTest = TestData[2];
-    const updatedFields: Partial<User> = { fullName: "Alice Wonderland", username: "alice_wonderland", password: "lss$$asf&&a11_Alice" };
-    const affectedRows = await transactionTable.update(
-      updatedFields, 
-      { id: { eq: RecordTest.id } }
-    );
-
-    const updatedRecord = await transactionTable.findByPk({ id: RecordTest.id });
-
-    expect(affectedRows).toBe(1);
-    expect(updatedRecord).toEqual({ ...RecordTest, ...updatedFields });
-  });
-
-  it("should affect no rows when do not have any fields to update", async () => {
-    const affectedRows = await transactionTable.update({}, {});
-    expect(affectedRows).toBe(0);
-  });
-
-  it("should update all records", async () => {
-    const affectedRows = await transactionTable.update({ age: 45, password: "new_password" }, {});
-
-    expect(affectedRows).toBe(TestData.length);
-    const updatedRecords = await transactionTable.select([], {});
-    expect(transactionTable.size()).toBe(TestData.length);
-    expect(transactionTable.sizeMap).toBe(TestData.length);
-    updatedRecords.forEach(record => {
-      expect(record.age).toBe(45);
-      expect(record.password).toBe("new_password");
-    });
-  });
-
-
-  it("should update the PK of a record and insert a new record with the old PK", async () => {
-    const InitialRegisteredPk = 4;
-    const LoopCount = 5;
-    const InitialUnregisteredPk = 1000;
-    const userToInsert: User = { id: InitialRegisteredPk, fullName: "Arnold", gender: "Male", age: 42, email: "arnold@some.com", username: "arnold", password: "456" };
-
-    let currentUnregisteredPK = InitialUnregisteredPk;
-    for (let i = 1; i <= LoopCount; i++) {
-      currentUnregisteredPK++;
-      // Update a field different from the PK
-      const firstUpdateAffectedRows = await transactionTable.update(
-        { fullName: `Bob Marley ${i}`}, 
-        { id: { eq: InitialRegisteredPk } }
-      );
-      
-      // Update the PK
-      const updatedPkAffectedRows = await transactionTable.update(
-        { id: currentUnregisteredPK },
-        { id: { eq: InitialRegisteredPk } }
-      );
-
-      // Find the record with the new PK
-      const updatedPkRecord = await transactionTable.findByPk({ id: currentUnregisteredPK });
-      
-      // Find the record with the old PK
-      const oldPkRecord = await transactionTable.findByPk({ id: InitialRegisteredPk });
-      expect(firstUpdateAffectedRows).toBe(1);
-      expect(updatedPkAffectedRows).toBe(1);
-      expect(updatedPkRecord).not.toBeNull();
-      expect(oldPkRecord).toBeNull();
-      // Insert a new record with the old PK
-      await expect(transactionTable.insert(userToInsert)).resolves.not.toThrow();
-      await expect(transactionTable.insert(userToInsert)).rejects.toThrow(DuplicatePrimaryKeyValueError);
-      // Find the recent inserted record with the old PK
-      await expect(transactionTable.findByPk({ id: InitialRegisteredPk })).not.toBeNull();
-    }
-    expect(transactionTable.size()).toBe(TestData.length + LoopCount);
-  });
-
+updateTestWithCompositePK("Transaction table with composite PK - update() - should...", (testData) => {
+  const table = new Table<Enrollment>({ name: 'entities', primaryKey: ['year', 'semester', 'courseId', 'studentId'] });
+  table.bulkInsert(testData);
+  return new TransactionTable<Enrollment>(generateId(), table);
 });
