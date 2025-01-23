@@ -13,21 +13,23 @@ import { User } from "../../types/user-test.type";
  * 
  * Param Example:
  * ```ts
- * const createInstance = () => new Table<User>({ name: 'user', primaryKey: ['id'] });
+ * const createInstance = (testData) => {
+ *  const table = new Table<User>({ name: 'user', primaryKey: ['id'] });
+ *  table.bulkInsert(testData);
+ *  return table;
+ * }
  * 
  * ```
  */
-export function findByPkTestWithSinglePK(description: string, createInstance: () => Table<User>) {
+export function findByPkTestWithSinglePK(description: string, createInstance: (testData: User[]) => Table<User>) {
   describe(description, () => {
     let userTable: Table<User>;
 
     beforeEach(() => {
-      userTable = createInstance();
+      userTable = createInstance(thirtyItemsUserList);
     });
 
     it("find registers by PK correctly", async () => {
-      await userTable.bulkInsert(thirtyItemsUserList);
-
       for (let item of thirtyItemsUserList) {
         const found = await userTable.findByPk({ id: item.id });
         expect(found).not.toBe(item);
@@ -55,21 +57,23 @@ export function findByPkTestWithSinglePK(description: string, createInstance: ()
  * 
  * Param Example:
  * ```ts
- * const createInstance = () => new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
+ * const createInstance = (testData) => {
+ *  const table = new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
+ *  table.bulkInsert(testData);
+ *  return table;
+ * }
  * 
  * ```
  */
-export function findByPkTestWithCompositePK(description: string, createInstance: () => Table<OrderDetail>) {
+export function findByPkTestWithCompositePK(description: string, createInstance: (testData: OrderDetail[]) => Table<OrderDetail>) {
   describe(description, () => {
     let orderDetailTable: Table<OrderDetail>;
 
     beforeEach(() => {
-      orderDetailTable = createInstance();
+      orderDetailTable = createInstance(twentyOrderDetails);
     });
 
     it("find registers by PK correctly", async () => {
-      await orderDetailTable.bulkInsert(twentyOrderDetails);
-
       for (let item of twentyOrderDetails) {
         const found = await orderDetailTable.findByPk({
           orderId: item.orderId,
@@ -115,18 +119,25 @@ export function findByPkTestWithCompositePK(description: string, createInstance:
  * 
  * Param Example:
  * ```ts
- * const createInstance = () => new Table<User & { _id?: string }>({ name: 'user' });
+ * const createInstance = (testData) => {
+ *  const table = new Table<User & { _id?: string }>({ name: 'user' });
+ *  table.bulkInsert(testData);
+ *  return table;
+ * }
  * 
  * ```
  */
-export function findByPkTestWithoutPK(description: string, createInstance: () => Table<User & { _id?: string }>) {
+export function findByPkTestWithoutPK(
+  description: string, 
+  createInstance: (testData: Array<User & { _id?: string }>) => Table<User & { _id?: string }>
+) {
   describe(description, () => {
     type UserWithDefaultId = User & { _id?: string };
 
     let userTable: Table<UserWithDefaultId>;
 
     beforeEach(() => {
-      userTable = createInstance();
+      userTable = createInstance(thirtyItemsUserList);
     });
 
     it("find a register with the default '_id' created", async () => {

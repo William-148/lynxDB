@@ -77,7 +77,6 @@ const orderDetails: OrderDetail[] = [
  * ```ts
  * const createInstance = () => new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
  */
-// "Table with composite PK - insert() - should..."
 export function insertTestWithCompositePK(description: string, createInstance: () => Table<OrderDetail>) {
   describe(description, () => {
     let orderDetailTable: Table<OrderDetail>;
@@ -144,7 +143,6 @@ export function insertTestWithCompositePK(description: string, createInstance: (
  * const createInstance = () => new Table<User & { _id?: string }>({ name: 'user' });
  * ```
  */
-//"Table without PK - insert() - should..."
 export function insertTestWithoutPK(description: string, createInstance: () => Table<User & { _id?: string }>) {
   describe(description, () => {
     type UserWithDefaultId = User & { _id?: string };
