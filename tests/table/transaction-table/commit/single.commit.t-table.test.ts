@@ -1,8 +1,8 @@
-import { Table } from "../../../src/core/table";
-import { TransactionTable } from "../../../src/core/transaction-table";
-import { IsolationLevel } from "../../../src/types/transaction.type";
-import { generateId } from "../../../src/utils/generate-id";
-import { Product } from "../../types/product-test.type";
+import { Table } from "../../../../src/core/table";
+import { TransactionTable } from "../../../../src/core/transaction-table";
+import { IsolationLevel } from "../../../../src/types/transaction.type";
+import { generateId } from "../../../../src/utils/generate-id";
+import { Product } from "../../../types/product-test.type";
 
 describe(`Transaction Table Commit ${IsolationLevel.ReadLatest}`, () => {
   const TestData: Product[] = [

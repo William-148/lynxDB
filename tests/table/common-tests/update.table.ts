@@ -1,6 +1,6 @@
-import { DuplicatePrimaryKeyValueError } from "../../src/core/errors/table.error";
-import { Table } from "../../src/core/table";
-import { Enrollment, getResultStatus } from "../types/enrollment-test.type";
+import { DuplicatePrimaryKeyValueError } from "../../../src/core/errors/table.error";
+import { Table } from "../../../src/core/table";
+import { Enrollment, getResultStatus } from "../../types/enrollment-test.type";
 
 type Entity = {
   id: number;

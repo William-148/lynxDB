@@ -112,10 +112,7 @@ export class TransactionTable<T> extends Table<T> {
     this._sharedLocks.add(key);
   }
 
-  private async acquireExclusiveLock(key: string): Promise<void> 
-  private async acquireExclusiveLock(record: RecordWithId<T>): Promise<void> 
-  private async acquireExclusiveLock(arg: string | RecordWithId<T>): Promise<void> {
-    const key = typeof arg === 'string' ? arg : this.buildPkFromRecord(arg);
+  private async acquireExclusiveLock(key: string): Promise<void>{
     if (this._exclusiveLocks.has(key)) return;
     if (this._sharedLocks.has(key)) {
       this._lockManager.releaseLock(this._transactionId, key);
@@ -134,7 +131,6 @@ export class TransactionTable<T> extends Table<T> {
         return this.acquireSharedLock(key);
       case IsolationLevel.StrictLocking:
         return this.acquireExclusiveLock(key);
-      default: throw new Error('Invalid isolation level');
     }
   }
 
@@ -289,41 +285,37 @@ export class TransactionTable<T> extends Table<T> {
     const result: Partial<T>[] = [];
     const areFieldsToSelectEmpty = (fields.length === 0);
 
-    const processSelect = async (record: RecordWithId<T>, verifyCommittedRecordChanges: boolean) => {
-      if (!matchRecord(record, compiledFilter)) return;
+    const committedSelectProcess = async (committedRecord: RecordWithId<T>) => {
+      const recordWithTempChanges = this.getTempChangesFromCommittedRecord(committedRecord);
+      // The function execution is finished because the record is null, 
+      // which means that it was deleted and should not be added to the result.
+      if (recordWithTempChanges === null) return;
 
-      let selectedRecord: Partial<T> | null = null;
-      
-      if (verifyCommittedRecordChanges) {
-        await this.acquireReadLock(record);
+      if (!matchRecord(recordWithTempChanges, compiledFilter)) return;
 
-        const recordWithTempChanges = this.getTempChangesFromCommittedRecord(record);
-        // The function execution is finished because the record is null, 
-        // which means that it was deleted and should not be added to the result.
-        if (recordWithTempChanges === null) return;
+      // Lock the committed record to ensure that the record is not modified
+      // It is locked because the updates (temporary) are not visible to others
+      await this.acquireReadLock(committedRecord);
 
-        selectedRecord = areFieldsToSelectEmpty
-          ? { ...recordWithTempChanges }
-          : this.extractSelectedFields(fields, recordWithTempChanges);
-      } else {
-        selectedRecord = areFieldsToSelectEmpty
-          ? { ...record}
-          : this.extractSelectedFields(fields, record);
-      }
+      result.push(areFieldsToSelectEmpty
+        ? { ...recordWithTempChanges }
+        : this.extractSelectedFields(fields, recordWithTempChanges)
+      );
+    }
 
-      result.push(selectedRecord);
-    };
+    const newestSelectProcess = async (newestRecord: RecordWithId<T>) => {
+      if (!matchRecord(newestRecord, compiledFilter)) return;
+      result.push(areFieldsToSelectEmpty
+        ? { ...newestRecord}
+        : this.extractSelectedFields(fields, newestRecord)
+      );
+    }
 
     // Loop through the committed and temporary Array to access 
     // the committed and newer records.
-    const committedPromises = Promise.all(
-      this._recordsArray.map(async (committedRecord) => processSelect(committedRecord, true))
-    );
-
-    const uncommitedPromises = Promise.all(
-      this._tempRecordsArray.map(async (uncommittedRecord) => processSelect(uncommittedRecord, false))
-    );
-
+    const committedPromises = Promise.all(this._recordsArray.map(committedSelectProcess));
+    const uncommitedPromises = Promise.all(this._tempRecordsArray.map(newestSelectProcess));
+    
     await committedPromises;
     await uncommitedPromises;
 
@@ -504,7 +496,7 @@ export class TransactionTable<T> extends Table<T> {
    */
   private async WritingPhase(): Promise<void> {
     this.applyUpdates();
-    this.applyDeletes();
+    // this.applyDeletes(); // NOT IMPLEMENTED YET
     this.applyNewInsertions();
   }
 
@@ -533,6 +525,7 @@ export class TransactionTable<T> extends Table<T> {
   }
 
   /**
+   * @ignore NOT IMPLEMENTED YET
    * Deletes records from the committed records map and array.
    *
    * This method iterates over the temporary deleted records set and removes the corresponding
@@ -540,21 +533,21 @@ export class TransactionTable<T> extends Table<T> {
    * array by building the primary key (PK) for each record and checking if it is in the set of
    * records to be removed.
    */
-  private applyDeletes(): void {
-    if (this._tempDeletedRecordsSet.size === 0) return;
+  // private applyDeletes(): void {
+  //   if (this._tempDeletedRecordsSet.size === 0) return;
 
-    for (let pk of this._tempDeletedRecordsSet) {
-      this._recordsMap.delete(pk);
-    }
-    const newArray = [];
-    for (let i = 0; i < this._recordsArray.length; i++) {
-      const recordPK = this.buildPkFromRecord(this._recordsArray[i]);
-      if (!this._tempDeletedRecordsSet.has(recordPK)) {
-        newArray.push(this._recordsArray[i]);
-      }
-    }
-    this._recordsArray = newArray;
-  }
+  //   for (let pk of this._tempDeletedRecordsSet) {
+  //     this._recordsMap.delete(pk);
+  //   }
+  //   const newArray = [];
+  //   for (let i = 0; i < this._recordsArray.length; i++) {
+  //     const recordPK = this.buildPkFromRecord(this._recordsArray[i]);
+  //     if (!this._tempDeletedRecordsSet.has(recordPK)) {
+  //       newArray.push(this._recordsArray[i]);
+  //     }
+  //   }
+  //   this._recordsArray = newArray;
+  // }
 
   /**
    * Inserts new records into the committed records map and array.

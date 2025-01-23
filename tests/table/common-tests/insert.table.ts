@@ -1,11 +1,11 @@
-import { Table } from "../../src/core/table";
-import { defaultUser, thirtyItemsUserList } from "../data/data-test";
-import { User } from "../types/user-test.type";
-import { OrderDetail } from "../types/order-test.type";
+import { Table } from "../../../src/core/table";
+import { defaultUser, thirtyItemsUserList } from "../../data/data-test";
+import { User } from "../../types/user-test.type";
+import { OrderDetail } from "../../types/order-test.type";
 import { 
   DuplicatePrimaryKeyValueError,
   PrimaryKeyValueNullError
-} from "../../src/core/errors/table.error";
+} from "../../../src/core/errors/table.error";
 
 describe("Table with single PK - insert() - should...", () => {
   let userTable: Table<User>;

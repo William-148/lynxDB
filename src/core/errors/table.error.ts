@@ -33,9 +33,3 @@ export class DuplicatePrimaryKeyValueError extends Error {
     super(`Key (${pkName})=(${pkValue}) already exists`);
   }
 }
-
-export class LockConflictError extends Error {
-  constructor() {
-    super(`Lock conflict`);
-  }
-}

@@ -1,8 +1,8 @@
-import { Table } from "../../src/core/table";
-import { User } from "../types/user-test.type";
+import { Table } from "../../../src/core/table";
+import { User } from "../../types/user-test.type";
 import { 
   DuplicatePrimaryKeyDefinitionError,
-} from "../../src/core/errors/table.error";
+} from "../../../src/core/errors/table.error";
 
 describe("Table should", () => {
 

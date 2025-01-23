@@ -1,4 +1,4 @@
-import { Table } from "../../../src/core/table";
+import { Table } from "../../../../src/core/table";
 
 type ScoreRecord = {
   id: number;

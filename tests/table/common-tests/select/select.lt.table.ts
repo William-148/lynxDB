@@ -1,4 +1,4 @@
-import { Table } from "../../../src/core/table";
+import { Table } from "../../../../src/core/table";
 
 describe ("Table - select() with lt and lte conditions - should...", () => {
 
