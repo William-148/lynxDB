@@ -29,6 +29,7 @@ const scoreDataList: ScoreRecord[] = [
  *  table.bulkInsert(dataTest);
  *  return table;
  * }
+ * ```
  */
 export function selectGtGteTests(description: string, createInstance: (dataTest: ScoreRecord[]) => Table<ScoreRecord>) {
   describe (description, () => {
