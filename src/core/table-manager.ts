@@ -1,4 +1,4 @@
-import { LocalTable, RecordWithId } from "../types/database-table.type";
+import { LocalTable, RecordWithId } from "../types/table.type";
 import { Filter } from "../types/filter.type";
 import { Table } from "./table";
 

@@ -1,6 +1,8 @@
 import { DuplicatePrimaryKeyValueError } from "../../src/core/errors/table.error";
 import { Table } from "../../src/core/table";
 import { TransactionTable } from "../../src/core/transaction-table";
+import { IsolationLevel } from "../../src/types/transaction.type";
+import { generateId } from "../../src/utils/generate-id";
 import { User } from "../types/user-test.type";
 
 
@@ -21,12 +23,9 @@ describe("Transaction Table Update", () => {
     table.bulkInsert(TestData);
 
     transactionTable = new TransactionTable<User>(
-      crypto.randomUUID(),
-      table.name,
-      table.recordsMap,
-      table.recordsArray,
-      table.lockManager,
-      table.pkDefinition
+      generateId(),
+      table,
+      IsolationLevel.ReadLatest
     );
   });
 

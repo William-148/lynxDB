@@ -1,8 +1,10 @@
 import { Table } from "../../../src/core/table";
 import { TransactionTable } from "../../../src/core/transaction-table";
+import { IsolationLevel } from "../../../src/types/transaction.type";
+import { generateId } from "../../../src/utils/generate-id";
 import { Product } from "../../types/product-test.type";
 
-describe("Transaction Table Commit", () => {
+describe(`Transaction Table Commit ${IsolationLevel.ReadLatest}`, () => {
   const TestData: Product[] = [
     { id: 1, name: "Laptop", price: 1500, stock: 30 },
     { id: 2, name: "Mouse",  price: 20, stock: 100 },
@@ -19,12 +21,9 @@ describe("Transaction Table Commit", () => {
     table.bulkInsert(TestData);
 
     transactionTable = new TransactionTable<Product>(
-      crypto.randomUUID(),
-      table.name,
-      table.recordsMap,
-      table.recordsArray,
-      table.lockManager,
-      table.pkDefinition
+      generateId(),
+      table,
+      IsolationLevel.ReadLatest
     );
   });
 

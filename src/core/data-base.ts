@@ -1,14 +1,18 @@
 import { TableAlreadyExistsError, TableNotFoundError } from "./errors/data-base.error";
 import { Transaction } from "./transaction";
 import { Table } from "./table";
-import { LocalTable, TableDefinition } from "../types/database-table.type";
+import { LocalTable, TableDefinition } from "../types/table.type";
 import { TableManager } from "./table-manager";
+import { DatabaseOptions } from "../types/database.type";
+import { IsolationLevel, TransactionOptions } from "../types/transaction.type";
 
 export class LynxDB {
   private tablesMap: Map<string, Table<any>>;
   private tableManagersMap: Map<string, TableManager<any>>;
+  private isolationLevel: IsolationLevel;
 
-  constructor() {
+  constructor(options: DatabaseOptions) {
+    this.isolationLevel = options.isolationLevel || IsolationLevel.ReadLatest;
     this.tablesMap = new Map();
     this.tableManagersMap = new Map();
   }
@@ -26,7 +30,9 @@ export class LynxDB {
     return tableManager;
   }
 
-  public createTransaction(): Transaction {
-    return new Transaction(this.tablesMap);
+  public createTransaction(options?: TransactionOptions): Transaction {
+    return new Transaction(this.tablesMap, {
+      isolationLevel: options?.isolationLevel || this.isolationLevel
+    });
   }
 }

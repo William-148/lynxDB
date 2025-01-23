@@ -2,7 +2,8 @@ import { Filter } from "../types/filter.type";
 import { LockType } from "../types/lock.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { Table } from "./table";
-import { RecordWithId } from "../types/database-table.type";
+import { RecordWithId } from "../types/table.type";
+import { IsolationLevel } from "../types/transaction.type";
 import { RecordLockManager } from "./record-lock-manager";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
@@ -10,6 +11,7 @@ import { ExternalModificationError } from "./errors/transaction-table.error";
 
 export class TransactionTable<T> extends Table<T> {
   private _transactionId: string;
+  private _isolationLevel: IsolationLevel;
   /**
    * Temporal Map that stores new records and updated committed records. 
    * The records in this map have the most recent data.
@@ -55,9 +57,14 @@ export class TransactionTable<T> extends Table<T> {
    * @param transactionId The ID of the transaction.
    * @param table The table to be used in the transaction.
    */
-  constructor(transactionId: string, table: Table<T>) {
+  constructor(
+    transactionId: string, 
+    table: Table<T>, 
+    isolationLevel: IsolationLevel = IsolationLevel.ReadLatest
+  ) {
     super({ name: table.name, primaryKey: table.pkDefinition });
     this._transactionId = transactionId;
+    this._isolationLevel = isolationLevel;
     this._recordsArray = table.recordsArray;
     this._recordsMap = table.recordsMap;
     this._lockManager = table.lockManager;
@@ -99,10 +106,7 @@ export class TransactionTable<T> extends Table<T> {
    * @param key The primary key of the record to be locked.
    * @throws {LockTimeoutError} If the lock cannot be acquired within the timeout.
    */
-  private async acquireSharedLock(key: string): Promise<void>;
-  private async acquireSharedLock(record: RecordWithId<T>): Promise<void> 
-  private async acquireSharedLock(arg: string | RecordWithId<T>): Promise<void> {
-    const key = typeof arg === 'string' ? arg : this.buildPkFromRecord(arg);
+  private async acquireSharedLock(key: string): Promise<void> {
     if (this._sharedLocks.has(key) || this._exclusiveLocks.has(key)) return;
     await this._lockManager.acquireLockWithTimeout(this._transactionId, key, LockType.Shared, 1000);
     this._sharedLocks.add(key);
@@ -119,6 +123,19 @@ export class TransactionTable<T> extends Table<T> {
     }
     await this._lockManager.acquireLockWithTimeout(this._transactionId, key, LockType.Exclusive, 1000);
     this._exclusiveLocks.add(key);
+  }
+
+  private async acquireReadLock(key: string): Promise<void>;
+  private async acquireReadLock(record: RecordWithId<T>): Promise<void> 
+  private async acquireReadLock(arg: string | RecordWithId<T>): Promise<void> {
+    const key = typeof arg === 'string' ? arg : this.buildPkFromRecord(arg);
+    switch (this._isolationLevel) {
+      case IsolationLevel.ReadLatest:
+        return this.acquireSharedLock(key);
+      case IsolationLevel.StrictLocking:
+        return this.acquireExclusiveLock(key);
+      default: throw new Error('Invalid isolation level');
+    }
   }
 
   /**
@@ -245,7 +262,7 @@ export class TransactionTable<T> extends Table<T> {
     // At this point, an attempt is made to find a recently inserted or updated record.
     const temporaryRecord = this._tempRecordsMap.get(primaryKeyBuilt);
     if (temporaryRecord) {
-      await this.acquireSharedLock(primaryKeyBuilt);
+      await this.acquireReadLock(primaryKeyBuilt);
       return { ...temporaryRecord };
     }
 
@@ -260,7 +277,7 @@ export class TransactionTable<T> extends Table<T> {
     //   record has been modified. Therefore, null must be returned because the committed record 
     //   no longer exists with this PK and will be deleted from the committed Map during the 
     //   commit operation.
-    await this.acquireSharedLock(primaryKeyBuilt);
+    await this.acquireReadLock(primaryKeyBuilt);
     if (this._tempDeletedRecordsSet.has(primaryKeyBuilt)
       || this._tempUpdatedRecordsMap.has(primaryKeyBuilt)) return null;
 
@@ -278,7 +295,7 @@ export class TransactionTable<T> extends Table<T> {
       let selectedRecord: Partial<T> | null = null;
       
       if (verifyCommittedRecordChanges) {
-        await this.acquireSharedLock(record);
+        await this.acquireReadLock(record);
 
         const recordWithTempChanges = this.getTempChangesFromCommittedRecord(record);
         // The function execution is finished because the record is null, 

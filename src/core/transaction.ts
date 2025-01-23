@@ -2,9 +2,10 @@ import { Table } from "./table";
 import { TransactionTable } from "./transaction-table";
 import { TableNotFoundError } from "./errors/data-base.error";
 import { TableManager } from "./table-manager";
-import { LocalTable } from "../types/database-table.type";
+import { LocalTable } from "../types/table.type";
 import { TransactionCompletedError } from "./errors/transaction.error";
 import { generateId } from "../utils/generate-id";
+import { IsolationLevel, TransactionOptions } from "../types/transaction.type";
 
 export class Transaction  {
   private transactionId: string;
@@ -13,7 +14,8 @@ export class Transaction  {
   private isActive: boolean;
 
   constructor(
-    private tables: Map<string, Table<any>>
+    private tables: Map<string, Table<any>>,
+    private options: TransactionOptions
   ) {
     this.transactionId = generateId();
     this.transactionTables = new Map();
@@ -25,7 +27,11 @@ export class Transaction  {
     const table: Table<T> | undefined = this.tables.get(name);
     if (!table) throw new TableNotFoundError(name);
     
-    const transactionTable = new TransactionTable<T>(this.transactionId, table);
+    const transactionTable = new TransactionTable<T>(
+      this.transactionId, 
+      table,
+      this.options.isolationLevel
+    );
     const tableManager = new TableManager(transactionTable);
 
     this.transactionTables.set(name, transactionTable);

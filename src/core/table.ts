@@ -6,7 +6,7 @@ import {
   LocalTable,
   RecordWithId,
   TableDefinition,
-} from "../types/database-table.type";
+} from "../types/table.type";
 import {
   DuplicatePrimaryKeyDefinitionError,
   DuplicatePrimaryKeyValueError,
