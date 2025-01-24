@@ -6,20 +6,20 @@ import {
   updateTestWithSinglePK 
 } from "../common-tests/update.table";
 
-updateTestWithSinglePK("Table with single PK - update() - should...", (testData) => {
+updateTestWithSinglePK("Table with single PK - update() - should...", async (testData) => {
   const table = new Table<any>({ name: 'entities', primaryKey: ['id'] });
-  table.bulkInsert(testData);
+  await table.bulkInsert(testData);
   return table;
 });
 
-updateTestWithCompositePK("Table with composite PK - update() - should...", (testData) => {
+updateTestWithCompositePK("Table with composite PK - update() - should...", async (testData) => {
   const table = new Table<Enrollment>({ name: 'entities', primaryKey: ['year', 'semester', 'courseId', 'studentId'] });
-  table.bulkInsert(testData);
+  await table.bulkInsert(testData);
   return table;
 });
 
-updateTestWithoutPK("Table without PK - update() - should...", (testData) => {
+updateTestWithoutPK("Table without PK - update() - should...", async (testData) => {
   const table = new Table<any>({ name: 'entities' });
-  table.bulkInsert(testData);
+  await table.bulkInsert(testData);
   return table;
 });

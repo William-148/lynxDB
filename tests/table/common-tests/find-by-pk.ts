@@ -13,20 +13,20 @@ import { User } from "../../types/user-test.type";
  * 
  * Param Example:
  * ```ts
- * const createInstance = (testData) => {
+ * const createInstance = async (testData) => {
  *  const table = new Table<User>({ name: 'user', primaryKey: ['id'] });
- *  table.bulkInsert(testData);
+ *  await table.bulkInsert(testData);
  *  return table;
  * }
  * 
  * ```
  */
-export function findByPkTestWithSinglePK(description: string, createInstance: (testData: User[]) => Table<User>) {
+export function findByPkTestWithSinglePK(description: string, createInstance: (testData: User[]) => Promise<Table<User>>) {
   describe(description, () => {
-    let userTable: Table<User>;
+    let userTable: Table<User>; // primaryKey: ['id']
 
-    beforeEach(() => {
-      userTable = createInstance(thirtyItemsUserList);
+    beforeEach(async () => {
+      userTable = await createInstance(thirtyItemsUserList);
     });
 
     it("find registers by PK correctly", async () => {
@@ -35,6 +35,11 @@ export function findByPkTestWithSinglePK(description: string, createInstance: (t
         expect(found).not.toBe(item);
         expect(found).toEqual(item);
       }
+    });
+
+    it("try to find a register that does not exist", async () => {
+      const notExist = await userTable.findByPk({ id: 1000 });
+      expect(notExist).toBeNull();
     });
 
     it("throw an error when PK was not provided", async () => {
@@ -57,20 +62,20 @@ export function findByPkTestWithSinglePK(description: string, createInstance: (t
  * 
  * Param Example:
  * ```ts
- * const createInstance = (testData) => {
+ * const createInstance = async (testData) => {
  *  const table = new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
- *  table.bulkInsert(testData);
+ *  await table.bulkInsert(testData);
  *  return table;
  * }
  * 
  * ```
  */
-export function findByPkTestWithCompositePK(description: string, createInstance: (testData: OrderDetail[]) => Table<OrderDetail>) {
+export function findByPkTestWithCompositePK(description: string, createInstance: (testData: OrderDetail[]) => Promise<Table<OrderDetail>>) {
   describe(description, () => {
-    let orderDetailTable: Table<OrderDetail>;
+    let orderDetailTable: Table<OrderDetail>; // primaryKey: ['orderId', 'productId']
 
-    beforeEach(() => {
-      orderDetailTable = createInstance(twentyOrderDetails);
+    beforeEach(async () => {
+      orderDetailTable = await createInstance(twentyOrderDetails);
     });
 
     it("find registers by PK correctly", async () => {
@@ -82,6 +87,11 @@ export function findByPkTestWithCompositePK(description: string, createInstance:
         expect(found).not.toBe(item);
         expect(found).toEqual(item);
       }
+    });
+
+    it("try to find a register that does not exist", async () => {
+      const notExist = await orderDetailTable.findByPk({ orderId: 1000, productId: 1000 });
+      expect(notExist).toBeNull();
     });
 
     it("throw an error when PK was not provided", async () => {
@@ -119,9 +129,9 @@ export function findByPkTestWithCompositePK(description: string, createInstance:
  * 
  * Param Example:
  * ```ts
- * const createInstance = (testData) => {
+ * const createInstance = async (testData) => {
  *  const table = new Table<User & { _id?: string }>({ name: 'user' });
- *  table.bulkInsert(testData);
+ *  await table.bulkInsert(testData);
  *  return table;
  * }
  * 
@@ -129,15 +139,15 @@ export function findByPkTestWithCompositePK(description: string, createInstance:
  */
 export function findByPkTestWithoutPK(
   description: string, 
-  createInstance: (testData: Array<User & { _id?: string }>) => Table<User & { _id?: string }>
+  createInstance: (testData: Array<User & { _id?: string }>) => Promise<Table<User & { _id?: string }>>
 ) {
   describe(description, () => {
     type UserWithDefaultId = User & { _id?: string };
 
     let userTable: Table<UserWithDefaultId>;
 
-    beforeEach(() => {
-      userTable = createInstance(thirtyItemsUserList);
+    beforeEach(async () => {
+      userTable = await createInstance(thirtyItemsUserList);
     });
 
     it("find a register with the default '_id' created", async () => {

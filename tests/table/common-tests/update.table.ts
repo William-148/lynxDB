@@ -24,19 +24,19 @@ const EntityData: Entity[] = [
  * 
  * Param Example:
  * ```ts
- * const createInstance = (testData) => { 
+ * const createInstance = async (testData) => { 
  *  const table = new Table<any>({ name: 'entities', primaryKey: ['id'] });
- *  table.bulkInsert(testData);
+ *  await table.bulkInsert(testData);
  *  return table;
  * }
  * ```
  */
-export function updateTestWithSinglePK(description: string, createInstance: (testData: Entity[]) => Table<any>) {
+export function updateTestWithSinglePK(description: string, createInstance: (testData: Entity[]) => Promise<Table<any>>) {
   describe(description, () => {
     let entityTable: Table<Entity>;
 
-    beforeEach(() => {
-      entityTable = createInstance(EntityData);
+    beforeEach(async () => {
+      entityTable = await createInstance(EntityData);
     });
 
     it('update a single record based on a specific condition', async () => {
@@ -158,7 +158,7 @@ export function updateTestWithSinglePK(description: string, createInstance: (tes
 
     it("update the PK of a record and insert a new record with the old PK", async () => {
       const InitialRegisteredPk = 2;
-      const LoopCount = 5;
+      const LoopCount = 8;
       const InitialUnregisteredPk = 1000;
       const EntityToInsert: Entity = { id: InitialRegisteredPk, name: "Kappa", value: 90, status: "active" };
 
@@ -218,22 +218,22 @@ const defaultEntityWithId: EntityWithDefaultId[] = [
  * 
  * Param Example:
  * ```ts
- * const createInstance = (testData) => {
+ * const createInstance = async (testData) => {
  *  const table = new Table<any>({ name: 'entities' });
- *  table.bulkInsert(testData);
+ *  await table.bulkInsert(testData);
  *  return table;
  * }
  * ```
  */
 export function updateTestWithoutPK(
   description: string, 
-  createInstance: (testData: Array<any & { _id?: string }>) => Table<any & { _id?: string }>
+  createInstance: (testData: Array<any & { _id?: string }>) => Promise<Table<any & { _id?: string }>>
 ) {
   describe(description, () => {
     let entityTable: Table<EntityWithDefaultId>;
 
-    beforeEach(() => {
-      entityTable = createInstance(defaultEntityWithId);
+    beforeEach(async () => {
+      entityTable = await createInstance(defaultEntityWithId);
     });
 
     it('update a single record based on a specific condition', async () => {
@@ -337,18 +337,18 @@ const enrollmentData: Enrollment[] = [
  * 
  * Param Example:
  * ```ts
- * const createInstance = (testData) => {
+ * const createInstance = async (testData) => {
  *  const table = new Table<Enrollment>({ name: 'enrollments', primaryKey: ['year', 'semester', 'courseId', 'studentId'] });
- *  table.bulkInsert(testData);
+ *  await table.bulkInsert(testData);
  *  return table;
  * }
  */
-export function updateTestWithCompositePK(description: string, createInstance: (testData: Enrollment[]) => Table<Enrollment>) {
+export function updateTestWithCompositePK(description: string, createInstance: (testData: Enrollment[]) => Promise<Table<Enrollment>>) {
   describe(description, () => {
     let enrollmentTable: Table<Enrollment>;
 
-    beforeEach(() => {
-      enrollmentTable = createInstance(enrollmentData);
+    beforeEach(async () => {
+      enrollmentTable = await createInstance(enrollmentData);
     });
 
     it('update a single record based on a specific condition', async () => {
@@ -458,7 +458,7 @@ export function updateTestWithCompositePK(description: string, createInstance: (
       expect(shouldNotExistRecord).toBeNull();
     });
 
-    it('update multiple record where field is part of the composite PK', async () => {
+    it('update the composite PK of multiple records', async () => {
       const YearToTest = 2025;
       const SemesterToTest = 'Fall';
       const SemesterToUpdate = 'Summer';
@@ -496,6 +496,68 @@ export function updateTestWithCompositePK(description: string, createInstance: (
         });
         expect(record).toBeNull();
       }
+      expect(enrollmentTable.size()).toBe(enrollmentData.length);
+      expect(enrollmentTable.sizeMap).toBe(enrollmentData.length);
+    });
+
+    it('update the composite PK of multiple records 2 times', async () => {
+      const YearToTest = 2025;
+      const OriginalSemester = 'Fall';
+      const SemesterToUpdate = 'Summer';
+
+      // Update the PK for the first time
+      const affectedRowsFirstUpdate = await enrollmentTable.update(
+        { semester: SemesterToUpdate }, 
+        {
+          year: { eq: YearToTest },
+          semester: { eq: OriginalSemester }
+        }
+      );
+
+      expect(affectedRowsFirstUpdate).toBe(4);
+
+      // Get the updated records, these records shouldn't exist after the second update
+      const shouldNotExistAtEnd = await enrollmentTable.select([], {
+        year: { eq: YearToTest },
+        semester: { eq: SemesterToUpdate }
+      });
+
+      expect(shouldNotExistAtEnd).toHaveLength(6);
+
+      // Update the PK for the second time
+      const affectedRowsSecondUpdate = await enrollmentTable.update(
+        { semester: OriginalSemester }, 
+        {
+          year: { eq: YearToTest },
+          semester: { eq: SemesterToUpdate }
+        }
+      );
+
+      expect(affectedRowsSecondUpdate).toBe(6);
+
+      // Check if the records with the original semester
+      const secondUpdatedRecords = await enrollmentTable.select([], {
+        year: { eq: YearToTest },
+        semester: { eq: OriginalSemester }
+      });
+      expect(secondUpdatedRecords).toHaveLength(6);
+      secondUpdatedRecords.forEach(item => {
+        expect(item.year).toBe(YearToTest);
+        expect(item.semester).toBe(OriginalSemester);
+      });
+
+      // Check if the records with the old semester no longer exist
+      for (let item of shouldNotExistAtEnd) {
+        const record = await enrollmentTable.findByPk({
+          year: item.year,
+          semester: item.semester,
+          courseId: item.courseId,
+          studentId: item.studentId
+        });
+        expect(record).toBeNull();
+      }
+      expect(enrollmentTable.size()).toBe(enrollmentData.length);
+      expect(enrollmentTable.sizeMap).toBe(enrollmentData.length);
     });
 
     it('update a record with a complete composite PK', async () => {

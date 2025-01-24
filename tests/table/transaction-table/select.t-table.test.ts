@@ -11,9 +11,12 @@ import { User } from "../../types/user-test.type";
 
 //#region GENERAL SELECT TESTS
 selectTestsWithFields("Transaction table - select() with fields - should...", async (dataTest) => {
+  const middle = Math.floor(dataTest.length / 2);
   const table = new Table<User>({ name: 'generic', primaryKey: ['id'] });
-  await table.bulkInsert(dataTest);
-  return new TransactionTable<User>(generateId(), table);
+  await table.bulkInsert(dataTest.slice(0, middle));
+  const transactionTable = new TransactionTable<User>(generateId(), table);
+  await transactionTable.bulkInsert(dataTest.slice(middle));
+  return transactionTable;
 });
 
 selectWithOperatorTest("Transaction table - select() with operator - should...", async () => {
