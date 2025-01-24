@@ -2,77 +2,108 @@ import { Table } from "../../../../src/core/table";
 import { thirtyItemsUserList } from "../../../data/data-test";
 import { User, userPropertyList } from "../../../types/user-test.type";
 
-let userTable: Table<User>;
-
-describe("Table - select() with fields - should...", () => {
-
-  beforeEach(async () => {
-    userTable = new Table<User>({ name: 'user', primaryKey: ['id'] });
-    await userTable.bulkInsert(thirtyItemsUserList);
-  });
-
-  function generatePartialUser(user: User, propertiesToAdd: (keyof User)[]): Partial<User> {
-    const partialUser: Partial<User> = {};
-    for (let property of propertiesToAdd) {
-      partialUser[property] = user[property] as any;
-    }
-    return partialUser;
-  }
-
-  it("return all registers when no conditions are provided", async () => {
-    const resultList = await userTable.select([], {});
-    const resultItem = resultList[3];
-
-    expect(resultList.length).toBe(thirtyItemsUserList.length);
-    for (let property of userPropertyList) {
-      expect(resultItem).toHaveProperty(property);
-    } 
-  });
-
-  it("returns the correct fields when the fields parameter is provided", async () => {
-    const itemUsedForTesting = thirtyItemsUserList[2];
-    const propertiesToSelect: (keyof User)[] = ["email", "id", "password"];
-    const expectedResult = generatePartialUser(itemUsedForTesting, propertiesToSelect);
-
-    const resultList = await userTable.select(propertiesToSelect, {});
-    const resultItem = resultList.find(u => u.id === itemUsedForTesting.id);
-
-    expect(resultList.length).toBe(thirtyItemsUserList.length);
-    for (let item of userPropertyList) {
-      expect(resultItem?.[item]).toBe(expectedResult[item]);
-    }
-  });
-
-  it("returns the correct fields when the fields parameter has duplicated items", async () => {
-    const itemUsedForTesting = thirtyItemsUserList[8];
-    const propertiesToSelect: (keyof User)[] = ["id", "username", "age", "id", "age", "username", "id"];
-    const expectedResult = generatePartialUser(itemUsedForTesting, propertiesToSelect);
-
-    const resultList = await userTable.select(propertiesToSelect, {});
-    const resultItem = resultList.find(u => u.id === itemUsedForTesting.id);
-
-    expect(resultList.length).toBe(thirtyItemsUserList.length);
-    for (let item of userPropertyList) {
-      expect(resultItem?.[item]).toBe(expectedResult[item]);
-    }
-  });
-
-});
-
-describe("Table - select() with nonexistent operator as condition - should...", () => {
+/**
+ * Common test for the select() method with fields
+ * @param description The description of the test
+ * @param createInstance Function that receives the data to be inserted and returns a new instance of the Table
+ * 
+ * Param Example:
+ * ```ts
+ * const createInstance = async (testData: User) => {
+ *  const table = new Table<User>({ name: 'user', primaryKey: ['id'] });
+ *  await table.bulkInsert(testData);
+ *  return table;
+ * }
+ * ```
+ */
+export function selectTestsWithFields(description: string, createInstance: (testData: User[]) => Promise<Table<User>>) {
+  describe(description, () => {
+    let userTable: Table<User>;
+    
+    beforeEach(async () => {
+      userTable = await createInstance(thirtyItemsUserList);
+    });
   
-  it("throw an error when the operator is not recognized", async () => {
-    const table = new Table<any>({ name: 'test', primaryKey: ['id'] });
-    
-    const tryToFilter = async () => {
-      await table.select([], { 
-        id: { unexistent_operator: 1 } as any 
-      });
+    function generatePartialUser(user: User, propertiesToAdd: (keyof User)[]): Partial<User> {
+      const partialUser: Partial<User> = {};
+      for (let property of propertiesToAdd) {
+        partialUser[property] = user[property] as any;
+      }
+      return partialUser;
     }
-
-    await expect(tryToFilter)
-      .rejects
-      .toThrow(/^Unsupported operator:/);
-    
+  
+    it("return all registers when no conditions are provided", async () => {
+      const resultList = await userTable.select([], {});
+      const resultItem = resultList[3];
+  
+      expect(resultList.length).toBe(thirtyItemsUserList.length);
+      for (let property of userPropertyList) {
+        expect(resultItem).toHaveProperty(property);
+      } 
+    });
+  
+    it("returns the correct fields when the fields parameter is provided", async () => {
+      const itemUsedForTesting = thirtyItemsUserList[2];
+      const propertiesToSelect: (keyof User)[] = ["email", "id", "password"];
+      const expectedResult = generatePartialUser(itemUsedForTesting, propertiesToSelect);
+  
+      const resultList = await userTable.select(propertiesToSelect, {});
+      const resultItem = resultList.find(u => u.id === itemUsedForTesting.id);
+  
+      expect(resultList.length).toBe(thirtyItemsUserList.length);
+      for (let item of userPropertyList) {
+        expect(resultItem?.[item]).toBe(expectedResult[item]);
+      }
+    });
+  
+    it("returns the correct fields when the fields parameter has duplicated items", async () => {
+      const itemUsedForTesting = thirtyItemsUserList[8];
+      const propertiesToSelect: (keyof User)[] = ["id", "username", "age", "id", "age", "username", "id"];
+      const expectedResult = generatePartialUser(itemUsedForTesting, propertiesToSelect);
+  
+      const resultList = await userTable.select(propertiesToSelect, {});
+      const resultItem = resultList.find(u => u.id === itemUsedForTesting.id);
+  
+      expect(resultList.length).toBe(thirtyItemsUserList.length);
+      for (let item of userPropertyList) {
+        expect(resultItem?.[item]).toBe(expectedResult[item]);
+      }
+    });
+  
   });
-});
+}
+
+/**
+ * Common test for the select() method with operators
+ * 
+ * @param description The description of the test
+ * @param createInstance Function that returns a new instance of the Table
+ * 
+ * Param Example:
+ * ```ts
+ * const createInstance = async () => new Table<any>({ name: 'generic', primaryKey: ['id'] });
+ * ```
+ */
+export function selectWithOperatorTest(description: string, createInstance: () => Promise<Table<any>>) {
+  describe(description, () => {
+    let defaultTable: Table<any>;
+
+    beforeEach(async () => {
+      defaultTable = await createInstance();
+    });
+    
+    it("throw an error when the operator is not recognized", async () => {
+      
+      const tryToFilter = async () => {
+        await defaultTable.select([], { 
+          id: { unexistent_operator: 1 } as any 
+        });
+      }
+  
+      await expect(tryToFilter)
+        .rejects
+        .toThrow(/^Unsupported operator:/);
+      
+    });
+  });
+}

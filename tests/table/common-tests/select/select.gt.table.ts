@@ -24,20 +24,20 @@ const scoreDataList: ScoreRecord[] = [
  * 
  * Param Example:
  * ```ts
- * const createInstance = (dataTest) => {
+ * const createInstance = async (dataTest) => {
  *  const table = new Table<ScoreRecord>({ name: 'generic' });
- *  table.bulkInsert(dataTest);
+ *  await table.bulkInsert(dataTest);
  *  return table;
  * }
  * ```
  */
-export function selectGtGteTests(description: string, createInstance: (dataTest: ScoreRecord[]) => Table<ScoreRecord>) {
+export function selectGtGteTests(description: string, createInstance: (dataTest: ScoreRecord[]) => Promise<Table<ScoreRecord>>) {
   describe (description, () => {
     
     let genericTable: Table<any>;
   
-    beforeEach(() => {
-      genericTable = createInstance(scoreDataList);
+    beforeEach(async () => {
+      genericTable = await createInstance(scoreDataList);
     });
   
     it('filter records with gt operator for numeric values', async () => {

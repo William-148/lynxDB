@@ -282,7 +282,9 @@ export class TransactionTable<T> extends Table<T> {
 
   override async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
     const compiledFilter = compileFilter(where);
-    const result: Partial<T>[] = [];
+    const committedResults: Partial<T>[] = [];
+    const newestResults: Partial<T>[] = [];
+
     const areFieldsToSelectEmpty = (fields.length === 0);
 
     const committedSelectProcess = async (committedRecord: RecordWithId<T>) => {
@@ -297,7 +299,7 @@ export class TransactionTable<T> extends Table<T> {
       // It is locked because the updates (temporary) are not visible to others
       await this.acquireReadLock(committedRecord);
 
-      result.push(areFieldsToSelectEmpty
+      committedResults.push(areFieldsToSelectEmpty
         ? { ...recordWithTempChanges }
         : this.extractSelectedFields(fields, recordWithTempChanges)
       );
@@ -305,7 +307,7 @@ export class TransactionTable<T> extends Table<T> {
 
     const newestSelectProcess = async (newestRecord: RecordWithId<T>) => {
       if (!matchRecord(newestRecord, compiledFilter)) return;
-      result.push(areFieldsToSelectEmpty
+      newestResults.push(areFieldsToSelectEmpty
         ? { ...newestRecord}
         : this.extractSelectedFields(fields, newestRecord)
       );
@@ -319,7 +321,7 @@ export class TransactionTable<T> extends Table<T> {
     await committedPromises;
     await uncommitedPromises;
 
-    return result;
+    return committedResults.concat(newestResults);
   }
 
   public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {

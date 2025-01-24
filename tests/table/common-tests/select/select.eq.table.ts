@@ -23,20 +23,20 @@ const genericDataList: GenericData[] = [
  * 
  * Param Example:
  * ```ts
- * const createInstance = (dataTest) => {
+ * const createInstance = async (dataTest) => {
  * const table = new Table<GenericData>({ name: 'generic', primaryKey: ['id'] });
- * table.bulkInsert(dataTest);
+ * await table.bulkInsert(dataTest);
  * return table;
  * }
  * ```
  * 
  */
-export function selectEqTests(description: string, createInstance: (dataTest: GenericData[]) => Table<any>) {
+export function selectEqTests(description: string, createInstance: (dataTest: GenericData[]) => Promise<Table<any>>) {
   describe(description, () => {
     let genericTable: Table<GenericData>;
   
-    beforeEach(() => {
-      genericTable = createInstance(genericDataList);
+    beforeEach(async () => {
+      genericTable = await createInstance(genericDataList);
     });
   
     it('filter records with numeric value', async () => {
@@ -111,18 +111,18 @@ export function selectEqTests(description: string, createInstance: (dataTest: Ge
  * 
  * Param Example:
  * ```ts
- * const createInstance = () => {
+ * const createInstance = async () => {
  * const table = new Table<GenericData>({ name: 'generic', primaryKey: ['id'] });
  * return table;
  * }
  * ```
  */
-export function selectEqTestsWithObjects(description: string, createInstance: () => Table<any>) {
+export function selectEqTestsWithObjects(description: string, createInstance: () => Promise<Table<any>>) {
   describe(description, () => {
     let genericTable: Table<any>;
   
-    beforeEach(() => {
-      genericTable = createInstance();
+    beforeEach(async () => {
+      genericTable = await createInstance();
     });
   
     it("filter records with array fields", async () => {

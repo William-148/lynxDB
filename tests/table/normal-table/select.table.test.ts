@@ -1,24 +1,59 @@
 import { Table } from "../../../src/core/table";
+import { selectTestsWithFields, selectWithOperatorTest } from "../common-tests/select/select.table";
 import { selectEqTests, selectEqTestsWithObjects } from "../common-tests/select/select.eq.table";
 import { selectGtGteTests } from "../common-tests/select/select.gt.table";
+import { selectIncludesTests } from "../common-tests/select/select.includes.table";
+import { selectLikeTests } from "../common-tests/select/select.like.table";
+import { selectLtLteTests } from "../common-tests/select/select.lt.table";
+
+//#region GENERAL SELECT TESTS
+selectTestsWithFields("Table - select() with fields - should...", async (dataTest) => {
+  const table = new Table<any>({ name: 'generic', primaryKey: ['id'] });
+  await table.bulkInsert(dataTest);
+  return table;
+});
+
+selectWithOperatorTest("Table - select() with operator - should...", async () => {
+  const table = new Table<any>({ name: 'generic', primaryKey: ['id'] });
+  return table;
+});
+//#endregion
+
 
 //#region TESTS WITH EQ CONDITION
-selectEqTests("Table - select() with eq condition - should...", (dataTest) => {
+selectEqTests("Table - select() with eq condition - should...", async (dataTest) => {
   const table = new Table<any>({ name: 'generic', primaryKey: ['id'] });
-  table.bulkInsert(dataTest);
+  await table.bulkInsert(dataTest);
   return table;
 });
 
-selectEqTestsWithObjects("Table - select() with eq condition and objects - should...", () => {
+selectEqTestsWithObjects("Table - select() with eq condition and objects - should...", async () => {
   const table = new Table<any>({ name: 'generic', primaryKey: ['id'] });
   return table;
 });
 //#endregion
 
-//#region TESTS WITH GT AND GTE CONDITIONS
-selectGtGteTests("Table - select() with gt and gte condition - should...", (dataTest) => {
+
+selectGtGteTests("Table - select() with gt and gte condition - should...", async (dataTest) => {
   const table = new Table<any>({ name: 'generic' });
-  table.bulkInsert(dataTest);
+  await table.bulkInsert(dataTest);
   return table;
 });
-//#endregion
+
+selectIncludesTests("Table - select() with include condition - should...", async (dataTest) => {
+  const table = new Table<any>({ name: 'generic' });
+  await table.bulkInsert(dataTest);
+  return table;
+});
+
+selectLikeTests("Table - select() with like condition - should...", async (dataTest) => {
+  const table = new Table<any>({ name: 'generic' });
+  await table.bulkInsert(dataTest);
+  return table;
+});
+
+selectLtLteTests("Table - select() with lt and lte conditions - should...", async (dataTest) => {
+  const table = new Table<any>({ name: 'generic', primaryKey: ['id'] });
+  await table.bulkInsert(dataTest);
+  return table;
+});
