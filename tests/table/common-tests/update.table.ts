@@ -201,7 +201,7 @@ export function updateTestWithSinglePK(description: string, createInstance: (tes
 
 
 type EntityWithDefaultId = Entity & { _id?: string };
-const defaultEntityWithId: EntityWithDefaultId[] = [
+const defaultEntityData: EntityWithDefaultId[] = [
   { id: 1, name: 'Epsilon', value: 50, status: 'active' },
   { id: 2, name: 'Zeta', value: 60, status: 'inactive' },
   { id: 3, name: 'Eta', value: 70, status: 'active' },
@@ -233,11 +233,11 @@ export function updateTestWithoutPK(
     let entityTable: Table<EntityWithDefaultId>;
 
     beforeEach(async () => {
-      entityTable = await createInstance(defaultEntityWithId);
+      entityTable = await createInstance(defaultEntityData);
     });
 
     it('update a single record based on a specific condition', async () => {
-      const ItemToTest = defaultEntityWithId[0];
+      const ItemToTest = defaultEntityData[0];
       const NewFieldsValues: Partial<Entity> = { status: 'archived' };
 
       const affectedRows = await entityTable.update(NewFieldsValues, { id: { eq: ItemToTest.id } });
@@ -253,14 +253,36 @@ export function updateTestWithoutPK(
       });
     });
 
+    it('update a single record two times withouth changing the PK', async () => {
+      const UpdatedData1 = defaultEntityData[4];
+      const UpdatedData2 = defaultEntityData[2];
+      const ItemToTest = (await entityTable.select([], { id: { eq: 2 } }))[0];
+      expect(ItemToTest).not.toBeUndefined();
+
+      // First update
+      const affectedUpdate1 = await entityTable.update(UpdatedData1, { _id: { eq: ItemToTest._id } });
+      expect(affectedUpdate1).toBe(1);
+
+      const updatedRecord1 = await entityTable.findByPk({ _id: ItemToTest._id });
+      expect(updatedRecord1).toEqual({ ...UpdatedData1, _id: ItemToTest._id });
+
+      // Second update
+      const affectedUpdate2 = await entityTable.update(UpdatedData2, { _id: { eq: ItemToTest._id } });
+      expect(affectedUpdate2).toBe(1);
+
+      const updatedRecord2 = await entityTable.findByPk({ _id: ItemToTest._id });
+      expect(updatedRecord2).toEqual({ ...UpdatedData2, _id: ItemToTest._id });
+
+    });
+
     it('update multiple records matching a condition', async () => {
       const NewFieldsValues: Partial<Entity> = { id: 1, status: 'freeze' };
 
       const affectedRows = await entityTable.update(NewFieldsValues, { id: { gte: 1 } });
-      expect(affectedRows).toBe(defaultEntityWithId.length);
+      expect(affectedRows).toBe(defaultEntityData.length);
 
       const updatedRecords = await entityTable.select([], { id: { eq: NewFieldsValues.id } });
-      expect(updatedRecords).toHaveLength(defaultEntityWithId.length);
+      expect(updatedRecords).toHaveLength(defaultEntityData.length);
       for (const item of updatedRecords) {
         expect(item.id).toBe(NewFieldsValues.id);
         expect(item.status).toBe(NewFieldsValues.status);
@@ -268,7 +290,7 @@ export function updateTestWithoutPK(
     });
 
     it('update the "_id" field of a record', async () => {
-      const ItemToTest = defaultEntityWithId[2];
+      const ItemToTest = defaultEntityData[2];
       const NewDefaultId = 'new-id';
       const NewFieldsValues: Partial<EntityWithDefaultId> = { _id: NewDefaultId };
 
@@ -287,7 +309,7 @@ export function updateTestWithoutPK(
     });
 
     it('throw an error when updating records with an existing "_id"', async () => {
-      const ItemToTest = await entityTable.insert(defaultEntityWithId[3]);
+      const ItemToTest = await entityTable.insert(defaultEntityData[3]);
       async function tryToUpdate() {
         await entityTable.update({ _id: ItemToTest._id }, {});
       }
@@ -374,6 +396,70 @@ export function updateTestWithCompositePK(description: string, createInstance: (
         studentId: ItemToTest.studentId
       });
       expect(updatedRecord).toEqual({ ...ItemToTest, ...UpdatedFields });
+    });
+
+    it('update a single record two times withouth changing the PK', async () => {
+      const ItemToTest = enrollmentData[3];
+      const WrongObtainedGrade = 59;
+      const CorrectObtainedGrade = 75;
+
+      // Update record with the wrong data
+      const affectedRowsFirstUpdate = await enrollmentTable.update({
+        grade: WrongObtainedGrade,
+        gradeStatus: 'loaded',
+        resultStatus: getResultStatus(WrongObtainedGrade)
+      }, {
+        year: { eq: ItemToTest.year },
+        semester: { eq: ItemToTest.semester },
+        courseId: { eq: ItemToTest.courseId },
+        studentId: { eq: ItemToTest.studentId }
+      });
+
+      expect(affectedRowsFirstUpdate).toBe(1);
+
+      // Verify if the record was updated with the wrong data
+      const wrongUpdatedRecord = await enrollmentTable.findByPk({
+        year: ItemToTest.year,
+        semester: ItemToTest.semester,
+        courseId: ItemToTest.courseId,
+        studentId: ItemToTest.studentId
+      });
+
+      expect(wrongUpdatedRecord).toEqual({ 
+        ...ItemToTest,
+        grade: WrongObtainedGrade,
+        gradeStatus: 'loaded',
+        resultStatus: getResultStatus(WrongObtainedGrade)
+      });
+
+      // Update the record with the correct data
+      const affectedRowsSecondUpdate = await enrollmentTable.update({
+        grade: CorrectObtainedGrade,
+        gradeStatus: 'loaded',
+        resultStatus: getResultStatus(CorrectObtainedGrade)
+      }, {
+        year: { eq: ItemToTest.year },
+        semester: { eq: ItemToTest.semester },
+        courseId: { eq: ItemToTest.courseId },
+        studentId: { eq: ItemToTest.studentId }
+      });
+
+      expect(affectedRowsFirstUpdate).toBe(1);
+
+      // Verify if the record was updated with the wrong data
+      const fixedUpdatedRecord = await enrollmentTable.findByPk({
+        year: ItemToTest.year,
+        semester: ItemToTest.semester,
+        courseId: ItemToTest.courseId,
+        studentId: ItemToTest.studentId
+      });
+
+      expect(fixedUpdatedRecord).toEqual({ 
+        ...ItemToTest,
+        grade: CorrectObtainedGrade,
+        gradeStatus: 'loaded',
+        resultStatus: getResultStatus(CorrectObtainedGrade)
+      });
     });
 
     it('update multiple records matching a condition', async () => {
