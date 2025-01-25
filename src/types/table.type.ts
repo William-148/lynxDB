@@ -1,11 +1,13 @@
 import { Filter } from "./filter.type";
 
-export type TableDefinition<T> = {
-  /** Name of the table */
-  name: string;
+export type TableConfig<T> = {
   /** Definition of the primary key. Optional. */
   primaryKey?: (keyof T)[];
 }
+
+export type TablesDefinition<T extends Record<string, any>> = {
+  [K in keyof T]: TableConfig<T[K]>;
+};
 
 export type RecordWithId<T> = T & { 
   /** Default primary key if not defined */

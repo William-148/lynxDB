@@ -18,7 +18,7 @@ describe(`Transaction Table Commit ${IsolationLevel.ReadLatest}`, () => {
   let transactionTable: TransactionTable<Product>;
 
   beforeEach(() => {
-    table = new Table<Product>({ name: "products", primaryKey: ["id"] });
+    table = new Table<Product>({ primaryKey: ["id"] });
     table.bulkInsert(TestData);
 
     transactionTable = new TransactionTable<Product>(

@@ -10,7 +10,7 @@ import { User, userPropertyList } from "../../../types/user-test.type";
  * Param Example:
  * ```ts
  * const createInstance = async (testData: User) => {
- *  const table = new Table<User>({ name: 'user', primaryKey: ['id'] });
+ *  const table = new Table<User>({ primaryKey: ['id'] });
  *  await table.bulkInsert(testData);
  *  return table;
  * }
@@ -81,7 +81,7 @@ export function selectTestsWithFields(description: string, createInstance: (test
  * 
  * Param Example:
  * ```ts
- * const createInstance = async () => new Table<any>({ name: 'generic', primaryKey: ['id'] });
+ * const createInstance = async () => new Table<any>({ primaryKey: ['id'] });
  * ```
  */
 export function selectWithOperatorTest(description: string, createInstance: () => Promise<Table<any>>) {

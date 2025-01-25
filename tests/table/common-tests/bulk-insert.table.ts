@@ -15,7 +15,7 @@ import {
  * 
  * Param Example:
  * ```ts
- * const createInstance = () => new Table<User>({ name: 'user', primaryKey: ['id'] });
+ * const createInstance = () => new Table<User>({ primaryKey: ['id'] });
  * ```
  */
 export function bulkInsertTestsWithSinglePK(description: string, createInstance: () => Table<User>): void {
@@ -73,7 +73,7 @@ const orderDetails: OrderDetail[] = [
  * 
  * Param Example:
  * ```ts
- * const createInstance = () => new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ["orderId", "productId"] });
+ * const createInstance = () => new Table<OrderDetail>({ primaryKey: ["orderId", "productId"] });
  * ```
  */
 export function bulkInsertTestsWithCompositePK(description: string, createInstance: () => Table<OrderDetail>): void {
@@ -141,7 +141,7 @@ export function bulkInsertTestsWithCompositePK(description: string, createInstan
  * 
  * Param Example:
  * ```ts
- * const createInstance = () => new Table<User>({ name: 'user' });
+ * const createInstance = () => new Table<User>({ primaryKey: [] });
  * ```
  * 
  */

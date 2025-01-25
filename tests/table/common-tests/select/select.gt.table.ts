@@ -25,7 +25,7 @@ const scoreDataList: ScoreRecord[] = [
  * Param Example:
  * ```ts
  * const createInstance = async (dataTest) => {
- *  const table = new Table<ScoreRecord>({ name: 'generic' });
+ *  const table = new Table<ScoreRecord>({ primaryKey: [] });
  *  await table.bulkInsert(dataTest);
  *  return table;
  * }

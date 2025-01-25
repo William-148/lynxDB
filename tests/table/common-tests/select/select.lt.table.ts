@@ -16,7 +16,7 @@ const defaultData = [
  * Param Example:
  * ```ts
  * const createInstance = async (data) => {
- * const table = new Table<any>({ name: 'generic', primaryKey: ['id'] });
+ * const table = new Table<any>({ primaryKey: ['id'] });
  * await table.bulkInsert(dataTest);
  * return table;
  * }

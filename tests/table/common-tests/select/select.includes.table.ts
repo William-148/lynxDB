@@ -23,7 +23,7 @@ const defaultData: UserTags[] = [
  * Param Example:
  * ```ts
  * const createInstance = async (dataTest) => {
- * const table = new Table<UserTags>({ name: 'generic' });
+ * const table = new Table<UserTags>({ primaryKey: [] });
  * await table.bulkInsert(dataTest);
  * return table;
  * }

@@ -59,7 +59,7 @@ export class TransactionTable<T> extends Table<T> {
    * @param transactionConfig The configuration object for the transaction.
    */
   constructor(transactionId: string, table: Table<T>, transactionConfig?: Config) {
-    super({ name: table.name, primaryKey: table.pkDefinition }, transactionConfig);
+    super({ primaryKey: table.pkDefinition }, transactionConfig);
     this._transactionId = transactionId;
     this._transactionConfig = transactionConfig ?? new Config();
     this._tempRecordsMap = new Map();

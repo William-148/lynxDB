@@ -7,7 +7,7 @@ import { TransactionCompletedError } from "./errors/transaction.error";
 import { generateId } from "../utils/generate-id";
 import { Config } from "./config";
 
-export class Transaction  {
+export class Transaction <Tables extends Record<string, any>>  {
   private transactionId: string;
   private transactionTables: Map<string, TransactionTable<any>>;
   private tableManagers: Map<string, TableManager<any>>;
@@ -38,13 +38,13 @@ export class Transaction  {
     return tableManager;
   }
 
-  public get<T>(name: string): ITable<T> {
+  public get<K extends keyof Tables>(name: K): ITable<Tables[K]> {
     if (!this.isActive) throw new TransactionCompletedError();
 
-    const found = this.transactionTables.get(name);
-    if (found) return found as TransactionTable<T>;
+    const found = this.tableManagers.get(String(name));
+    if (found) return found;
 
-    return this.createTransactionTable(name);    
+    return this.createTransactionTable(String(name));    
   }
 
   private finishTransaction(): void {

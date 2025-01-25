@@ -14,7 +14,7 @@ import { User } from "../../types/user-test.type";
  * Param Example:
  * ```ts
  * const createInstance = async (testData) => {
- *  const table = new Table<User>({ name: 'user', primaryKey: ['id'] });
+ *  const table = new Table<User>({ primaryKey: ['id'] });
  *  await table.bulkInsert(testData);
  *  return table;
  * }
@@ -63,7 +63,7 @@ export function findByPkTestWithSinglePK(description: string, createInstance: (t
  * Param Example:
  * ```ts
  * const createInstance = async (testData) => {
- *  const table = new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
+ *  const table = new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
  *  await table.bulkInsert(testData);
  *  return table;
  * }
@@ -130,7 +130,7 @@ export function findByPkTestWithCompositePK(description: string, createInstance:
  * Param Example:
  * ```ts
  * const createInstance = async (testData) => {
- *  const table = new Table<User & { _id?: string }>({ name: 'user' });
+ *  const table = new Table<User & { _id?: string }>({ primaryKey: [] });
  *  await table.bulkInsert(testData);
  *  return table;
  * }

@@ -4,13 +4,13 @@ import { User } from "../../types/user-test.type";
 import { insertTestWithCompositePK, insertTestWithoutPK, insertTestWithSinglePK } from "../common-tests/insert.table";
 
 insertTestWithSinglePK("Table with single PK - insert() - should...", () => {
-  return new Table<User>({ name: 'user', primaryKey: ['id'] });
+  return new Table<User>({ primaryKey: ['id'] });
 }); 
 
 insertTestWithCompositePK("Table with composite PK - insert() - should...", () => {
-  return new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
+  return new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
 });
 
 insertTestWithoutPK("Table without PK - insert() - should...", () => {
-  return new Table<User>({ name: 'user' });
+  return new Table<User>({ primaryKey: [] });
 });

@@ -8,13 +8,13 @@ import {
 } from "../common-tests/bulk-insert.table";
 
 bulkInsertTestsWithSinglePK("Table with single PK - bulkInsert() - should...", () =>{
-  return new Table<User>({ name: 'user', primaryKey: ['id'] });
+  return new Table<User>({ primaryKey: ['id'] });
 });
 
 bulkInsertTestsWithCompositePK("Table with composite PK - bulkInsert() - should...", () =>{
- return new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
+ return new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
 });
 
 bulkInsertTestWithoutPK("Table without PK - bulkInsert() - should...", () =>{
-  return new Table<User>({ name: 'user' });
+  return new Table<User>({ primaryKey: [] });
 });

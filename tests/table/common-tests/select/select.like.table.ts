@@ -22,7 +22,7 @@ const defaultData: Element[] = [
  * Param Example:
  * ```ts
  * const createInstance = async (data) => {
- *  const table = new Table<Element>({ name: 'generic' });
+ *  const table = new Table<Element>({ primaryKey: [] });
  *  await table.bulkInsert(data);
  *  return table;
  * }

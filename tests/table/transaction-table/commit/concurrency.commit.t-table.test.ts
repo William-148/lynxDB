@@ -34,7 +34,7 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, 
   let table: Table<Product>;
 
   beforeEach(() => {
-    table = new Table<Product>({ name: "products", primaryKey: ["id"] });
+    table = new Table<Product>({ primaryKey: ["id"] });
     table.bulkInsert(TestData);
   });
 
@@ -88,7 +88,7 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.StrictLocking}
   const isolationLevel = IsolationLevel.StrictLocking;
 
   beforeEach(() => {
-    table = new Table<Product>({ name: "products", primaryKey: ["id"] });
+    table = new Table<Product>({ primaryKey: ["id"] });
     table.bulkInsert(TestData);
   });
 

@@ -10,16 +10,16 @@ import {
 } from "../common-tests/insert.table";
 
 insertTestWithSinglePK("Transaction table with single PK - insert() - should...", () => {
-  const table = new Table<User>({ name: 'user', primaryKey: ['id'] });
+  const table = new Table<User>({ primaryKey: ['id'] });
   return new TransactionTable<User>(generateId(), table);
 }); 
 
 insertTestWithCompositePK("Transaction table with composite PK - insert() - should...", () => {
-  const table = new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
+  const table = new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
   return new TransactionTable<OrderDetail>(generateId(), table);
 });
 
 insertTestWithoutPK("Transaction table without PK - insert() - should...", () => {
-  const table = new Table<User>({ name: 'user' });
+  const table = new Table<User>({ primaryKey: [] });
   return new TransactionTable<User>(generateId(), table);
 });

@@ -24,7 +24,7 @@ const genericDataList: GenericData[] = [
  * Param Example:
  * ```ts
  * const createInstance = async (dataTest) => {
- * const table = new Table<GenericData>({ name: 'generic', primaryKey: ['id'] });
+ * const table = new Table<GenericData>({ primaryKey: ['id'] });
  * await table.bulkInsert(dataTest);
  * return table;
  * }
@@ -77,13 +77,13 @@ export function selectEqTests(description: string, createInstance: (dataTest: Ge
     });
   
     it("handle edge case with empty table", async () => {
-      const emptyTable = new Table<GenericData>({ name: 'empty', primaryKey: ['id'] });
+      const emptyTable = new Table<GenericData>({ primaryKey: ['id'] });
       const result = await emptyTable.select([], { id: { eq: 1 } });
       expect(result).toHaveLength(0);
     });
   
     it("handle null or undefined values gracefully", async () => {
-      const tableWithNulls = new Table<any>({ name: 'nulls', primaryKey: ['id'] });
+      const tableWithNulls = new Table<any>({ primaryKey: ['id'] });
       tableWithNulls.bulkInsert([
         { id: 1, name: null },
         { id: 2, name: undefined },
@@ -112,7 +112,7 @@ export function selectEqTests(description: string, createInstance: (dataTest: Ge
  * Param Example:
  * ```ts
  * const createInstance = async () => {
- * const table = new Table<GenericData>({ name: 'generic', primaryKey: ['id'] });
+ * const table = new Table<GenericData>({ primaryKey: ['id'] });
  * return table;
  * }
  * ```

@@ -10,16 +10,16 @@ import {
 } from "../common-tests/bulk-insert.table";
 
 bulkInsertTestsWithSinglePK("Transaction table with single PK - bulkInsert() - should...", () =>{
-  const table = new Table<User>({ name: 'user', primaryKey: ['id'] });
+  const table = new Table<User>({ primaryKey: ['id'] });
   return new TransactionTable<User>(generateId(), table);
 });
 
 bulkInsertTestsWithCompositePK("Transaction table with composite PK - bulkInsert() - should...", () =>{
-  const table = new Table<OrderDetail>({ name: 'orderDetail', primaryKey: ['orderId', 'productId'] });
+  const table = new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
   return new TransactionTable<OrderDetail>(generateId(), table);
 });
 
 bulkInsertTestWithoutPK("Transaction table without PK - bulkInsert() - should...", () =>{
-  const table = new Table<User>({ name: 'user' });
+  const table = new Table<User>({ primaryKey: [] });
   return new TransactionTable<User>(generateId(), table);
 });

@@ -6,7 +6,7 @@ import { Config } from "./config";
 import { 
   ITable,
   RecordWithId,
-  TableDefinition,
+  TableConfig,
 } from "../types/table.type";
 import {
   DuplicatePrimaryKeyDefinitionError,
@@ -15,7 +15,6 @@ import {
 } from "./errors/table.error";
 
 export class Table<T> implements ITable<T> {
-  private _name: string;
   protected _recordsMap: Map<string, RecordWithId<T>>;
   protected _recordsArray: RecordWithId<T>[];
   protected _pkDefinition: (keyof T)[];
@@ -25,15 +24,13 @@ export class Table<T> implements ITable<T> {
    * @param definition Definition object for the table
    * @param config Configuration object for the table
    */
-  constructor(definition: TableDefinition<T>, config?: Config) {
-    this._name = definition.name;
+  constructor(definition: TableConfig<T>, config?: Config) {
     this._recordsMap = new Map();
     this._recordsArray = [];
     this._pkDefinition = this.validatePKDefinition(definition.primaryKey ?? []);
     this._lockManager = new RecordLockManager(config);
   }
 
-  get name(): string { return this._name; }
   get sizeMap(): number { return this._recordsMap.size; }
   get recordsMap(): Map<string, RecordWithId<T>> { return this._recordsMap; }
   get recordsArray(): RecordWithId<T>[] { return this._recordsArray; }
