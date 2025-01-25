@@ -27,7 +27,7 @@ export class TableManager <T> implements ITable <T> {
   }
 
   update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
-    return this.update(updatedFields, where);
+    return this.table.update(updatedFields, where);
   }
 
 }
