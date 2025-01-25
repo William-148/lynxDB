@@ -62,7 +62,6 @@ export class Table<T> implements LocalTable<T> {
   /**
    * Checks if a partial record contains any fields that are part of the primary key.
    *
-   * @protected
    * @template T
    * @param {Partial<T>} record - The partial record to check.
    * @returns {boolean} - Returns true if the record contains any primary key fields, otherwise false.
@@ -76,7 +75,6 @@ export class Table<T> implements LocalTable<T> {
   /**
    * Build a primary key (PK) from a partial record.
    * 
-   * @protected
    * @param {Partial<T>} record - The partial record containing the primary key fields.
    * @returns {string} - The built primary key.
    * @throws {PrimaryKeyValueNullError} - If any primary key values are null or undefined.
@@ -97,7 +95,6 @@ export class Table<T> implements LocalTable<T> {
   /**
    * Generates new and old primary keys (PK) for updating a record.
    * 
-   * @protected
    * @param {Partial<T>} updatedFields - The partial record containing the updated fields.
    * @param {T} registeredRecord - The existing record from which the old primary key is derived.
    * @returns {{newPk: string, oldPk: string}} - An object containing the new and old primary keys.
@@ -127,7 +124,6 @@ export class Table<T> implements LocalTable<T> {
   /**
    * Extracts the specified fields from a record and returns a new partial record containing only those fields.
    *
-   * @protected
    * @template T
    * @param {Array<keyof T>} fields - The fields to extract from the record.
    * @param {T} record - The record from which to extract the fields.
@@ -157,7 +153,6 @@ export class Table<T> implements LocalTable<T> {
   /**
    * Checks if the primary key is already in use and throws an error if it is.
    *
-   * @protected
    * @param {string} primaryKey - The primary key to check.
    * @throws {DuplicatePrimaryKeyValueError} - If the primary key is already in use.
    */
@@ -170,7 +165,6 @@ export class Table<T> implements LocalTable<T> {
   /**
    * Inserts a record into the record map.
    * 
-   * @private
    * @param {RecordWithVersion<T>} record - The record to be inserted.
    */
   private insertInMap(record: RecordWithId<T>): void {
@@ -184,7 +178,6 @@ export class Table<T> implements LocalTable<T> {
    * Creates a new record with an initial version. Generates a new primary key 
    * if no primary key definition exists.
    * 
-   * @protected
    * @param {T} record - The original record.
    * @returns {RecordWithId<T>} - The new record with an initial version.
    */

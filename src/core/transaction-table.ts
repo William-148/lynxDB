@@ -493,7 +493,6 @@ export class TransactionTable<T> extends Table<T> {
   private async acquireExclusiveLocks(keys: string[]): Promise<void[]> {
     const promises: Promise<void>[] = [];
     for (let key of keys) {
-      if (this._exclusiveLocks.has(key)) continue;
       promises.push(this.acquireExclusiveLock(key));
     }
     return Promise.all(promises);
@@ -545,17 +544,17 @@ export class TransactionTable<T> extends Table<T> {
   private applyUpdates(): void {
     for (let [pk, updatedRecord] of this._tempUpdatedRecordsMap) {
       const committedRecord = this._recordsMap.get(pk);
-      if (!committedRecord) continue;
-
-      const updatedPk = this.buildPkFromRecord(updatedRecord);
-      // Update the reference of the committed record with the updated record,
-      // this way the changes of the committed record are reflected in the committed array.
-      Object.assign(committedRecord, updatedRecord);
-
-      // Delete from the Map because there is a possibility that the PK has changed
-      this._recordsMap.delete(pk);
-      // Add the original reference to the Map with the new PK
-      this._recordsMap.set(updatedPk, committedRecord);
+      if (committedRecord){
+        const updatedPk = this.buildPkFromRecord(updatedRecord);
+        // Update the reference of the committed record with the updated record,
+        // this way the changes of the committed record are reflected in the committed array.
+        Object.assign(committedRecord, updatedRecord);
+  
+        // Delete from the Map because there is a possibility that the PK has changed
+        this._recordsMap.delete(pk);
+        // Add the original reference to the Map with the new PK
+        this._recordsMap.set(updatedPk, committedRecord);
+      }
     }
   }
 
