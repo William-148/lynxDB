@@ -4,7 +4,7 @@ import { generateId } from "../utils/generate-id";
 import { RecordLockManager } from "./record-lock-manager";
 import { Config } from "./config";
 import { 
-  LocalTable,
+  ITable,
   RecordWithId,
   TableDefinition,
 } from "../types/table.type";
@@ -14,7 +14,7 @@ import {
   PrimaryKeyValueNullError,
 } from "./errors/table.error";
 
-export class Table<T> implements LocalTable<T> {
+export class Table<T> implements ITable<T> {
   private _name: string;
   protected _recordsMap: Map<string, RecordWithId<T>>;
   protected _recordsArray: RecordWithId<T>[];

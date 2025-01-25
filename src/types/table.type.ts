@@ -12,7 +12,7 @@ export type RecordWithId<T> = T & {
   _id ?: string 
 };
 
-export interface LocalTable<T> {
+export interface ITable<T> {
   /**
    * Return the number of records in the table
    */
@@ -46,6 +46,7 @@ export interface LocalTable<T> {
    * @returns The records found
    */
   select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]>;
+  
   /**
    * Update a record in the table
    * @params updatedFields The fields to update

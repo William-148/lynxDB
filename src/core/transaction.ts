@@ -2,7 +2,7 @@ import { Table } from "./table";
 import { TransactionTable } from "./transaction-table";
 import { TableNotFoundError } from "./errors/data-base.error";
 import { TableManager } from "./table-manager";
-import { LocalTable } from "../types/table.type";
+import { ITable } from "../types/table.type";
 import { TransactionCompletedError } from "./errors/transaction.error";
 import { generateId } from "../utils/generate-id";
 import { Config } from "./config";
@@ -22,7 +22,7 @@ export class Transaction  {
     this.transactionConfig = transactionConfig ?? new Config();
   }
 
-  private createTransactionTable<T>(name: string): LocalTable<T> {
+  private createTransactionTable<T>(name: string): ITable<T> {
     const table: Table<T> | undefined = this.tables.get(name);
     if (!table) throw new TableNotFoundError(name);
     
@@ -38,7 +38,7 @@ export class Transaction  {
     return tableManager;
   }
 
-  public getTable<T>(name: string): LocalTable<T> {
+  public get<T>(name: string): ITable<T> {
     if (!this.isActive) throw new TransactionCompletedError();
 
     const found = this.transactionTables.get(name);
@@ -47,37 +47,40 @@ export class Transaction  {
     return this.createTransactionTable(name);    
   }
 
-  private clearTransactionTables(): void {
-    for (const transactionTable of this.transactionTables.values()) {
-      transactionTable.clearTemporaryRecords();
-    }
-    this.transactionTables.clear();
-  }
-
-  private onFinishTransaction(): void {
-    this.clearTransactionTables();
-    this.tableManagers.clear();
+  private finishTransaction(): void {
     this.isActive = false;
+    this.tableManagers.clear();
+    this.transactionTables.clear();
   }
 
   public async commit(): Promise<void> {
     if (!this.isActive) throw new TransactionCompletedError();
-
-    const promises: Promise<void>[] = [];
-    for (const transactionTable of this.transactionTables.values()) {
-      transactionTable.commit();
+    try {
+      const promises: Promise<void>[] = [];
+      this.transactionTables.forEach((transactionTable) => {
+        promises.push(transactionTable.commit());
+      });
+      
+      await Promise.all(promises);
     }
-    await Promise.all(promises);
-
-    this.onFinishTransaction();
+    finally {
+      this.finishTransaction();
+    }
   }
 
-  public rollback(): void {
+  public async rollback(): Promise<void> {
     if (!this.isActive) throw new TransactionCompletedError();
-
-    // Manage the rollback process
-
-    this.onFinishTransaction();
+    try {
+      const promises: Promise<void>[] = [];
+      this.transactionTables.forEach((transactionTable) => {
+        promises.push(transactionTable.rollback());
+      });
+      
+      await Promise.all(promises);
+    }
+    finally {
+      this.finishTransaction();
+    }
   }
 
 }

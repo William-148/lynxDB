@@ -1,8 +1,8 @@
-import { LocalTable, RecordWithId } from "../types/table.type";
+import { ITable, RecordWithId } from "../types/table.type";
 import { Filter } from "../types/filter.type";
 import { Table } from "./table";
 
-export class TableManager <T> implements LocalTable <T> {
+export class TableManager <T> implements ITable <T> {
 
   constructor(private table: Table<T>) {}
 

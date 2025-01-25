@@ -457,7 +457,7 @@ export class TransactionTable<T> extends Table<T> {
    * This method clears any temporary records that were created during the transaction,
    * effectively rolling back any changes that were made.
    */
-  public rollback(): void {
+  public async rollback(): Promise<void> {
     this.releaseCurrentLocks();
     this.clearTemporaryRecords();
   }
