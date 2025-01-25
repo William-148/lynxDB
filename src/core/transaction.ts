@@ -5,22 +5,21 @@ import { TableManager } from "./table-manager";
 import { LocalTable } from "../types/table.type";
 import { TransactionCompletedError } from "./errors/transaction.error";
 import { generateId } from "../utils/generate-id";
-import { IsolationLevel, TransactionOptions } from "../types/transaction.type";
+import { Config } from "./config";
 
 export class Transaction  {
   private transactionId: string;
   private transactionTables: Map<string, TransactionTable<any>>;
   private tableManagers: Map<string, TableManager<any>>;
   private isActive: boolean;
+  private transactionConfig: Config;
 
-  constructor(
-    private tables: Map<string, Table<any>>,
-    private options: TransactionOptions
-  ) {
+  constructor(private tables: Map<string, Table<any>>, transactionConfig?: Config) {
     this.transactionId = generateId();
     this.transactionTables = new Map();
     this.tableManagers = new Map();
     this.isActive = true;
+    this.transactionConfig = transactionConfig ?? new Config();
   }
 
   private createTransactionTable<T>(name: string): LocalTable<T> {
@@ -30,7 +29,7 @@ export class Transaction  {
     const transactionTable = new TransactionTable<T>(
       this.transactionId, 
       table,
-      this.options.isolationLevel
+      this.transactionConfig
     );
     const tableManager = new TableManager(transactionTable);
 

@@ -1,4 +1,5 @@
 import { LockDetail, LockRequest, LockRequestType, LockType } from "../types/lock.type";
+import { Config } from "./config";
 import { InvalidLockTypeError, LockTimeoutError } from "./errors/record-lock-manager.error";
 
 /**
@@ -7,10 +8,15 @@ import { InvalidLockTypeError, LockTimeoutError } from "./errors/record-lock-man
 export class RecordLockManager {
   private locks: Map<string, LockDetail>;
   private waitingQueues: Map<string, LockRequest[]>;
+  private config: Config;
 
-  constructor() {
+  /**
+   * @param config - The configuration object for the lock manager.
+   */
+  constructor(config?: Config) {
     this.locks = new Map();
     this.waitingQueues = new Map();
+    this.config = config || new Config();
   }
 
   /**
@@ -143,14 +149,14 @@ export class RecordLockManager {
    * @param {number} timeoutMs - The maximum time to wait for the lock in milliseconds.
    * @throws {LockTimeoutError} if the key cannot be unlocked within the timeout.
    */
-  public async acquireLockWithTimeout(transactionId: string, key: string, lockType: LockType, timeoutMs: number): Promise<void> {
+  public async acquireLockWithTimeout(transactionId: string, key: string, lockType: LockType, timeoutMs?: number): Promise<void> {
     if (this.acquireLock(transactionId, key, lockType)) return;
     return this.enqueueLockRequest(
       transactionId,
       key,
       LockRequestType.Acquire,
       lockType,
-      timeoutMs
+      timeoutMs ?? this.config.get('lockTimeout')
     );
   }
 
@@ -161,14 +167,14 @@ export class RecordLockManager {
    * @param timeoutMs - The maximum time to wait for the key to be unlocked in milliseconds.
    * @throws {LockTimeoutError} if the key cannot be unlocked within the timeout.
    */
-  public async waitUnlockToRead(key: string, timeoutMs: number = 500): Promise<void> {
+  public async waitUnlockToRead(key: string, timeoutMs?: number): Promise<void> {
     if (this.canItBeRead(key)) return;
     return this.enqueueLockRequest(
       '', // In this case, the transaction ID is not important
       key, 
       LockRequestType.WaitToRead, 
       LockType.Shared, // In this case, the lock type is not important 
-      timeoutMs
+      timeoutMs ?? this.config.get('lockTimeout')
     );
   }
 
@@ -179,14 +185,14 @@ export class RecordLockManager {
    * @param timeoutMs - The maximum time to wait for the key to be unlocked in milliseconds.
    * @throws {LockTimeoutError} if the key cannot be unlocked within the timeout.
    */
-  public async waitUnlockToWrite(key: string, timeoutMs: number = 500): Promise<void> {
+  public async waitUnlockToWrite(key: string, timeoutMs?: number): Promise<void> {
     if (this.canItBeWritten(key)) return;
     return this.enqueueLockRequest(
       '', // In this case, the transaction ID is not important
       key, 
       LockRequestType.WaitToWrite, 
       LockType.Shared, // In this case, the lock type is not important 
-      timeoutMs
+      timeoutMs ?? this.config.get('lockTimeout')
     );
   }
 

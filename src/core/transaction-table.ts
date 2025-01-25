@@ -4,14 +4,14 @@ import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { Table } from "./table";
 import { RecordWithId } from "../types/table.type";
 import { IsolationLevel } from "../types/transaction.type";
-import { RecordLockManager } from "./record-lock-manager";
+import { Config } from "./config";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 import { ExternalModificationError } from "./errors/transaction-table.error";
 
 export class TransactionTable<T> extends Table<T> {
   private _transactionId: string;
-  private _isolationLevel: IsolationLevel;
+  private _transactionConfig: Config;
   /**
    * Temporal Map that stores new records and updated committed records. The records in this 
    * map have the most recent data.
@@ -56,28 +56,25 @@ export class TransactionTable<T> extends Table<T> {
   /**
    * @param transactionId The ID of the transaction.
    * @param table The table to be used in the transaction.
-   * @param isolationLevel The isolation level of the transaction. Default is ReadLatest.
+   * @param transactionConfig The configuration object for the transaction.
    */
-  constructor(
-    transactionId: string,
-    table: Table<T>,
-    isolationLevel: IsolationLevel = IsolationLevel.ReadLatest
-  ) {
-    super({ name: table.name, primaryKey: table.pkDefinition });
+  constructor(transactionId: string, table: Table<T>, transactionConfig?: Config) {
+    super({ name: table.name, primaryKey: table.pkDefinition }, transactionConfig);
     this._transactionId = transactionId;
-    this._isolationLevel = isolationLevel;
-    this._recordsArray = table.recordsArray;
-    this._recordsMap = table.recordsMap;
-    this._lockManager = table.lockManager;
-
-    this._tempRecordsArray = [];
+    this._transactionConfig = transactionConfig ?? new Config();
     this._tempRecordsMap = new Map();
+    this._tempRecordsArray = [];
 
     this._tempUpdatedRecordsMap = new Map();
     this._tempDeletedRecordsSet = new Set();
 
     this._sharedLocks = new Set();
     this._exclusiveLocks = new Set();
+
+    // Copy references from the table to the transaction table
+    this._recordsArray = table.recordsArray;
+    this._recordsMap = table.recordsMap;
+    this._lockManager = table.lockManager;
   }
 
   override get sizeMap(): number {
@@ -116,7 +113,12 @@ export class TransactionTable<T> extends Table<T> {
    */
   private async acquireSharedLock(key: string): Promise<void> {
     if (this._sharedLocks.has(key) || this._exclusiveLocks.has(key)) return;
-    await this._lockManager.acquireLockWithTimeout(this._transactionId, key, LockType.Shared, 1000);
+    await this._lockManager.acquireLockWithTimeout(
+      this._transactionId, 
+      key, 
+      LockType.Shared,
+      this._transactionConfig.get("lockTimeout")
+    );
     this._sharedLocks.add(key);
   }
 
@@ -132,7 +134,12 @@ export class TransactionTable<T> extends Table<T> {
       this._lockManager.releaseLock(this._transactionId, key);
       this._sharedLocks.delete(key);
     }
-    await this._lockManager.acquireLockWithTimeout(this._transactionId, key, LockType.Exclusive, 1000);
+    await this._lockManager.acquireLockWithTimeout(
+      this._transactionId, 
+      key, 
+      LockType.Exclusive, 
+      this._transactionConfig.get("lockTimeout")
+    );
     this._exclusiveLocks.add(key);
   }
 
@@ -143,7 +150,7 @@ export class TransactionTable<T> extends Table<T> {
    * @returns {Promise<void>} - A promise that resolves when the lock is acquired.
    */
   private async acquireReadLock(key: string): Promise<void> {
-    switch (this._isolationLevel) {
+    switch (this._transactionConfig.get("isolationLevel")) {
       case IsolationLevel.ReadLatest:
         return this.acquireSharedLock(key);
       case IsolationLevel.StrictLocking:

@@ -1,3 +1,4 @@
+import { Config } from "../../../../src/core/config";
 import { DuplicatePrimaryKeyValueError } from "../../../../src/core/errors/table.error";
 import { Table } from "../../../../src/core/table";
 import { TransactionTable } from "../../../../src/core/transaction-table";
@@ -15,7 +16,7 @@ function generateTransactionTables(
     transactionTables.push(new TransactionTable<Product>(
       generateId(), 
       table,
-      isolationLevel
+      new Config({ isolationLevel })
     ));
   }
   return transactionTables;

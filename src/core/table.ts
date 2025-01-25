@@ -2,6 +2,7 @@ import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { generateId } from "../utils/generate-id";
 import { RecordLockManager } from "./record-lock-manager";
+import { Config } from "./config";
 import { 
   LocalTable,
   RecordWithId,
@@ -21,15 +22,15 @@ export class Table<T> implements LocalTable<T> {
   protected _lockManager: RecordLockManager;
 
   /**
-   * @param name Name of the table
-   * @param pkDefinition Definition of the primary key. if a primary key is not required, pass an empty array
+   * @param definition Definition object for the table
+   * @param config Configuration object for the table
    */
-  constructor(definition: TableDefinition<T>) {
+  constructor(definition: TableDefinition<T>, config?: Config) {
     this._name = definition.name;
     this._recordsMap = new Map();
     this._recordsArray = [];
     this._pkDefinition = this.validatePKDefinition(definition.primaryKey ?? []);
-    this._lockManager = new RecordLockManager();
+    this._lockManager = new RecordLockManager(config);
   }
 
   get name(): string { return this._name; }

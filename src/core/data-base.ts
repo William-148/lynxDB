@@ -3,23 +3,29 @@ import { Transaction } from "./transaction";
 import { Table } from "./table";
 import { LocalTable, TableDefinition } from "../types/table.type";
 import { TableManager } from "./table-manager";
-import { DatabaseOptions } from "../types/database.type";
-import { IsolationLevel, TransactionOptions } from "../types/transaction.type";
+import { ConfigOptions } from "../types/config.type";
+import { Config } from "./config";
 
 export class LynxDB {
+  /** Map of tables in the database */
   private tablesMap: Map<string, Table<any>>;
+  /** Map of table managers in the database */
   private tableManagersMap: Map<string, TableManager<any>>;
-  private isolationLevel: IsolationLevel;
+  /** Gobal configuration for the database */
+  private dbConfig:Config;
 
-  constructor(options: DatabaseOptions) {
-    this.isolationLevel = options.isolationLevel || IsolationLevel.ReadLatest;
+  /**
+   * @param databaseOptions Configuration options for the database
+   */
+  constructor(databaseOptions: ConfigOptions = {}) {
     this.tablesMap = new Map();
     this.tableManagersMap = new Map();
+    this.dbConfig = new Config(databaseOptions);
   }
 
   public createTable<T>(definition: TableDefinition<T>): void {
     if (this.tablesMap.has(definition.name)) throw new TableAlreadyExistsError(definition.name);
-    const table = new Table<T>(definition);
+    const table = new Table<T>(definition, this.dbConfig);
     this.tablesMap.set(definition.name, table);
     this.tableManagersMap.set(definition.name, new TableManager(table));
   }
@@ -30,9 +36,10 @@ export class LynxDB {
     return tableManager;
   }
 
-  public createTransaction(options?: TransactionOptions): Transaction {
-    return new Transaction(this.tablesMap, {
-      isolationLevel: options?.isolationLevel || this.isolationLevel
-    });
+  public createTransaction(options?: ConfigOptions): Transaction {
+    return new Transaction(
+      this.tablesMap, 
+      options ? Config.fromOptions(this.dbConfig, options) : this.dbConfig
+    );
   }
 }

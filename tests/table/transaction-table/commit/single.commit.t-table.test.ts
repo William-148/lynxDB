@@ -1,3 +1,4 @@
+import { Config } from "../../../../src/core/config";
 import { Table } from "../../../../src/core/table";
 import { TransactionTable } from "../../../../src/core/transaction-table";
 import { IsolationLevel } from "../../../../src/types/transaction.type";
@@ -23,7 +24,7 @@ describe(`Transaction Table Commit ${IsolationLevel.ReadLatest}`, () => {
     transactionTable = new TransactionTable<Product>(
       generateId(),
       table,
-      IsolationLevel.ReadLatest
+      new Config({ isolationLevel: IsolationLevel.ReadLatest })
     );
   });
 
