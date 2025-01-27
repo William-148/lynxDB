@@ -3,6 +3,7 @@ import { LockTimeoutError } from "../../../../src/core/errors/record-lock-manage
 import { TransactionConflictError } from "../../../../src/core/errors/transaction.error";
 import { Table } from "../../../../src/core/table";
 import { TransactionTable } from "../../../../src/core/transaction-table";
+import { ConfigOptions } from "../../../../src/types/config.type";
 import { IsolationLevel } from "../../../../src/types/transaction.type";
 import { generateId } from "../../../../src/utils/generate-id";
 import { Product } from "../../../types/product-test.type";
@@ -10,14 +11,14 @@ import { Product } from "../../../types/product-test.type";
 function generateTransactionTables(
   transactionCount: number,
   table: Table<Product>,
-  isolationLevel?: IsolationLevel,
+  configOptions?: ConfigOptions
 ): TransactionTable<Product>[] {
   const transactionTables = [];
   for (let i = 0; i < transactionCount; i++) {
     transactionTables.push(new TransactionTable<Product>(
       generateId(),
       table,
-      new Config({ isolationLevel })
+      new Config(configOptions)
     ));
   }
   return transactionTables;
@@ -40,12 +41,12 @@ describe("Transaction Table - Common Concurrency", () => {
   });
 
   it("should handle concurrent transactions gracefully", async () => {
-    const commonConfig = new Config({ 
-      isolationLevel: IsolationLevel.ReadLatest,
+    const commonConfig = { 
       lockTimeout: 20
-    });
-    const tx1 = new TransactionTable<Product>(generateId(), table, commonConfig);
-    const tx2 = new TransactionTable<Product>(generateId(), table, commonConfig);
+    }
+    const tTables = generateTransactionTables(2, table, commonConfig);
+    const tx1 = tTables[0];
+    const tx2 = tTables[1];
 
     // TX1 make update
     await tx1.update({ price: 9999 }, { id: { eq: 1 } });
@@ -66,12 +67,12 @@ describe("Transaction Table - Common Concurrency", () => {
 
   it("should handle concurrent transactions with conflicting inserts", async () => {
     const newProduct = { id: 100, name: "Socks", price: 5, stock: 100 };
-    const commonConfig = new Config({ 
-      isolationLevel: IsolationLevel.ReadLatest,
+    const commonConfig = { 
       lockTimeout: 500
-    });
-    const tx1 = new TransactionTable<Product>(generateId(), table, commonConfig);
-    const tx2 = new TransactionTable<Product>(generateId(), table, commonConfig);
+    }
+    const tTables = generateTransactionTables(2, table, commonConfig);
+    const tx1 = tTables[0];
+    const tx2 = tTables[1];
 
     // Make the same insert in both transactions
     await tx1.insert(newProduct);
@@ -92,15 +93,6 @@ describe("Transaction Table - Common Concurrency", () => {
     expect(await table.findByPk({ id: newProduct.id })).not.toBeNull();
     expect(table.size()).toBe(clothesProducts.length + 1);
   });
-});
-
-describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, () => {
-  let table: Table<Product>;
-
-  beforeEach(() => {
-    table = new Table<Product>({ primaryKey: ["id"] });
-    table.bulkInsert(clothesProducts);
-  });
 
   it("should commit the first insert and the others should throw an Duplicate PK error", async () => {
     const newProductsWithSamePk: Product[] = [
@@ -112,7 +104,11 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, 
     ];
     const TransactionCount = newProductsWithSamePk.length;
     const FinalSize = clothesProducts.length + 1;
-    const transactionTables = generateTransactionTables(TransactionCount, table);
+    const transactionTables = generateTransactionTables(
+      TransactionCount, 
+      table , 
+      { isolationLevel: IsolationLevel.ReadLatest }
+    );
 
     // Insert new products with the same primary key
     await Promise.all(transactionTables.map(async (transactionTable, i) => {
@@ -123,14 +119,19 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, 
     }));
 
     // Commit transactions, Only one should be commited
-    for (let i = 0; i < TransactionCount; i++) {
-      if (i === 0) {
-        await expect(transactionTables[i].commit()).resolves.not.toThrow();
+    const commitsResult = await Promise.allSettled(transactionTables.map(
+      (t_table) => t_table.commit() 
+    ));
+    let successCount = 0;
+    for (const result of commitsResult) {
+      if (result.status === "rejected") {
+        expect(result.reason).toBeInstanceOf(TransactionConflictError);
+        continue;
       }
-      else {
-        await expect(transactionTables[i].commit()).rejects.toThrow(TransactionConflictError);
-      }
+      successCount++;
     }
+    expect(successCount).toBe(1);
+
     // Check if the table has the new product
     expect(table.size()).toBe(FinalSize);
     expect(table.sizeMap).toBe(FinalSize);
@@ -139,17 +140,124 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, 
 });
 
 
+describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, () => {
+  let table: Table<Product>;
+
+  let defaultConfig: ConfigOptions = {
+    isolationLevel: IsolationLevel.ReadLatest,
+    lockTimeout: 5000
+  };
+
+  beforeEach(() => {
+    table = new Table<Product>({ primaryKey: ["id"] });
+    table.bulkInsert(clothesProducts);
+  });
+
+  it("should allow reading the most recent committed data", async () => {
+    const itemTest = clothesProducts[2];
+    const tTables = generateTransactionTables(2, table, defaultConfig);
+    const tx1 = tTables[0];
+    const tx2 = tTables[1];
+
+    await tx1.update({ stock: 25 }, { id: { eq: itemTest.id } });
+    await tx1.commit();
+
+    const productInTx2 = await tx2.findByPk({ id: itemTest.id });
+    expect(productInTx2).toEqual({ ...itemTest, stock: 25 });
+  });
+
+  it("should handle concurrent updates with shared and exclusive locks", async () => {
+    const itemTest = clothesProducts[1];
+    const tTables = generateTransactionTables(2, table, defaultConfig);
+    const tx1 = tTables[0];
+    const tx2 = tTables[1];
+
+    // Update then read the item in tx1
+    await tx1.update({ stock: 15 }, { id: { eq: itemTest.id } });
+    const tx1Updated = await tx1.findByPk({ id: itemTest.id });
+    expect(tx1Updated).toEqual({ ...itemTest, stock: 15 });
+
+    // Try to update the same item in tx2, but the item is locked by tx1
+    // so it should wait for the lock to be released
+    const tx2UpdatePromise = tx2.update({ stock: 10 }, { id: { eq: itemTest.id } });
+
+    // tx1 should commit and release the lock
+    await tx1.commit();
+
+    // tx2 should be able to update the item now and lock the item again
+    await tx2UpdatePromise;
+    tx2.commit(); // tx2 commit the changes and release the lock
+
+    // The changes should be visible in the table
+    const finalState = await table.findByPk({ id: 2 });
+    expect(finalState).toEqual({ ...itemTest, stock: 10 });
+  });
+
+  // it("Template test", async () => {
+  //   // Create transaction tables example
+  //   const tx1 = new TransactionTable<Product>(generateId(), table, new Config(defaultConfig));
+  //   const tx2 = new TransactionTable<Product>(generateId(), table, new Config(defaultConfig));
+
+  //   /**
+  //    * Where clause supported operators:
+  //    * - eq
+  //    * - gt
+  //    * - lt
+  //    * - gte
+  //    * - lte
+  //    * - includes: Receives an array of values
+  //    * - like
+  //    */
+
+  //   // Insert example
+  //   await tx1.insert(
+  //     { id: 100, name: "Socks", price: 5, stock: 100 } // Product
+  //   );
+
+  //   // Bulk insert example
+  //   await tx1.bulkInsert([
+  //     // Multiple products
+  //   ]);
+
+  //   // Find by primary key example
+  //   const product: Product | null = await tx1.findByPk(
+  //     { id: 1 } // Partial<Product> where should be all fields of the primary key
+  //   );
+
+  //   // update example
+  //   await tx1.update(
+  //     { price: 9999 }, // new values
+  //     { id: { eq: 1 } } // where clause
+  //   );
+
+  //   // select example
+  //   const found: Array<Partial<Product>> = await tx1.select(
+  //     [], // fields to select
+  //     { price: { gte: 50 } } // where clause
+  //   );
+
+  //   // commit and rollback example
+  //   await tx1.commit();
+  //   await tx1.rollback();
+  //   await tx2.commit();
+  //   await tx2.rollback();
+
+  // });
+
+});
+
+
 describe(`Transaction Table - Concurrency Commit ${IsolationLevel.StrictLocking}`, () => {
   const technologyProducts: Product[] = [
     { id: 1, name: "Laptop", price: 1500, stock: 30 },
     { id: 2, name: "Mouse", price: 20, stock: 100 },
-    { id: 3, name: "Keyboard", price: 17, stock: 23 },
+    { id: 3, name: "Keyboard", price: 17, stock: 100 },
     { id: 4, name: "Monitor", price: 900, stock: 20 },
     { id: 5, name: "Headset", price: 100, stock: 30 },
   ];
 
   let table: Table<Product>;
-  const isolationLevel = IsolationLevel.StrictLocking;
+  const defaultConfig: ConfigOptions = { isolationLevel: IsolationLevel.StrictLocking };
 
   beforeEach(() => {
     table = new Table<Product>({ primaryKey: ["id"] });
@@ -158,11 +266,11 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.StrictLocking}
 
   it("should commit update and insert operations without errors", async () => {
     const CommitedProduct = technologyProducts[2];
-    const TransactionCount = 30;
+    const TransactionCount = 150;
     const transactionTables = generateTransactionTables(
       TransactionCount,
       table,
-      isolationLevel
+      defaultConfig
     );
     await Promise.all(transactionTables.map(async (transactionTable) => {
       const product = await transactionTable.findByPk({ id: CommitedProduct.id });
