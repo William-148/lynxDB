@@ -8,7 +8,7 @@ import { InvalidLockTypeError, LockTimeoutError } from "./errors/record-lock-man
 export class RecordLockManager {
   private locks: Map<string, LockDetail>;
   private waitingQueues: Map<string, LockRequest[]>;
-  private config: Config;
+  private _config: Config;
 
   /**
    * @param config - The configuration object for the lock manager.
@@ -16,8 +16,10 @@ export class RecordLockManager {
   constructor(config?: Config) {
     this.locks = new Map();
     this.waitingQueues = new Map();
-    this.config = config || new Config();
+    this._config = config || new Config();
   }
+
+  get config(): Config { return this._config; }
 
   /**
    * Returns the count of active locks for a given key.
@@ -156,7 +158,7 @@ export class RecordLockManager {
       key,
       LockRequestType.Acquire,
       lockType,
-      timeoutMs ?? this.config.get('lockTimeout')
+      timeoutMs ?? this._config.get('lockTimeout')
     );
   }
 
@@ -174,7 +176,7 @@ export class RecordLockManager {
       key, 
       LockRequestType.WaitToRead, 
       LockType.Shared, // In this case, the lock type is not important 
-      timeoutMs ?? this.config.get('lockTimeout')
+      timeoutMs ?? this._config.get('lockTimeout')
     );
   }
 
@@ -192,7 +194,7 @@ export class RecordLockManager {
       key, 
       LockRequestType.WaitToWrite, 
       LockType.Shared, // In this case, the lock type is not important 
-      timeoutMs ?? this.config.get('lockTimeout')
+      timeoutMs ?? this._config.get('lockTimeout')
     );
   }
 

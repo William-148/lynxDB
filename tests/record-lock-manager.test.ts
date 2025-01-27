@@ -2,8 +2,41 @@ import { RecordLockManager } from "../src/core/record-lock-manager";
 import { LockType } from '../src/types/lock.type';
 import { InvalidLockTypeError, LockTimeoutError } from '../src/core/errors/record-lock-manager.error';
 import { delay } from "../src/utils/delay";
+import { IsolationLevel } from "../src/types/transaction.type";
+import { Config } from "../src/core/config";
 
 describe('RecordLockManager', () => {
+  it("create a read lock manager correctly", async () => {
+    const recordLockManager = new RecordLockManager();
+    expect(recordLockManager).toBeInstanceOf(RecordLockManager);
+  });
+
+  it("create a read lock manager with custom config correctly", async () => {
+    const customConfigA: Config = new Config({
+      isolationLevel: IsolationLevel.StrictLocking,
+      lockTimeout: 8767
+    });
+
+    const customConfigB: Config = new Config({
+      isolationLevel: IsolationLevel.ReadLatest,
+      lockTimeout: 9887
+    });
+
+    const customConfigC: Config = new Config({
+      lockTimeout: 43
+    });
+    const recordLockManagerA = new RecordLockManager(customConfigA);
+    const recordLockManagerB = new RecordLockManager(customConfigB);
+    const recordLockManagerC = new RecordLockManager(customConfigC);
+
+    expect(recordLockManagerA.config).toEqual(customConfigA);
+    expect(recordLockManagerB.config).toEqual(customConfigB);
+    expect(recordLockManagerC.config).toEqual(customConfigC);
+  });
+
+});
+
+describe('RecordLockManager operations', () => {
   let lockManager: RecordLockManager;
 
   beforeEach(() => {
@@ -153,15 +186,15 @@ describe('RecordLockManager', () => {
   it('should acquire exclusive locks and wait for acquire other locks ', async () => {
     expect(lockManager.acquireLock('txnA', 'key1', LockType.Exclusive)).toBe(true);
 
-    const aquireLockAndRelease = async(transactionId: string, key: string, lockType: LockType, timeout: number) => {
+    const aquireLockAndRelease = async (transactionId: string, key: string, lockType: LockType, timeout?: number) => {
       await lockManager.acquireLockWithTimeout(transactionId, key, lockType, timeout);
       lockManager.releaseLock(transactionId, key);
     }
 
     const promises = Promise.all([
-      aquireLockAndRelease('txnB', 'key1', LockType.Shared, 1000),
-      aquireLockAndRelease('txnC', 'key1', LockType.Exclusive, 1000),
-      aquireLockAndRelease('txnD', 'key1', LockType.Shared, 1000),
+      aquireLockAndRelease('txnB', 'key1', LockType.Shared),
+      aquireLockAndRelease('txnC', 'key1', LockType.Exclusive),
+      aquireLockAndRelease('txnD', 'key1', LockType.Shared),
     ]);
 
     await delay(20);
@@ -176,14 +209,14 @@ describe('RecordLockManager', () => {
     expect(lockManager.acquireLock('txnA', 'key1', LockType.Exclusive)).toBe(true);
     lockManager.acquireLockWithTimeout('txnB', 'key1', LockType.Exclusive, 1000);
 
-    const aquireLockAndRelease = async(transactionId: string, key: string, lockType: LockType, timeout: number) => {
+    const aquireLockAndRelease = async (transactionId: string, key: string, lockType: LockType, timeout: number) => {
       await lockManager.acquireLockWithTimeout(transactionId, key, lockType, timeout);
       lockManager.releaseLock(transactionId, key);
     }
 
     const promises = Promise.all([
-      lockManager.waitUnlockToRead('key1', 1000),
-      lockManager.waitUnlockToWrite('key1', 1000),
+      lockManager.waitUnlockToRead('key1'), // Default timeout
+      lockManager.waitUnlockToWrite('key1'),
     ]);
     const promiseExpired = aquireLockAndRelease('txnC', 'key1', LockType.Exclusive, 30);
 

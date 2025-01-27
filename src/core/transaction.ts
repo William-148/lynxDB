@@ -3,9 +3,10 @@ import { TransactionTable } from "./transaction-table";
 import { TableNotFoundError } from "./errors/data-base.error";
 import { TableManager } from "./table-manager";
 import { ITable } from "../types/table.type";
-import { TransactionCompletedError } from "./errors/transaction.error";
+import { TransactionCompletedError, TransactionConflictError } from "./errors/transaction.error";
 import { generateId } from "../utils/generate-id";
 import { Config } from "./config";
+import { TwoPhaseCommitParticipant } from "../types/transaction.type";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 
@@ -90,26 +91,30 @@ export class Transaction <Tables extends Record<string, any>>  {
    * 
    * This method coordinates the commit process across all transaction tables:
    * 1. Verifies transaction is still active
-   * 2. Executes commit operations across all registered transaction tables
-   * 3. Ensures transaction cleanup in all cases (success or failure)
+   * 2. Prepares all transaction tables for commit
+   * 3. Applies commit operations across all transaction tables
+   * 4. Ensures transaction cleanup in all cases (success or failure)
+   * 
+   * If any error occurs during the commit process, the transaction is rolled back.
    * 
    * @throws {TransactionCompletedError} If the transaction is already completed
-   * @throws {LockTimeoutError} If a record lock couldn't be acquired
-   * @throws {DuplicatePrimaryKeyValueError} If a duplicate primary key value is detected
+   * @throws {TransactionConflictError} If a conflict occurs during the commit process
    * @throws {Error} Potential errors from individual table commits
    */
   public async commit(): Promise<void> {
     if (!this.isActive) throw new TransactionCompletedError();
     try {
-      const promises: Promise<void>[] = [];
-      this.transactionTables.forEach((transactionTable) => {
-        promises.push(transactionTable.commit());
-      });
-      
-      await Promise.all(promises);
-    }
-    finally {
+      const tTables: TwoPhaseCommitParticipant[] = Array.from(this.transactionTables.values());
+      // Phase 1: Prepare
+      await Promise.all(tTables.map((tTable) => tTable.prepare()));
+      // Phase 2: Commit
+      await Promise.all(tTables.map((tTable) => tTable.apply()));
+
       this.finishTransaction();
+    }
+    catch(error){
+      await this.rollback();
+      throw error;
     }
   }
 
@@ -122,12 +127,9 @@ export class Transaction <Tables extends Record<string, any>>  {
   public async rollback(): Promise<void> {
     if (!this.isActive) throw new TransactionCompletedError();
     try {
-      const promises: Promise<void>[] = [];
-      this.transactionTables.forEach((transactionTable) => {
-        promises.push(transactionTable.rollback());
-      });
-      
-      await Promise.all(promises);
+      await Promise.all(Array.from(this.transactionTables.values()).map(
+        (tTable) => tTable.rollback()
+      ));
     }
     finally {
       this.finishTransaction();

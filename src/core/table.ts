@@ -19,6 +19,7 @@ export class Table<T> implements ITable<T> {
   protected _recordsArray: RecordWithId<T>[];
   protected _pkDefinition: (keyof T)[];
   protected _lockManager: RecordLockManager;
+  protected _config: Config;
 
   /**
    * @param definition Definition object for the table
@@ -28,6 +29,7 @@ export class Table<T> implements ITable<T> {
     this._recordsMap = new Map();
     this._recordsArray = [];
     this._pkDefinition = this.validatePKDefinition(definition.primaryKey ?? []);
+    this._config = config ?? new Config();
     this._lockManager = new RecordLockManager(config);
   }
 
@@ -36,6 +38,7 @@ export class Table<T> implements ITable<T> {
   get recordsArray(): RecordWithId<T>[] { return this._recordsArray; }
   get pkDefinition(): (keyof T)[] { return this._pkDefinition; }
   get lockManager(): RecordLockManager { return this._lockManager; }
+  get config(): Config { return this._config; }
 
   private validatePKDefinition(pkDefinition: (keyof T)[]): (keyof T)[] {
     const uniqueKeys = new Set(pkDefinition);

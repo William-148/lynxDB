@@ -3,14 +3,16 @@ import { LockType } from "../types/lock.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { Table } from "./table";
 import { RecordWithId } from "../types/table.type";
-import { IsolationLevel } from "../types/transaction.type";
+import { IsolationLevel, TwoPhaseCommitParticipant } from "../types/transaction.type";
 import { Config } from "./config";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 import { ExternalModificationError } from "./errors/transaction-table.error";
+import { TransactionCompletedError, TransactionConflictError } from "./errors/transaction.error";
 
-export class TransactionTable<T> extends Table<T> {
+export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParticipant {
   private _transactionId: string;
+  private _isActive: boolean;
   private _transactionConfig: Config;
   /**
    * Temporal Map that stores new records and updated committed records. The records in this 
@@ -61,6 +63,7 @@ export class TransactionTable<T> extends Table<T> {
   constructor(transactionId: string, table: Table<T>, transactionConfig?: Config) {
     super({ primaryKey: table.pkDefinition }, transactionConfig);
     this._transactionId = transactionId;
+    this._isActive = true;
     this._transactionConfig = transactionConfig ?? new Config();
     this._tempRecordsMap = new Map();
     this._tempRecordsArray = [];
@@ -76,6 +79,9 @@ export class TransactionTable<T> extends Table<T> {
     this._recordsMap = table.recordsMap;
     this._lockManager = table.lockManager;
   }
+
+  get transactionId(): string { return this._transactionId; }
+  get config(): Config { return this._config; }
 
   override get sizeMap(): number {
     // In this case, _tempRecordsArray is used to complement the size of the Map, because the 
@@ -106,6 +112,15 @@ export class TransactionTable<T> extends Table<T> {
   }
 
   /**
+   * Finishes the transaction by releasing locks and clearing temporary records.
+   */
+  private finishTransaction(): void {
+    this._isActive = false;
+    this.releaseCurrentLocks();
+    this.clearTemporaryRecords();
+  }
+  
+  /**
    * Acquires a shared lock for the specified primary key.
    * 
    * @param key The primary key of the record to be locked.
@@ -114,8 +129,8 @@ export class TransactionTable<T> extends Table<T> {
   private async acquireSharedLock(key: string): Promise<void> {
     if (this._sharedLocks.has(key) || this._exclusiveLocks.has(key)) return;
     await this._lockManager.acquireLockWithTimeout(
-      this._transactionId, 
-      key, 
+      this._transactionId,
+      key,
       LockType.Shared,
       this._transactionConfig.get("lockTimeout")
     );
@@ -128,16 +143,16 @@ export class TransactionTable<T> extends Table<T> {
    * @param {string} key - The key for which to acquire the lock.
    * @returns {Promise<void>} - A promise that resolves when the lock is acquired.
    */
-  private async acquireExclusiveLock(key: string): Promise<void>{
+  private async acquireExclusiveLock(key: string): Promise<void> {
     if (this._exclusiveLocks.has(key)) return;
     if (this._sharedLocks.has(key)) {
       this._lockManager.releaseLock(this._transactionId, key);
       this._sharedLocks.delete(key);
     }
     await this._lockManager.acquireLockWithTimeout(
-      this._transactionId, 
-      key, 
-      LockType.Exclusive, 
+      this._transactionId,
+      key,
+      LockType.Exclusive,
       this._transactionConfig.get("lockTimeout")
     );
     this._exclusiveLocks.add(key);
@@ -241,7 +256,6 @@ export class TransactionTable<T> extends Table<T> {
   /**
    * Creates a new updated record by merging the committed record with the updated fields.
    * 
-   * @private
    * @param {RecordWithId<T>} committedRecord - The committed record.
    * @param {Partial<T>} updatedFields - The fields to update in the record.
    * @returns {RecordWithId<T>} - The new updated record.
@@ -389,7 +403,6 @@ export class TransactionTable<T> extends Table<T> {
    * @param {Partial<T>} updatedFields - The fields to update in the record.
    * @param {RecordWithId<T>} newestRecord - The newest record to update.
    * @param {boolean} willPkBeModified - Indicates if the primary key will be modified.
-   * @returns {void}
    */
   private handleNewestRecordUpdate(updatedFields: Partial<T>, newestRecord: RecordWithId<T>, willPkBeModified: boolean): void {
     if (willPkBeModified) {
@@ -420,8 +433,8 @@ export class TransactionTable<T> extends Table<T> {
       // At this point `record` is the committed record. The committed record is not modified, 
       // to update it, a new record is created with the updated fields.
       const newRecordUpdated = this.createNewUpdatedRecord(record, updatedFields);
-      this._tempRecordsMap.set(newPk, newRecordUpdated); 
-      this._tempUpdatedRecordsMap.set(oldPk, newRecordUpdated); 
+      this._tempRecordsMap.set(newPk, newRecordUpdated);
+      this._tempUpdatedRecordsMap.set(oldPk, newRecordUpdated);
     } else {
       // The committed record was already updated previously, `record` have the latest changes. 
       // The reference of the record (latest changes) is updated with the new updated fields.
@@ -431,10 +444,18 @@ export class TransactionTable<T> extends Table<T> {
     }
   }
 
+  /**
+   * Handles the update of a record when the primary key is not modified.
+   * 
+   * @param updatedFields - The fields to update in the record.
+   * @param record - The record to update.
+   * @param committedRecordPk - The primary key of the committed record.
+   * @param isFirstUpdate - Indicates if this is the first update for the record.
+   */
   private handleUpdateWithPKNotUpdated(
-    updatedFields: Partial<T>, 
-    record: RecordWithId<T>, 
-    committedRecordPk: string, 
+    updatedFields: Partial<T>,
+    record: RecordWithId<T>,
+    committedRecordPk: string,
     isFirstUpdate: boolean
   ): void {
     if (isFirstUpdate) {
@@ -451,49 +472,66 @@ export class TransactionTable<T> extends Table<T> {
     }
   }
 
-  /**
-   * Rolls back the changes by clearing the temporary records.
-   *
-   * This method clears any temporary records that were created during the transaction,
-   * effectively rolling back any changes that were made.
-   */
+  public async prepare(): Promise<void> {
+    if (!this._isActive) throw new TransactionCompletedError();
+    try {
+      const keysToLock = [
+        ...this._tempUpdatedRecordsMap.keys(),
+        ...this._tempDeletedRecordsSet.keys()
+      ];
+      await this.acquireExclusiveLocks(keysToLock);
+      await this.validateChanges();
+    }
+    catch (error: any) {
+      this.rollback();
+      throw new TransactionConflictError(this._transactionId, error?.message);
+    }
+  }
+
+  public async apply(): Promise<void> {
+    if (!this._isActive) throw new TransactionCompletedError();
+    try {
+      // Apply the changes
+      this.applyUpdates();
+      // this.applyDeletes(); // NOT IMPLEMENTED YET
+      this.applyNewInsertions();
+  
+      // Release locks and clear temporary records
+      this.finishTransaction();
+    }
+    catch(error: any) {
+      this.rollback();
+      throw new TransactionConflictError(this._transactionId, error?.message);
+    }
+  }
+
   public async rollback(): Promise<void> {
-    this.releaseCurrentLocks();
-    this.clearTemporaryRecords();
+    this.finishTransaction();
   }
 
   /**
-   * Commits the changes by locking the keys, validating, and writing the updates.
-   *
-   * This method collects the keys from the temporary updated records map and the temporary 
-   * deleted records set, then performs the validation and writing phases asynchronously.
+   * Commits the changes.
    * 
+   * Applies the changes permanently by updating the committed records map and array.
+   * 
+   * Phases:
+   * 1. Prepare: Validates changes and locks resources.
+   * 2. Apply/Commit: Applies the changes permanently.
+   * 
+   * If any phase fails, the changes are rolled back automatically.
+   * 
+   * @throws {TransactionCompletedError} If the transaction is already completed.
    * @throws {LockTimeoutError} If the locks cannot be acquired within the timeout.
    * @throws {DuplicatePrimaryKeyValueError} If there are duplicate primary keys.
-   *
    */
   public async commit(): Promise<void> {
-    const keysToLock = [
-      ...this._tempUpdatedRecordsMap.keys(),
-      ...this._tempDeletedRecordsSet.keys()
-    ];
-    try {
-      await this.acquireExclusiveLocks(keysToLock);
-      await this.ValidationPhase();
-      await this.WritingPhase();
-      this.releaseCurrentLocks();
-      this.clearTemporaryRecords();
-    }
-    catch (error) {
-      this.rollback();
-      throw error;
-    }
+    await this.prepare();
+    await this.apply();
   }
 
   /**
    * Acquires exclusive locks for the specified keys.
    *
-   * @private
    * @param {string[]} keys - The keys for which to acquire exclusive locks.
    * @returns {Promise<void[]>} - A promise that resolves when all locks are acquired.
    */
@@ -515,7 +553,7 @@ export class TransactionTable<T> extends Table<T> {
    * @throws {LockTimeoutError} If the locks cannot be acquired within the timeout.
    * @throws {DuplicatePrimaryKeyValueError} If there are duplicate primary keys.
    */
-  private async ValidationPhase(): Promise<void> {
+  public async validateChanges(): Promise<void> {
     // Validate that there are no duplicate PKs
     for (let pk of this._tempRecordsMap.keys()) {
       if (this._recordsMap.has(pk)
@@ -527,18 +565,20 @@ export class TransactionTable<T> extends Table<T> {
   }
 
   /**
-   * Applies changes by acquiring exclusive locks and performing updates, deletions, and insertions.
+   * Inserts new records into the committed records map and array.
    *
-   * This method acquires exclusive locks for the specified keys and then applies updates, deletions,
-   * and new insertions to the committed map and array. If the locks cannot be acquired within the
-   * timeout, a LockTimeoutError is thrown.
-   *
-   * @throws {LockTimeoutError} If the locks cannot be acquired within the timeout.
+   * This method iterates over the temporary records array, builds the primary key (PK) for each 
+   * new record, and inserts the record into the committed records map and array.
+   * 
+   * @throws {DuplicatePrimaryKeyValueError} If a duplicate primary key is found.
    */
-  private async WritingPhase(): Promise<void> {
-    this.applyUpdates();
-    // this.applyDeletes(); // NOT IMPLEMENTED YET
-    this.applyNewInsertions();
+  private applyNewInsertions(): void {
+    for (let newRecord of this._tempRecordsArray) {
+      const primaryKey = this.buildPkFromRecord(newRecord);
+      if (this._recordsMap.has(primaryKey)) throw this.createDuplicatePkValueError(primaryKey);
+      this._recordsMap.set(primaryKey, newRecord);
+      this._recordsArray.push(newRecord);
+    }
   }
 
   /**
@@ -551,12 +591,12 @@ export class TransactionTable<T> extends Table<T> {
   private applyUpdates(): void {
     for (let [pk, updatedRecord] of this._tempUpdatedRecordsMap) {
       const committedRecord = this._recordsMap.get(pk);
-      if (committedRecord){
+      if (committedRecord) {
         const updatedPk = this.buildPkFromRecord(updatedRecord);
         // Update the reference of the committed record with the updated record,
         // this way the changes of the committed record are reflected in the committed array.
         Object.assign(committedRecord, updatedRecord);
-  
+
         // Delete from the Map because there is a possibility that the PK has changed
         this._recordsMap.delete(pk);
         // Add the original reference to the Map with the new PK
@@ -589,19 +629,4 @@ export class TransactionTable<T> extends Table<T> {
   //   }
   //   this._recordsArray = newArray;
   // }
-
-  /**
-   * Inserts new records into the committed records map and array.
-   *
-   * This method iterates over the temporary records array, builds the primary key (PK) for each new record,
-   * and inserts the record into the committed records map and array.
-   */
-  private applyNewInsertions(): void {
-    for (let newRecord of this._tempRecordsArray) {
-      const primaryKey = this.buildPkFromRecord(newRecord);
-      this._recordsMap.set(primaryKey, newRecord);
-      this._recordsArray.push(newRecord);
-    }
-  }
-
 }
