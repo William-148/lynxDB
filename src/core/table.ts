@@ -30,7 +30,7 @@ export class Table<T> implements ITable<T> {
     this._recordsArray = [];
     this._pkDefinition = this.validatePKDefinition(definition.primaryKey ?? []);
     this._config = config ?? new Config();
-    this._lockManager = new RecordLockManager(config);
+    this._lockManager = new RecordLockManager(this._config);
   }
 
   get sizeMap(): number { return this._recordsMap.size; }
