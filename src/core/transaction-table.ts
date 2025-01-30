@@ -332,7 +332,6 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * 
    * @param primaryKey - Built primary key string
    * @returns Cloned updated record or null if not found
-   * @sideEffect Releases lock if record is found because it has a temporary record
    */
   private findInUpdatedRecords(primaryKey: string): T | null {
     const committedPk = this._tempUpdatedWithUpdatedPK.get(primaryKey);
@@ -341,7 +340,6 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     const updatedRecord = this._tempUpdatedMap.get(committedPk);
     if (!updatedRecord) return null;
 
-    this.releaseLock(primaryKey);
     return { ...updatedRecord };
   }
 
@@ -598,9 +596,6 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     // Delete the updated records from the Maps.
     this._tempUpdatedWithUpdatedPK.delete(primaryKey);
     this._tempUpdatedMap.delete(committedPk);
-
-    // Release the lock because the temporary record has been deleted.
-    this.releaseLock(primaryKey);
 
     return { ...updatedCommittedRecord };
   }
