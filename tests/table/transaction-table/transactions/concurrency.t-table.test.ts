@@ -5,9 +5,9 @@ import { Table } from "../../../../src/core/table";
 import { TransactionTable } from "../../../../src/core/transaction-table";
 import { ConfigOptions } from "../../../../src/types/config.type";
 import { IsolationLevel } from "../../../../src/types/transaction.type";
-import { delay } from "../../../../src/utils/delay";
 import { generateId } from "../../../../src/utils/generate-id";
 import { Product } from "../../../types/product-test.type";
+import { delay } from "../../../utils/delay-test";
 
 function generateTransactionTables(
   transactionCount: number,
@@ -42,7 +42,7 @@ describe("Transaction Table - Common Concurrency", () => {
   });
 
   it("should handle concurrent transactions gracefully", async () => {
-    const commonConfig = { 
+    const commonConfig = {
       lockTimeout: 20
     }
     const tTables = generateTransactionTables(2, table, commonConfig);
@@ -68,7 +68,7 @@ describe("Transaction Table - Common Concurrency", () => {
 
   it("should handle concurrent transactions with conflicting inserts", async () => {
     const newProduct = { id: 100, name: "Socks", price: 5, stock: 100 };
-    const commonConfig = { 
+    const commonConfig = {
       lockTimeout: 500
     }
     const tTables = generateTransactionTables(2, table, commonConfig);
@@ -86,7 +86,7 @@ describe("Transaction Table - Common Concurrency", () => {
         tx2.commit()
       ]);
     }
-    
+
     await expect(tryToCommit()).rejects.toThrow(TransactionConflictError);
 
     // Check if the table has the new product
@@ -106,8 +106,8 @@ describe("Transaction Table - Common Concurrency", () => {
     const TransactionCount = newProductsWithSamePk.length;
     const FinalSize = clothesProducts.length + 1;
     const transactionTables = generateTransactionTables(
-      TransactionCount, 
-      table , 
+      TransactionCount,
+      table,
       { isolationLevel: IsolationLevel.ReadLatest }
     );
 
@@ -120,7 +120,7 @@ describe("Transaction Table - Common Concurrency", () => {
 
     // Commit transactions, Only one should be commited
     const commitsResult = await Promise.allSettled(transactionTables.map(
-      (t_table) => t_table.commit() 
+      (t_table) => t_table.commit()
     ));
     let successCount = 0;
     for (const result of commitsResult) {
@@ -194,39 +194,47 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, 
 
   it("should ...", async () => {
     const itemTest = clothesProducts[2];
-    const tTables = generateTransactionTables(2, table, defaultConfig);
+    const tTables = generateTransactionTables(
+      2,
+      table,
+      // defaultConfig
+      {
+        isolationLevel: IsolationLevel.ReadLatest,
+        lockTimeout: 5000
+      }
+    );
     const tx1 = tTables[0];
     const tx2 = tTables[1];
     const stockInTx1 = 15;
     const stockInTx2 = 25;
 
     const operationsTx1 = async () => {
-      try{ 
-      // Lock the record with shared lock
-      const found = await tx1.findByPk({ id: itemTest.id });
+      try {
+        // Lock the record with shared lock
+        const found = await tx1.findByPk({ id: itemTest.id });
 
-      // Release the shared lock and lock the record with exclusive lock
-      if(found){
-        const affected = await tx1.update({ stock: found.stock - 1 }, { id: { eq: found.id }, stock: { eq: found.stock } });
-        if (affected !== 1) throw new Error("Product external changes");
+        // Release the shared lock and lock the record with exclusive lock
+        if (found) {
+          const affected = await tx1.update({ stock: found.stock - 1 }, { id: { eq: found.id }, stock: { eq: found.stock } });
+          if (affected !== 1) throw new Error("Product external changes");
+        }
+
+        console.table([
+          found,
+          await tx1.findByPk({ id: itemTest.id })
+        ])
+        tx1.commit();
       }
-
-      console.table([
-        found,
-        await tx1.findByPk({ id: itemTest.id })
-      ])
-      tx1.commit();
-    }
-    catch (error) {
-      tx1.rollback();
-      console.error(error);
-    }
+      catch (error) {
+        tx1.rollback();
+        console.error(error);
+      }
     }
 
     const operationsTx2 = async () => {
       try {
         const found = await tx2.findByPk({ id: itemTest.id });
-        if(found){
+        if (found) {
           await delay(1000);
           const affected = await tx2.update({ stock: found.stock - 1 }, { id: { eq: found.id }, stock: { eq: found.stock } });
           if (affected !== 1) throw new Error("Product external changes");
@@ -241,7 +249,7 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, 
         tx2.rollback();
         console.error(error);
       }
-      
+
     }
 
     await Promise.all([
@@ -352,6 +360,42 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.StrictLocking}
     const updatedProduct = await table.findByPk({ id: CommitedProduct.id });
     const finalStock = CommitedProduct.stock - TransactionCount;
     expect(updatedProduct?.stock).toBe(finalStock < 0 ? 0 : finalStock);
+  });
+
+  /**
+   Hacer un test donde 2 o más transacciones actualizan 1 registro 
+    - Como está ahora se debería de cumplir el error de actualización perdida
+   */
+  it("should update the same register by many transactions", async () => {
+    const itemTest = technologyProducts[2];
+    const tTables = generateTransactionTables(2, table, defaultConfig);
+
+    const operationsTx1 = async (tx: TransactionTable<Product>) => {
+      try {
+        // await tx.findByPk({ id: itemTest.id });
+        // Lock the record with shared lock
+        const affected = await tx.update({ stock: itemTest.stock - 1 }, { 
+          id: { eq: itemTest.id }, 
+          stock: { eq: itemTest.stock } 
+        });
+        if (affected !== 1) throw new Error("Product external changes");
+
+        console.table([
+          await tx.findByPk({ id: itemTest.id })
+        ])
+        tx.commit();
+      }
+      catch (error) {
+        tx.rollback();
+        console.error(error);
+      }
+    }
+
+    await Promise.all(tTables.map(operationsTx1));
+
+    console.table([
+      await table.findByPk({ id: itemTest.id })
+    ])
   });
 
 });

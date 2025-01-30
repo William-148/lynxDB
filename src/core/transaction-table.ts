@@ -430,7 +430,6 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     let affectedRecords = 0;
 
     const committedUpdateProcess = async (committedRecordPk: string) => {
-      await this.waitUlockToRead(committedRecordPk);
       const committedRecord = this._recordsMap.get(committedRecordPk);
       if (!committedRecord) return;
 
@@ -438,19 +437,18 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
       // Finish because the record is null, which means that it was deleted and should be ignored.
       if (recordWithTempChanges === null) return;
 
-      // const hasExclusiveLock = this._exclusiveLocks.has(committedRecordPk);
+      const hadExclusiveLock = this._exclusiveLocks.has(committedRecordPk); // TODO: Reevaluar
 
       if (!matchRecord(recordWithTempChanges, compiledFilter)) return;
       await this.acquireExclusiveLock(committedRecordPk);
 
-      const isRecordFirstUpdate = (committedRecord === recordWithTempChanges);
+      if(!hadExclusiveLock && !matchRecord(recordWithTempChanges, compiledFilter)) {
+        // TODO: Reevaluar este bloque
+        this.releaseLock(committedRecordPk);
+        return;
+      }
 
-      // if(!hasExclusiveLock && isRecordFirstUpdate) {
-      //   if(!matchRecord(recordWithTempChanges, compiledFilter)) {
-      //     this.releaseLock(committedRecordPk);
-      //     return;
-      //   }
-      // }
+      const isRecordFirstUpdate = (committedRecord === recordWithTempChanges);
 
       if (willPkBeModified) {
         this.handleUpdateWithPKUpdated(updatedFields, recordWithTempChanges, isRecordFirstUpdate);
