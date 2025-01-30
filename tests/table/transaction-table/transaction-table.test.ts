@@ -14,9 +14,8 @@ describe("Transaction table should", () => {
 
     expect(ttable).toBeInstanceOf(TransactionTable);
     expect(ttable.transactionId).toEqual(transactionId);
-    expect(ttable.pkDefinition).toEqual(['id', 'username']);
+    expect(ttable.primaryKeyDef).toEqual(['id', 'username']);
     expect(ttable.size()).toEqual(0);
-    expect(ttable.sizeMap).toEqual(0);
   });
 
   it("create a transaction table with custom config correctly", async () => {

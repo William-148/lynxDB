@@ -15,35 +15,32 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   private _isActive: boolean;
   private _transactionConfig: Config;
   /**
-   * Temporal Map that stores new records and updated committed records. The records in this 
-   * map have the most recent data.
+   * Temporal Map that stores new records. The records in this map have the most recent data.
    * 
    * This map stores:
-   * - New records inserted that have not yet been applied.
-   * - Committed records updated that have not yet been applied. These records have the most 
-   *   recently updated PK as the map key.
+   * - New inserted records that will be applied in the commit phase.
    */
-  private _tempRecordsMap: Map<string, RecordWithId<T>>;
+  private _tempInsertedRecordsMap: Map<string, RecordWithId<T>>;
   /**
-   * Temporal Array that stores the new inserted records that will be inserted in the committed 
-   * Array.
-   * 
-   * This array stores:
-   * - New records inserted that have not yet been applied.
-   */
-  private _tempRecordsArray: RecordWithId<T>[];
-  /**
-   * Temporal Map that stores the updates of the committed records that will be applied in the 
-   * committed Map and Array.
+   * Temporal Map that stores the updates of the committed records. These records will be applied
+   * in the commit phase.
    * 
    * This map stores:
    * - Committed records that have been updated and have not yet been applied.
    *   These records have the committed/oldest PK as the map key.
    */
-  private _tempUpdatedRecordsMap: Map<string, RecordWithId<T>>;
+  private _tempUpdatedMap: Map<string, RecordWithId<T>>;
   /**
-   * Temporal Set that stores the PK of the committed records that will be deleted in the 
-   * committed Map and Array.
+   * Temporal Map that stores the new and the original PK of the updated records as key-value pairs.
+   * 
+   * The key of this map is the new PK of the updated record, and the value is the original PK.
+   * 
+   * When a record is updated and the PK is not modified, the original PK is the key and the value.
+   */
+  private _tempUpdatedWithUpdatedPK: Map<string, string>;
+  /**
+   * Temporal Set that stores the PK of the deleted committed records that will be applied in the 
+   * commit phase.
    * 
    * This set stores:
    * - Committed records PK that have been deleted and have not yet been applied.
@@ -61,21 +58,20 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * @param transactionConfig The configuration object for the transaction.
    */
   constructor(transactionId: string, table: Table<T>, transactionConfig?: Config) {
-    super({ primaryKey: table.pkDefinition }, transactionConfig);
+    super({ primaryKey: table.primaryKeyDef }, transactionConfig);
     this._transactionId = transactionId;
     this._isActive = true;
     this._transactionConfig = transactionConfig ?? new Config();
-    this._tempRecordsMap = new Map();
-    this._tempRecordsArray = [];
+    this._tempInsertedRecordsMap = new Map();
 
-    this._tempUpdatedRecordsMap = new Map();
+    this._tempUpdatedMap = new Map();
+    this._tempUpdatedWithUpdatedPK = new Map();
     this._tempDeletedRecordsSet = new Set();
 
     this._sharedLocks = new Set();
     this._exclusiveLocks = new Set();
 
     // Copy references from the table to the transaction table
-    this._recordsArray = table.recordsArray;
     this._recordsMap = table.recordsMap;
     this._lockManager = table.lockManager;
   }
@@ -83,21 +79,14 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   get transactionId(): string { return this._transactionId; }
   get config(): Config { return this._config; }
 
-  override get sizeMap(): number {
-    // In this case, _tempRecordsArray is used to complement the size of the Map, because the 
-    // Temporary Map stores new and updated records, so its size is not real. Instead, the size 
-    // of the Temporary Array is used because it will only store new records.
-    return this._recordsMap.size + this._tempRecordsArray.length;
-  }
-
   /**
    * Clears all temporary records, including temporary records map, temporary records array, 
    * updated records map, and deleted records set.
    */
   public clearTemporaryRecords(): void {
-    this._tempRecordsMap.clear();
-    this._tempRecordsArray = [];
-    this._tempUpdatedRecordsMap.clear();
+    this._tempInsertedRecordsMap.clear();
+    this._tempUpdatedMap.clear();
+    this._tempUpdatedWithUpdatedPK.clear();
     this._tempDeletedRecordsSet.clear();
   }
 
@@ -111,6 +100,12 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     this._exclusiveLocks.clear();
   }
 
+  private async releaseLock(key: string): Promise<void> {
+    await this._lockManager.releaseLock(this._transactionId, key);
+    this._sharedLocks.delete(key);
+    this._exclusiveLocks.delete(key);
+  }
+
   /**
    * Finishes the transaction by releasing locks and clearing temporary records.
    */
@@ -119,7 +114,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     this.releaseCurrentLocks();
     this.clearTemporaryRecords();
   }
-  
+
   /**
    * Acquires a shared lock for the specified primary key.
    * 
@@ -159,6 +154,20 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   }
 
   /**
+   * Acquires exclusive locks for the specified keys.
+   *
+   * @param {string[]} keys - The keys for which to acquire exclusive locks.
+   * @returns {Promise<void[]>} - A promise that resolves when all locks are acquired.
+   */
+  private async acquireExclusiveLocks(keys: string[]): Promise<void[]> {
+    const promises: Promise<void>[] = [];
+    for (let key of keys) {
+      promises.push(this.acquireExclusiveLock(key));
+    }
+    return Promise.all(promises);
+  }
+
+  /**
    * Acquires a read lock for the specified key based on the isolation level.
    *
    * @param {string} key - The key for which to acquire the read lock.
@@ -173,15 +182,21 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     }
   }
 
+  private async waitUlockToRead(key: string): Promise<void> {
+    if (this._sharedLocks.has(key) || this._exclusiveLocks.has(key)) return;
+    await this._lockManager.waitUnlockToRead(key, this._config.get("lockTimeout"));
+  }
+
   /**
    * Checks if the primary key of a committed record has been updated.
    *
    * @param {string} commitedPk - The primary key of the committed record.
+   * @param {RecordWithId<T>} commitedRecord - The committed record to check for updates.
    * @returns {boolean} - Returns true if the primary key has been updated, otherwise false.
    */
-  private isCommitedRecordPkUpdated(commitedPk: string): boolean {
+  private isCommitedRecordPkUpdated(commitedPk: string, commitedRecord?: RecordWithId<T>): boolean {
     // Retrieve the temporarily updated committed record
-    const commitedRecordUpdated = this._tempUpdatedRecordsMap.get(commitedPk);
+    const commitedRecordUpdated = commitedRecord || this._tempUpdatedMap.get(commitedPk);
     if (!commitedRecordUpdated) return false;
 
     // If the record exists and its primary key has changed, return true
@@ -203,7 +218,8 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * committed Map or in the temporary Map
    */
   private checkIfPkExistsInMaps(primaryKey: string): void {
-    if (this._tempRecordsMap.has(primaryKey)) throw this.createDuplicatePkValueError(primaryKey);
+    if (this._tempInsertedRecordsMap.has(primaryKey) || this._tempUpdatedWithUpdatedPK.has(primaryKey))
+      throw this.createDuplicatePkValueError(primaryKey);
 
     if (!this._recordsMap.has(primaryKey)) {
       // The PK is available because it is not found in the temporary Map or in the committed Map.
@@ -237,7 +253,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   private insertInTemporaryMap(record: RecordWithId<T>): void {
     const primaryKey = this.buildPkFromRecord(record);
     this.checkIfPkExistsInMaps(primaryKey);
-    this._tempRecordsMap.set(primaryKey, record);
+    this._tempInsertedRecordsMap.set(primaryKey, record);
   }
 
   /**
@@ -245,12 +261,14 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    *
    * @param {string} primaryKey - The primary key of the committed record.
    * @param {RecordWithId<T>} committedRecord - The committed record to check for temporary changes.
-   * @returns {RecordWithId<T> | null} - The temporary changes if they exist, or null if the record 
-   * has been deleted, or the committed record if no changes are found.
+   * @returns {RecordWithId<T> | null} 
+   *  - The temporary changes if they exist.
+   *  - null if the record has been deleted.
+   *  - The committed record passed as a parameter if there are no temporary changes.
    */
   private getTempChangesFromCommittedRecord(primaryKey: string, committedRecord: RecordWithId<T>): RecordWithId<T> | null {
     if (this._tempDeletedRecordsSet.has(primaryKey)) return null;
-    return this._tempUpdatedRecordsMap.get(primaryKey) ?? committedRecord;
+    return this._tempUpdatedMap.get(primaryKey) ?? committedRecord;
   }
 
   /**
@@ -268,13 +286,12 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   }
 
   override size(): number {
-    return this._recordsArray.length + this._tempRecordsArray.length;
+    return this._recordsMap.size + this._tempInsertedRecordsMap.size - this._tempDeletedRecordsSet.size;
   }
 
   override async insert(record: T): Promise<T> {
     const newRecord = this.createNewRecordWithId(record);
     this.insertInTemporaryMap(newRecord);
-    this._tempRecordsArray.push(newRecord);
     return { ...newRecord };
   }
 
@@ -282,37 +299,75 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     for (let record of records) {
       const newRecord = this.createNewRecordWithId(record);
       this.insertInTemporaryMap(newRecord);
-      this._tempRecordsArray.push(newRecord);
     }
   }
 
-  override async findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
-    const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
+  //#region FIND BY PK METHODS
+  override async findByPk(objectPrimaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
+    const primaryKeyBuilt = this.buildPkFromRecord(objectPrimaryKey);
+    await this.acquireReadLock(primaryKeyBuilt);
 
-    // At this point, an attempt is made to find a recently inserted or updated record.
-    const temporaryRecord = this._tempRecordsMap.get(primaryKeyBuilt);
-    if (temporaryRecord) {
-      await this.acquireReadLock(primaryKeyBuilt);
-      return { ...temporaryRecord };
+    return this.findInInsertedRecords(primaryKeyBuilt)
+      ?? this.findInUpdatedRecords(primaryKeyBuilt)
+      ?? this.findInCommittedRecords(primaryKeyBuilt);
+  }
+
+  /**
+   * Searches for a record in temporarily inserted records.
+   * 
+   * @param primaryKey - Built primary key string
+   * @returns Cloned inserted record or null if not found
+   * @sideEffect Releases lock if record is found because it's a temporary record
+   */
+  private findInInsertedRecords(primaryKey: string): T | null {
+    const insertedRecord = this._tempInsertedRecordsMap.get(primaryKey);
+    if (!insertedRecord) return null;
+
+    this.releaseLock(primaryKey);
+    return { ...insertedRecord };
+  }
+
+  /**
+   * Searches for an updated record,
+   * 
+   * @param primaryKey - Built primary key string
+   * @returns Cloned updated record or null if not found
+   * @sideEffect Releases lock if record is found because it has a temporary record
+   */
+  private findInUpdatedRecords(primaryKey: string): T | null {
+    const committedPk = this._tempUpdatedWithUpdatedPK.get(primaryKey);
+    if (!committedPk) return null;
+
+    const updatedRecord = this._tempUpdatedMap.get(committedPk);
+    if (!updatedRecord) return null;
+
+    this.releaseLock(primaryKey);
+    return { ...updatedRecord };
+  }
+
+  /**
+   * Searches in committed records and validates deletion/update status
+   * 
+   * @param primaryKey - Built primary key string
+   * @returns Cloned committed record or null if deleted/not found
+   * @sideEffect Releases lock if record doesn't exist
+   */
+  private findInCommittedRecords(primaryKey: string): T | null {
+    const committedRecord = this._recordsMap.get(primaryKey);
+    
+    if (!committedRecord) {
+      this.releaseLock(primaryKey);
+      return null;
     }
 
-    // Try to find a permanent/committed record from the committed Map.
-    const committedRecord = this._recordsMap.get(primaryKeyBuilt);
-
-    if (!committedRecord) return null;
-
-    // * Check if the committed record was deleted.
-    // * Check if the committed record was updated. If it does not exist in the temporary Map 
-    //   but does exist in the temporary update Map, it means that the PK of the committed 
-    //   record has been modified. Therefore, null must be returned because the committed record 
-    //   no longer exists with this PK and will be deleted from the committed Map during the 
-    //   commit operation.
-    await this.acquireReadLock(primaryKeyBuilt);
-    if (this._tempDeletedRecordsSet.has(primaryKeyBuilt)
-      || this._tempUpdatedRecordsMap.has(primaryKeyBuilt)) return null;
+    if (this._tempDeletedRecordsSet.has(primaryKey) || 
+        this._tempUpdatedMap.has(primaryKey)) {
+      return null;
+    }
 
     return { ...committedRecord };
   }
+  //#endregion
 
   override async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
     const compiledFilter = compileFilter(where);
@@ -321,17 +376,16 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
 
     const areFieldsToSelectEmpty = (fields.length === 0);
 
-    const committedSelectProcess = async (committedRecord: RecordWithId<T>) => {
-      const commitedRecordPK = this.buildPkFromRecord(committedRecord);
-      const recordWithTempChanges = this.getTempChangesFromCommittedRecord(commitedRecordPK, committedRecord);
+    const committedSelectProcess = async ([committedRecordPk, committedRecord]: [string, RecordWithId<T>]) => {
+      await this.waitUlockToRead(committedRecordPk);
 
-      // The function execution is finished because the record is null, which means that it was 
-      // deleted and should not be added to the result.
+      const recordWithTempChanges = this.getTempChangesFromCommittedRecord(committedRecordPk, committedRecord);
+      // Finish because the record is null, which means that it was deleted and should be ignored.
       if (recordWithTempChanges === null) return;
 
       if (!matchRecord(recordWithTempChanges, compiledFilter)) return;
 
-      await this.acquireReadLock(commitedRecordPK);
+      await this.acquireReadLock(committedRecordPk);
 
       committedResults.push(areFieldsToSelectEmpty
         ? { ...recordWithTempChanges }
@@ -347,35 +401,58 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
       );
     }
 
-    // Loop through the committed and temporary Array to access the committed and newest records.
-    const committedPromises = Promise.all(this._recordsArray.map(committedSelectProcess));
-    const uncommitedPromises = Promise.all(this._tempRecordsArray.map(newestSelectProcess));
+    // Loops 
+    const committedPromises: Promise<void>[] = [];
+    for (const data of this._recordsMap) {
+      committedPromises.push(committedSelectProcess(data));
+    }
 
-    await committedPromises;
-    await uncommitedPromises;
+    const uncommittedPromises: Promise<void>[] = [];
+    for (const newestRecord of this._tempInsertedRecordsMap.values()) {
+      uncommittedPromises.push(newestSelectProcess(newestRecord));
+    }
+
+    // Loop through the committed and temporary Array to access the committed and newest records.
+    const proccessCommitted = this.processPromiseBatch(committedPromises);
+    const proccessUncommited = this.processPromiseBatch(uncommittedPromises);
+
+    await proccessCommitted;
+    await proccessUncommited;
 
     return committedResults.concat(newestResults);
   }
 
+  //#region UPDATE METHODS
   public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
     const willPkBeModified = this.isPartialRecordPartOfPk(updatedFields);
     const compiledFilter = compileFilter(where);
+    const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
 
-    const committedUpdateProcess = async (committedRecord: RecordWithId<T>) => {
-      const committedRecordPk = this.buildPkFromRecord(committedRecord);
-      const recordWithTempChanges = this.getTempChangesFromCommittedRecord(committedRecordPk, committedRecord);
+    const committedUpdateProcess = async (committedRecordPk: string) => {
+      await this.waitUlockToRead(committedRecordPk);
+      const committedRecord = this._recordsMap.get(committedRecordPk);
+      if (!committedRecord) return;
 
-      // The function execution is finished because the record is null, which means that it was 
-      // deleted and should be ignored.
+      const recordWithTempChanges = this.getTempChangesFromCommittedRecord(committedRecordPk, committedRecord);
+      // Finish because the record is null, which means that it was deleted and should be ignored.
       if (recordWithTempChanges === null) return;
+
+      // const hasExclusiveLock = this._exclusiveLocks.has(committedRecordPk);
 
       if (!matchRecord(recordWithTempChanges, compiledFilter)) return;
       await this.acquireExclusiveLock(committedRecordPk);
 
       const isRecordFirstUpdate = (committedRecord === recordWithTempChanges);
+
+      // if(!hasExclusiveLock && isRecordFirstUpdate) {
+      //   if(!matchRecord(recordWithTempChanges, compiledFilter)) {
+      //     this.releaseLock(committedRecordPk);
+      //     return;
+      //   }
+      // }
 
       if (willPkBeModified) {
         this.handleUpdateWithPKUpdated(updatedFields, recordWithTempChanges, isRecordFirstUpdate);
@@ -386,13 +463,13 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
       affectedRecords++;
     }
 
-    for (const newestRecord of this._tempRecordsArray) {
+    for (const newestRecord of Array.from(this._tempInsertedRecordsMap.values())) {
       if (!matchRecord(newestRecord, compiledFilter)) continue;
       this.handleNewestRecordUpdate(updatedFields, newestRecord, willPkBeModified);
       affectedRecords++;
     }
-
-    await Promise.all(this._recordsArray.map(committedUpdateProcess));
+    
+    await this.processPromiseBatch(keys.map(committedUpdateProcess));
 
     return affectedRecords;
   }
@@ -407,11 +484,11 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   private handleNewestRecordUpdate(updatedFields: Partial<T>, newestRecord: RecordWithId<T>, willPkBeModified: boolean): void {
     if (willPkBeModified) {
       const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, newestRecord);
-      this.checkIfPkExistsInMaps(newPk);
+      if (newPk !== oldPk) this.checkIfPkExistsInMaps(newPk);
 
-      this._tempRecordsMap.delete(oldPk);
       Object.assign(newestRecord, updatedFields);
-      this._tempRecordsMap.set(newPk, newestRecord);
+      this._tempInsertedRecordsMap.delete(oldPk);
+      this._tempInsertedRecordsMap.set(newPk, newestRecord);
     }
     else {
       Object.assign(newestRecord, updatedFields);
@@ -427,20 +504,23 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    */
   private handleUpdateWithPKUpdated(updatedFields: Partial<T>, record: RecordWithId<T>, isFirstUpdate: boolean): void {
     const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, record);
-    this.checkIfPkExistsInMaps(newPk);
+    if (newPk !== oldPk) this.checkIfPkExistsInMaps(newPk);
 
     if (isFirstUpdate) {
       // At this point `record` is the committed record. The committed record is not modified, 
       // to update it, a new record is created with the updated fields.
       const newRecordUpdated = this.createNewUpdatedRecord(record, updatedFields);
-      this._tempRecordsMap.set(newPk, newRecordUpdated);
-      this._tempUpdatedRecordsMap.set(oldPk, newRecordUpdated);
+      this._tempUpdatedMap.set(oldPk, newRecordUpdated);
+      this._tempUpdatedWithUpdatedPK.set(newPk, oldPk);
     } else {
       // The committed record was already updated previously, `record` have the latest changes. 
       // The reference of the record (latest changes) is updated with the new updated fields.
       Object.assign(record, updatedFields);
-      this._tempRecordsMap.delete(oldPk);
-      this._tempRecordsMap.set(newPk, record);
+      const committedPk = this._tempUpdatedWithUpdatedPK.get(oldPk);
+      if (committedPk) {
+        this._tempUpdatedWithUpdatedPK.delete(oldPk);
+        this._tempUpdatedWithUpdatedPK.set(newPk, committedPk);
+      }
     }
   }
 
@@ -462,8 +542,8 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
       // At this point `record` is the committed record. The committed record is not modified, 
       // to update it, a new record is created with the updated fields.
       const newRecordUpdated = this.createNewUpdatedRecord(record, updatedFields);
-      this._tempRecordsMap.set(committedRecordPk, newRecordUpdated);
-      this._tempUpdatedRecordsMap.set(committedRecordPk, newRecordUpdated);
+      this._tempUpdatedMap.set(committedRecordPk, newRecordUpdated);
+      this._tempUpdatedWithUpdatedPK.set(committedRecordPk, committedRecordPk);
     }
     else {
       // The committed record was already updated previously, `record` have the latest changes. 
@@ -471,12 +551,87 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
       Object.assign(record, updatedFields);
     }
   }
+  //#endregion
 
+  //#region DELETE METHODS
+  override async deleteByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
+    const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
+    await this.acquireExclusiveLock(primaryKeyBuilt);
+
+    return this.handleInsertedRecordDeletion(primaryKeyBuilt)
+      ?? await this.handleUpdatedRecordDeletion(primaryKeyBuilt)
+      ?? this.handleCommittedRecordDeletion(primaryKeyBuilt);
+  }
+
+  /**
+   * Try to delete a recently inserted record.
+   * 
+   * @param primaryKey The primary key of the record to be deleted.
+   * @returns The deleted record if it exists, otherwise null.
+   */
+  private handleInsertedRecordDeletion(primaryKey: string): RecordWithId<T> | null {
+    const insertedRecord = this._tempInsertedRecordsMap.get(primaryKey);
+    if (!insertedRecord) return null;
+    this._tempInsertedRecordsMap.delete(primaryKey);
+    // Release the lock because it's a temporary record.
+    this.releaseLock(primaryKey);
+    return { ...insertedRecord };
+  }
+
+  /**
+   * Try to delete a record that has been updated.
+   * 
+   * @param primaryKey The primary key of the record to be deleted.
+   * @returns The deleted record if it exists, otherwise null.
+   */
+  private async handleUpdatedRecordDeletion(primaryKey: string): Promise<RecordWithId<T> | null> {
+    const committedPk = this._tempUpdatedWithUpdatedPK.get(primaryKey);
+    if (!committedPk) return null;
+
+    const updatedCommittedRecord = this._tempUpdatedMap.get(committedPk);
+    if (!updatedCommittedRecord) return null;
+
+    // Acquire lock for committed record and mark as deleted
+    await this.acquireExclusiveLock(committedPk);
+    this._tempDeletedRecordsSet.add(committedPk);
+
+    // Delete the updated records from the Maps.
+    this._tempUpdatedWithUpdatedPK.delete(primaryKey);
+    this._tempUpdatedMap.delete(committedPk);
+
+    // Release the lock because the temporary record has been deleted.
+    this.releaseLock(primaryKey);
+
+    return { ...updatedCommittedRecord };
+  }
+
+  /**
+   * Try to delete a committed record, in other words, a record that has not been modified.
+   * 
+   * @param primaryKey The primary key of the record to be deleted.
+   * @returns The deleted record if it exists, otherwise null.
+   */
+  private handleCommittedRecordDeletion(primaryKey: string): RecordWithId<T> | null {
+    const committedRecord = this._recordsMap.get(primaryKey);
+    if (!committedRecord) {
+      // Release the lock because the record with the given PK does not exist.
+      this.releaseLock(primaryKey);
+      return null;
+    }
+
+    // Mark the committed record as deleted
+    this._tempDeletedRecordsSet.add(primaryKey);
+
+    return { ...committedRecord };
+  }
+  //#endregion
+
+  //#region TWO-PHASE COMMIT METHODS
   public async prepare(): Promise<void> {
     if (!this._isActive) throw new TransactionCompletedError();
     try {
       const keysToLock = [
-        ...this._tempUpdatedRecordsMap.keys(),
+        ...this._tempUpdatedMap.keys(),
         ...this._tempDeletedRecordsSet.keys()
       ];
       await this.acquireExclusiveLocks(keysToLock);
@@ -493,13 +648,13 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     try {
       // Apply the changes
       this.applyUpdates();
-      // this.applyDeletes(); // NOT IMPLEMENTED YET
+      this.applyDeletes();
       this.applyNewInsertions();
-  
+
       // Release locks and clear temporary records
       this.finishTransaction();
     }
-    catch(error: any) {
+    catch (error: any) {
       this.rollback();
       throw new TransactionConflictError(this._transactionId, error?.message);
     }
@@ -530,20 +685,6 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   }
 
   /**
-   * Acquires exclusive locks for the specified keys.
-   *
-   * @param {string[]} keys - The keys for which to acquire exclusive locks.
-   * @returns {Promise<void[]>} - A promise that resolves when all locks are acquired.
-   */
-  private async acquireExclusiveLocks(keys: string[]): Promise<void[]> {
-    const promises: Promise<void>[] = [];
-    for (let key of keys) {
-      promises.push(this.acquireExclusiveLock(key));
-    }
-    return Promise.all(promises);
-  }
-
-  /**
    * Validates the data integrity by acquiring shared locks and checking for duplicate primary keys.
    *
    * This method acquires shared locks for the specified keys and validates the data integrity.
@@ -555,9 +696,9 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    */
   public async validateChanges(): Promise<void> {
     // Validate that there are no duplicate PKs
-    for (let pk of this._tempRecordsMap.keys()) {
+    for (let pk of this._tempInsertedRecordsMap.keys()) {
       if (this._recordsMap.has(pk)
-        && !this._tempUpdatedRecordsMap.has(pk)
+        && !this._tempUpdatedMap.has(pk)
         && !this._tempDeletedRecordsSet.has(pk)) {
         throw this.createDuplicatePkValueError(pk);
       }
@@ -573,11 +714,9 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * @throws {DuplicatePrimaryKeyValueError} If a duplicate primary key is found.
    */
   private applyNewInsertions(): void {
-    for (let newRecord of this._tempRecordsArray) {
-      const primaryKey = this.buildPkFromRecord(newRecord);
+    for (const [primaryKey, newRecord] of this._tempInsertedRecordsMap) {
       if (this._recordsMap.has(primaryKey)) throw this.createDuplicatePkValueError(primaryKey);
       this._recordsMap.set(primaryKey, newRecord);
-      this._recordsArray.push(newRecord);
     }
   }
 
@@ -589,8 +728,8 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * in the committed records map accordingly.
    */
   private applyUpdates(): void {
-    for (let [pk, updatedRecord] of this._tempUpdatedRecordsMap) {
-      const committedRecord = this._recordsMap.get(pk);
+    for (let [primaryKey, updatedRecord] of this._tempUpdatedMap) {
+      const committedRecord = this._recordsMap.get(primaryKey);
       if (committedRecord) {
         const updatedPk = this.buildPkFromRecord(updatedRecord);
         // Update the reference of the committed record with the updated record,
@@ -598,7 +737,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
         Object.assign(committedRecord, updatedRecord);
 
         // Delete from the Map because there is a possibility that the PK has changed
-        this._recordsMap.delete(pk);
+        this._recordsMap.delete(primaryKey);
         // Add the original reference to the Map with the new PK
         this._recordsMap.set(updatedPk, committedRecord);
       }
@@ -606,27 +745,17 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   }
 
   /**
-   * @ignore NOT IMPLEMENTED YET
    * Deletes records from the committed records map and array.
    *
    * This method iterates over the temporary deleted records set and removes the corresponding
-   * records from the committed records map. It also removes the deleted records from the committed
-   * array by building the primary key (PK) for each record and checking if it is in the set of
-   * records to be removed.
+   * records from the committed records map.
    */
-  // private applyDeletes(): void {
-  //   if (this._tempDeletedRecordsSet.size === 0) return;
+  private applyDeletes(): void {
+    if (this._tempDeletedRecordsSet.size === 0) return;
 
-  //   for (let pk of this._tempDeletedRecordsSet) {
-  //     this._recordsMap.delete(pk);
-  //   }
-  //   const newArray = [];
-  //   for (let i = 0; i < this._recordsArray.length; i++) {
-  //     const recordPK = this.buildPkFromRecord(this._recordsArray[i]);
-  //     if (!this._tempDeletedRecordsSet.has(recordPK)) {
-  //       newArray.push(this._recordsArray[i]);
-  //     }
-  //   }
-  //   this._recordsArray = newArray;
-  // }
+    for (const pk of this._tempDeletedRecordsSet) {
+      this._recordsMap.delete(pk);
+    }
+  }
+  //#endregion
 }

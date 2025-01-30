@@ -44,7 +44,6 @@ describe(`Transaction Table Commit ${IsolationLevel.ReadLatest}`, () => {
 
     // Validate transaction table before commit
     expect(transactionTable.size()).toBe(NewTableSize);
-    expect(transactionTable.sizeMap).toBe(NewTableSize);
 
     expect(await transactionTable.findByPk({ id: CommitedProduct.id }))
       .toEqual({ ...CommitedProduct, ...UpdateProduct });
@@ -54,18 +53,15 @@ describe(`Transaction Table Commit ${IsolationLevel.ReadLatest}`, () => {
 
     // Validate table before commit
     expect(table.size()).toBe(TableSizeAtStart);
-    expect(table.sizeMap).toBe(TableSizeAtStart);
 
     // Execute commit
     await expect(transactionTable.commit()).resolves.not.toThrow();
 
     // Transaction table after commit
     expect(transactionTable.size()).toBe(NewTableSize);
-    expect(transactionTable.sizeMap).toBe(NewTableSize);
 
     // Table after commit
     expect(table.size()).toBe(NewTableSize);
-    expect(table.sizeMap).toBe(NewTableSize);
     expect(await table.findByPk({ id: CommitedProduct.id }))
       .toEqual({ ...CommitedProduct, ...UpdateProduct });
 

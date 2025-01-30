@@ -15,11 +15,14 @@ import {
 } from "./errors/table.error";
 
 export class Table<T> implements ITable<T> {
+  /** Map that stores the records of the table. */
   protected _recordsMap: Map<string, RecordWithId<T>>;
-  protected _recordsArray: RecordWithId<T>[];
-  protected _pkDefinition: (keyof T)[];
+  /** Definition of the primary key. */
+  protected _primaryKeyDef: (keyof T)[];
   protected _lockManager: RecordLockManager;
   protected _config: Config;
+  /** Number of records to process in a batch. */
+  protected _batchSize: number = 500;
 
   /**
    * @param definition Definition object for the table
@@ -27,37 +30,34 @@ export class Table<T> implements ITable<T> {
    */
   constructor(definition: TableConfig<T>, config?: Config) {
     this._recordsMap = new Map();
-    this._recordsArray = [];
-    this._pkDefinition = this.validatePKDefinition(definition.primaryKey ?? []);
+    this._primaryKeyDef = this.validatePKDefinition(definition.primaryKey ?? []);
     this._config = config ?? new Config();
     this._lockManager = new RecordLockManager(this._config);
   }
 
-  get sizeMap(): number { return this._recordsMap.size; }
   get recordsMap(): Map<string, RecordWithId<T>> { return this._recordsMap; }
-  get recordsArray(): RecordWithId<T>[] { return this._recordsArray; }
-  get pkDefinition(): (keyof T)[] { return this._pkDefinition; }
+  get primaryKeyDef(): (keyof T)[] { return this._primaryKeyDef; }
   get lockManager(): RecordLockManager { return this._lockManager; }
   get config(): Config { return this._config; }
 
-  private validatePKDefinition(pkDefinition: (keyof T)[]): (keyof T)[] {
-    const uniqueKeys = new Set(pkDefinition);
-    if (uniqueKeys.size !== pkDefinition.length) {
-      throw new DuplicatePrimaryKeyDefinitionError(pkDefinition.toString());
+  private validatePKDefinition(primaryKeyDef: (keyof T)[]): (keyof T)[] {
+    const uniqueKeys = new Set(primaryKeyDef);
+    if (uniqueKeys.size !== primaryKeyDef.length) {
+      throw new DuplicatePrimaryKeyDefinitionError(String(primaryKeyDef));
     }
-    return pkDefinition;
+    return primaryKeyDef;
   }
 
   protected hasPkDefinition(): boolean {
-    return this._pkDefinition.length > 0;
+    return this._primaryKeyDef.length > 0;
   }
 
   protected hasNotPkDefinition(): boolean {
-    return this._pkDefinition.length === 0;
+    return this._primaryKeyDef.length === 0;
   }
 
   protected isSingleKey(): boolean {
-    return this._pkDefinition.length === 1;
+    return this._primaryKeyDef.length === 1;
   }
   
   /**
@@ -69,8 +69,8 @@ export class Table<T> implements ITable<T> {
    */
   protected isPartialRecordPartOfPk(record: Partial<T>): boolean {
     if (this.hasNotPkDefinition()) return (("_id" in record) && record['_id'] !== undefined);
-    if (this.isSingleKey()) return record[this._pkDefinition[0]] !== undefined;
-    return this._pkDefinition.some(field => record[field] !== undefined);
+    if (this.isSingleKey()) return record[this._primaryKeyDef[0]] !== undefined;
+    return this._primaryKeyDef.some(field => record[field] !== undefined);
   }
 
   /**
@@ -86,7 +86,7 @@ export class Table<T> implements ITable<T> {
       return record._id;
     }
 
-    return this._pkDefinition.map((pkName: keyof T) => {
+    return this._primaryKeyDef.map((pkName: keyof T) => {
       const pkValue = record[pkName];
       if (!pkValue) throw new PrimaryKeyValueNullError(String(pkName));
       return pkValue;
@@ -109,7 +109,7 @@ export class Table<T> implements ITable<T> {
       };
     }
     if (this.isSingleKey()) {
-      const pkDefinitionName = this._pkDefinition[0];
+      const pkDefinitionName = this._primaryKeyDef[0];
       return {
         newPk: getPkValue(pkDefinitionName),
         oldPk: String(registeredRecord[pkDefinitionName])
@@ -117,8 +117,8 @@ export class Table<T> implements ITable<T> {
     }
     // Composite key
     return {
-      newPk: this._pkDefinition.map(getPkValue).join('-'),
-      oldPk: this._pkDefinition.map(pkName => registeredRecord[pkName]).join('-')
+      newPk: this._primaryKeyDef.map(getPkValue).join('-'),
+      oldPk: this._primaryKeyDef.map(pkName => registeredRecord[pkName]).join('-')
     }
   }
 
@@ -146,7 +146,7 @@ export class Table<T> implements ITable<T> {
    */
   protected createDuplicatePkValueError(primaryKey: string): DuplicatePrimaryKeyValueError {
     return new DuplicatePrimaryKeyValueError(
-      this.hasPkDefinition() ? this._pkDefinition.join(', ') : '_id',
+      this.hasPkDefinition() ? this._primaryKeyDef.join(', ') : '_id',
       primaryKey
     );
   }
@@ -157,7 +157,7 @@ export class Table<T> implements ITable<T> {
    * @param {string} primaryKey - The primary key to check.
    * @throws {DuplicatePrimaryKeyValueError} - If the primary key is already in use.
    */
-  protected checkIfPkIsInUse(primaryKey: string): void {
+  protected checkIfPrimaryKeyIsInUse(primaryKey: string): void {
     if (!this._recordsMap.has(primaryKey)) return;
     
     throw this.createDuplicatePkValueError(primaryKey);
@@ -170,7 +170,7 @@ export class Table<T> implements ITable<T> {
    */
   private insertInMap(record: RecordWithId<T>): void {
     const primaryKey = this.buildPkFromRecord(record);
-    this.checkIfPkIsInUse(primaryKey);
+    this.checkIfPrimaryKeyIsInUse(primaryKey);
 
     this._recordsMap.set(primaryKey, record);
   }
@@ -192,12 +192,22 @@ export class Table<T> implements ITable<T> {
     return newRecord;
   }
 
-  public size(): number { return this._recordsArray.length; }
+  /**
+   * Processes a list of promises in batches.
+   * 
+   * @param promises List of promises to process in batches.
+   */
+  protected async processPromiseBatch(promises: Promise<void>[]): Promise<void> {
+    for (let i = 0; i < promises.length; i += this._batchSize) {
+      await Promise.all(promises.slice(i, i + this._batchSize));
+    }
+  }
+
+  public size(): number { return this._recordsMap.size; }
   
   public async insert(record: T): Promise<T> {
     const newRecord = this.createNewRecordWithId(record);
     this.insertInMap(newRecord);
-    this._recordsArray.push(newRecord);
     return { ...newRecord };
   }
 
@@ -205,7 +215,6 @@ export class Table<T> implements ITable<T> {
     for (let record of records) {
       const newRecord = this.createNewRecordWithId(record);
       this.insertInMap(newRecord);
-      this._recordsArray.push(newRecord);
     }
   }
 
@@ -222,21 +231,26 @@ export class Table<T> implements ITable<T> {
   public async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
     const compiledFilter = compileFilter(where);
     const result: Partial<RecordWithId<T>>[] = [];
-    const areFieldsToSelectEmpty = fields.length === 0;
+    const areFieldsToSelectEmpty = (fields.length === 0);
 
-    for (let currentRecord of this._recordsArray) {
-      
-      await this._lockManager.waitUnlockToRead(
-        this.buildPkFromRecord(currentRecord)
-      );
+    const processSelect = async ([primaryKey, currentRecord]: [string, RecordWithId<T>]): Promise<void> => {
+      await this._lockManager.waitUnlockToRead(primaryKey);
 
-      if (!matchRecord(currentRecord, compiledFilter)) continue;
+      if (!matchRecord(currentRecord, compiledFilter)) return;
 
       result.push(areFieldsToSelectEmpty 
         ? { ...currentRecord }
         : this.extractSelectedFields(fields, currentRecord)
       );
     }
+
+    let promises: Promise<void>[] = [];
+    for (const data of this._recordsMap) {
+      promises.push(processSelect(data));
+    }
+
+    await this.processPromiseBatch(promises);
+
     return result;
   }
 
@@ -245,19 +259,21 @@ export class Table<T> implements ITable<T> {
 
     const willPkBeModified = this.isPartialRecordPartOfPk(updatedFields);
     const compiledFilter = compileFilter(where);
+    const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
 
-    for (let currentRecord of this._recordsArray) {
+    const proccessUpdate = async (key: string) => {
+      const currentRecord = this._recordsMap.get(key);
+      await this._lockManager.waitUnlockToRead(key);
 
-      if (!matchRecord(currentRecord, compiledFilter)) continue;
+      if (!currentRecord || !matchRecord(currentRecord, compiledFilter)) return;
+      
+      await this._lockManager.waitUnlockToWrite(key);
 
-      await this._lockManager.waitUnlockToWrite(
-        this.buildPkFromRecord(currentRecord)
-      );
-  
       if (willPkBeModified) { 
         const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, currentRecord);
-        this.checkIfPkIsInUse(newPk);
+
+        if (oldPk !== newPk) this.checkIfPrimaryKeyIsInUse(newPk);
         
         this._recordsMap.delete(oldPk);
         Object.assign(currentRecord, updatedFields);
@@ -269,7 +285,20 @@ export class Table<T> implements ITable<T> {
       affectedRecords++;
     }
 
+    await this.processPromiseBatch(keys.map(proccessUpdate));
+
     return affectedRecords;
+  }
+
+  public async deleteByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
+    const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
+
+    await this._lockManager.waitUnlockToWrite(primaryKeyBuilt);
+
+    const found = this._recordsMap.get(primaryKeyBuilt);
+    this._recordsMap.delete(primaryKeyBuilt);
+
+    return found ? { ...found } : null;
   }
 
 }

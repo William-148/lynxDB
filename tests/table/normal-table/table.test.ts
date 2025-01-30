@@ -11,7 +11,7 @@ describe("Table should", () => {
   it("create a table with a primary key", async () => {
     const userTb = new Table<User>({ primaryKey: ['id', 'username'] });
     expect(userTb).toBeInstanceOf(Table);
-    expect(userTb.pkDefinition).toEqual(['id', 'username']);
+    expect(userTb.primaryKeyDef).toEqual(['id', 'username']);
   });
 
   it("create tables with custom config correctly", async () => {

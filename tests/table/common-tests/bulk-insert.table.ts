@@ -30,7 +30,6 @@ export function bulkInsertTestsWithSinglePK(description: string, createInstance:
       await userTable.bulkInsert(thirtyItemsUserList);
   
       expect(userTable.size()).toBe(thirtyItemsUserList.length);
-      expect(userTable.sizeMap).toBe(thirtyItemsUserList.length);
     });
   
     it("throw an error when insert many registers with PK duplicated", async () => {
@@ -88,7 +87,6 @@ export function bulkInsertTestsWithCompositePK(description: string, createInstan
       await orderDetailTable.bulkInsert(orderDetails);
   
       expect(orderDetailTable.size()).toBe(orderDetails.length);
-      expect(orderDetailTable.sizeMap).toBe(orderDetails.length);
     });
   
     it("throw an error when insert many registers with PK duplicated", async () => {
@@ -157,7 +155,6 @@ export function bulkInsertTestWithoutPK(description: string, createInstance: () 
       await userTable.bulkInsert(thirtyItemsUserList);
   
       expect(userTable.size()).toBe(thirtyItemsUserList.length);
-      expect(userTable.sizeMap).toBe(thirtyItemsUserList.length);
     });
   
     it("insert the same register many times correctly", async () => {
@@ -165,7 +162,6 @@ export function bulkInsertTestWithoutPK(description: string, createInstance: () 
       await userTable.bulkInsert(thirtyItemsUserList);
   
       expect(userTable.size()).toBe(thirtyItemsUserList.length * 2);
-      expect(userTable.sizeMap).toBe(thirtyItemsUserList.length * 2);
     });
   
   });

@@ -32,7 +32,6 @@ export function insertTestWithSinglePK(description: string, createInstance: () =
       await userTable.insert(thirtyItemsUserList[5]);
   
       expect(userTable.size()).toBe(3);
-      expect(userTable.sizeMap).toBe(3);
     });
   
     it("throw an error when insert a PK duplicated", async () => {
@@ -91,7 +90,6 @@ export function insertTestWithCompositePK(description: string, createInstance: (
       }
         
       expect(orderDetailTable.size()).toBe(orderDetails.length);
-      expect(orderDetailTable.sizeMap).toBe(orderDetails.length);
     });
   
     it("throw an error when insert a composite PK duplicated", async () => {
@@ -160,7 +158,6 @@ export function insertTestWithoutPK(description: string, createInstance: () => T
       }
   
       expect(userTable.size()).toBe(thirtyItemsUserList.length);
-      expect(userTable.sizeMap).toBe(thirtyItemsUserList.length);
       for (let inserted of DataInserted) {
         expect(inserted._id).not.toBeUndefined();
       }
@@ -175,7 +172,6 @@ export function insertTestWithoutPK(description: string, createInstance: () => T
       }
   
       expect(userTable.size()).toBe(NumberOfInserts);
-      expect(userTable.sizeMap).toBe(NumberOfInserts);
       
       for (let inserted of DataInserted) {
         expect(inserted._id).not.toBeUndefined();

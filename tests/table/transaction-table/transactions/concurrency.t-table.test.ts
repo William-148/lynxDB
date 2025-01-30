@@ -5,6 +5,7 @@ import { Table } from "../../../../src/core/table";
 import { TransactionTable } from "../../../../src/core/transaction-table";
 import { ConfigOptions } from "../../../../src/types/config.type";
 import { IsolationLevel } from "../../../../src/types/transaction.type";
+import { delay } from "../../../../src/utils/delay";
 import { generateId } from "../../../../src/utils/generate-id";
 import { Product } from "../../../types/product-test.type";
 
@@ -115,7 +116,6 @@ describe("Transaction Table - Common Concurrency", () => {
       const inserted = await transactionTable.insert(newProductsWithSamePk[i]);
       expect(inserted).toEqual(newProductsWithSamePk[i]);
       expect(transactionTable.size()).toBe(FinalSize);
-      expect(transactionTable.sizeMap).toBe(FinalSize);
     }));
 
     // Commit transactions, Only one should be commited
@@ -134,7 +134,6 @@ describe("Transaction Table - Common Concurrency", () => {
 
     // Check if the table has the new product
     expect(table.size()).toBe(FinalSize);
-    expect(table.sizeMap).toBe(FinalSize);
   });
 
 });
@@ -191,6 +190,68 @@ describe(`Transaction Table - Concurrency Commit ${IsolationLevel.ReadLatest}`, 
     // The changes should be visible in the table
     const finalState = await table.findByPk({ id: 2 });
     expect(finalState).toEqual({ ...itemTest, stock: 10 });
+  });
+
+  it("should ...", async () => {
+    const itemTest = clothesProducts[2];
+    const tTables = generateTransactionTables(2, table, defaultConfig);
+    const tx1 = tTables[0];
+    const tx2 = tTables[1];
+    const stockInTx1 = 15;
+    const stockInTx2 = 25;
+
+    const operationsTx1 = async () => {
+      try{ 
+      // Lock the record with shared lock
+      const found = await tx1.findByPk({ id: itemTest.id });
+
+      // Release the shared lock and lock the record with exclusive lock
+      if(found){
+        const affected = await tx1.update({ stock: found.stock - 1 }, { id: { eq: found.id }, stock: { eq: found.stock } });
+        if (affected !== 1) throw new Error("Product external changes");
+      }
+
+      console.table([
+        found,
+        await tx1.findByPk({ id: itemTest.id })
+      ])
+      tx1.commit();
+    }
+    catch (error) {
+      tx1.rollback();
+      console.error(error);
+    }
+    }
+
+    const operationsTx2 = async () => {
+      try {
+        const found = await tx2.findByPk({ id: itemTest.id });
+        if(found){
+          await delay(1000);
+          const affected = await tx2.update({ stock: found.stock - 1 }, { id: { eq: found.id }, stock: { eq: found.stock } });
+          if (affected !== 1) throw new Error("Product external changes");
+        }
+        console.table([
+          found,
+          await tx2.findByPk({ id: itemTest.id })
+        ])
+        tx2.commit();
+      }
+      catch (error) {
+        tx2.rollback();
+        console.error(error);
+      }
+      
+    }
+
+    await Promise.all([
+      operationsTx1(),
+      operationsTx2()
+    ])
+
+    console.table([
+      await table.findByPk({ id: itemTest.id })
+    ])
   });
 
   // it("Template test", async () => {
