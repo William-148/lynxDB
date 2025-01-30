@@ -245,19 +245,19 @@ export class RecordLockManager {
     const existingLock = this.locks.get(key);
     if (!existingLock) return;
 
-    if (existingLock.lockType === LockType.Shared){
+    if (existingLock.lockType === LockType.Shared && existingLock.sharedLocks.has(transactionId)) {
       existingLock.sharedLocks.delete(transactionId);
+
       if (existingLock.sharedLocks.size === 0) {
         this.locks.delete(key);
       }
+      this.proccessWaitingQueue(key);
     }
 
-    if (existingLock.lockType === LockType.Exclusive 
-      && existingLock.exclusiveLock === transactionId) {
+    if (existingLock.lockType === LockType.Exclusive && existingLock.exclusiveLock === transactionId) {
       this.locks.delete(key);
+      this.proccessWaitingQueue(key);
     }
-
-    this.proccessWaitingQueue(key);
   }
 
   /**
