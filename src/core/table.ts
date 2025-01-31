@@ -7,6 +7,7 @@ import {
   ITable,
   RecordWithId,
   TableConfig,
+  Versioned,
 } from "../types/table.type";
 import {
   DuplicatePrimaryKeyDefinitionError,
@@ -16,7 +17,7 @@ import {
 
 export class Table<T> implements ITable<T> {
   /** Map that stores the records of the table. */
-  protected _recordsMap: Map<string, RecordWithId<T>>;
+  protected _recordsMap: Map<string, Versioned<T>>;
   /** Definition of the primary key. */
   protected _primaryKeyDef: (keyof T)[];
   protected _lockManager: RecordLockManager;
@@ -35,7 +36,7 @@ export class Table<T> implements ITable<T> {
     this._lockManager = new RecordLockManager(this._config);
   }
 
-  get recordsMap(): Map<string, RecordWithId<T>> { return this._recordsMap; }
+  get recordsMap(): Map<string, Versioned<T>> { return this._recordsMap; }
   get primaryKeyDef(): (keyof T)[] { return this._primaryKeyDef; }
   get lockManager(): RecordLockManager { return this._lockManager; }
   get config(): Config { return this._config; }
@@ -166,10 +167,10 @@ export class Table<T> implements ITable<T> {
   /**
    * Inserts a record into the record map.
    * 
-   * @param {RecordWithVersion<T>} record - The record to be inserted.
+   * @param {Versioned<T>} record - The record to be inserted.
    */
-  private insertInMap(record: RecordWithId<T>): void {
-    const primaryKey = this.buildPkFromRecord(record);
+  private insertInMap(record: Versioned<T>): void {
+    const primaryKey = this.buildPkFromRecord(record.data);
     this.checkIfPrimaryKeyIsInUse(primaryKey);
 
     this._recordsMap.set(primaryKey, record);
@@ -180,16 +181,27 @@ export class Table<T> implements ITable<T> {
    * if no primary key definition exists.
    * 
    * @param {T} record - The original record.
-   * @returns {RecordWithId<T>} - The new record with an initial version.
+   * @returns {Versioned<T>} - The new record with an initial version.
    */
-  protected createNewRecordWithId(record: T): RecordWithId<T> {
+  protected createNewVersionedRecord(record: T): Versioned<T> {
     const newRecord: RecordWithId<T> = { ...record } as RecordWithId<T>;
 
     if (this.hasNotPkDefinition() && !newRecord._id) {
       newRecord._id = generateId();
     }
 
-    return newRecord;
+    return { data: newRecord, version: 1 };
+  }
+
+  /**
+   * Updates the data and version of a versioned record.
+   * 
+   * @param versioned Versioned record to update.
+   * @param updatedFields The updated fields to apply to the record.
+   */
+  protected updateVersionedRecord(versioned: Versioned<T>, updatedFields: Partial<T>): void {
+    Object.assign(versioned.data, updatedFields);
+    versioned.version++;
   }
 
   /**
@@ -206,14 +218,14 @@ export class Table<T> implements ITable<T> {
   public size(): number { return this._recordsMap.size; }
   
   public async insert(record: T): Promise<T> {
-    const newRecord = this.createNewRecordWithId(record);
+    const newRecord = this.createNewVersionedRecord(record);
     this.insertInMap(newRecord);
-    return { ...newRecord };
+    return { ...newRecord.data };
   }
 
   public async bulkInsert(records: T[]): Promise<void> {
     for (let record of records) {
-      const newRecord = this.createNewRecordWithId(record);
+      const newRecord = this.createNewVersionedRecord(record);
       this.insertInMap(newRecord);
     }
   }
@@ -225,7 +237,7 @@ export class Table<T> implements ITable<T> {
 
     const recordFound = this._recordsMap.get(primaryKeyBuilt);
 
-    return recordFound ? { ...recordFound } : null;
+    return recordFound ? { ...recordFound.data } : null;
   }
 
   public async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
@@ -233,7 +245,8 @@ export class Table<T> implements ITable<T> {
     const result: Partial<RecordWithId<T>>[] = [];
     const areFieldsToSelectEmpty = (fields.length === 0);
 
-    const processSelect = async ([primaryKey, currentRecord]: [string, RecordWithId<T>]): Promise<void> => {
+    const processSelect = async ([primaryKey, versioned]: [string, Versioned<T>]): Promise<void> => {
+      const currentRecord = versioned.data;
       await this._lockManager.waitUnlockToRead(primaryKey);
 
       if (!matchRecord(currentRecord, compiledFilter)) return;
@@ -263,7 +276,9 @@ export class Table<T> implements ITable<T> {
     let affectedRecords = 0;
 
     const proccessUpdate = async (key: string) => {
-      const currentRecord = this._recordsMap.get(key);
+      const currentVersioned = this._recordsMap.get(key);
+      const currentRecord = currentVersioned?.data;
+
       await this._lockManager.waitUnlockToRead(key);
 
       if (!currentRecord || !matchRecord(currentRecord, compiledFilter)) return;
@@ -276,11 +291,11 @@ export class Table<T> implements ITable<T> {
         if (oldPk !== newPk) this.checkIfPrimaryKeyIsInUse(newPk);
         
         this._recordsMap.delete(oldPk);
-        Object.assign(currentRecord, updatedFields);
-        this._recordsMap.set(newPk, currentRecord);
+        this._recordsMap.set(newPk, currentVersioned);
+        this.updateVersionedRecord(currentVersioned, updatedFields);
       }
       else {
-        Object.assign(currentRecord, updatedFields);
+        this.updateVersionedRecord(currentVersioned, updatedFields);
       }
       affectedRecords++;
     }
@@ -298,7 +313,7 @@ export class Table<T> implements ITable<T> {
     const found = this._recordsMap.get(primaryKeyBuilt);
     this._recordsMap.delete(primaryKeyBuilt);
 
-    return found ? { ...found } : null;
+    return found ? { ...found.data } : null;
   }
 
 }

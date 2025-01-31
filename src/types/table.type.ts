@@ -1,5 +1,21 @@
 import { Filter } from "./filter.type";
 
+/**
+ * Represents a record with a default primary key
+ */
+export type RecordWithId<T> = T & { 
+  /** Default primary key if not defined */
+  _id ?: string 
+};
+
+/**
+ * Represents a versioned record
+ */
+export type Versioned<T> = {
+  data: RecordWithId<T>;
+  version: number;
+}
+
 export type TableConfig<T> = {
   /** Definition of the primary key. Optional. */
   primaryKey?: (keyof T)[];
@@ -7,11 +23,6 @@ export type TableConfig<T> = {
 
 export type TablesDefinition<T extends Record<string, any>> = {
   [K in keyof T]: TableConfig<T[K]>;
-};
-
-export type RecordWithId<T> = T & { 
-  /** Default primary key if not defined */
-  _id ?: string 
 };
 
 export interface ITable<T> {

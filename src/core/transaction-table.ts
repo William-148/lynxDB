@@ -2,7 +2,7 @@ import { Filter } from "../types/filter.type";
 import { LockType } from "../types/lock.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { Table } from "./table";
-import { RecordWithId } from "../types/table.type";
+import { RecordWithId, Versioned } from "../types/table.type";
 import { IsolationLevel, TwoPhaseCommitParticipant } from "../types/transaction.type";
 import { Config } from "./config";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
@@ -20,7 +20,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * This map stores:
    * - New inserted records that will be applied in the commit phase.
    */
-  private _tempInsertedRecordsMap: Map<string, RecordWithId<T>>;
+  private _tempInsertedRecordsMap: Map<string, Versioned<T>>;
   /**
    * Temporal Map that stores the updates of the committed records. These records will be applied
    * in the commit phase.
@@ -29,7 +29,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * - Committed records that have been updated and have not yet been applied.
    *   These records have the committed/oldest PK as the map key.
    */
-  private _tempUpdatedMap: Map<string, RecordWithId<T>>;
+  private _tempUpdatedMap: Map<string, Versioned<T>>;
   /**
    * Temporal Map that stores the new and the original PK of the updated records as key-value pairs.
    * 
@@ -196,7 +196,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    */
   private isCommitedRecordPkUpdated(commitedPk: string, commitedRecord?: RecordWithId<T>): boolean {
     // Retrieve the temporarily updated committed record
-    const commitedRecordUpdated = commitedRecord || this._tempUpdatedMap.get(commitedPk);
+    const commitedRecordUpdated = commitedRecord || this._tempUpdatedMap.get(commitedPk)?.data;
     if (!commitedRecordUpdated) return false;
 
     // If the record exists and its primary key has changed, return true
@@ -248,10 +248,10 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   /**
    * Inserts a record into the temporary map.
    * 
-   * @param {RecordWithId<T>} record - The record to be inserted.
+   * @param {Versioned<T>} record - The record to be inserted.
    */
-  private insertInTemporaryMap(record: RecordWithId<T>): void {
-    const primaryKey = this.buildPkFromRecord(record);
+  private insertInTemporaryMap(record: Versioned<T>): void {
+    const primaryKey = this.buildPkFromRecord(record.data);
     this.checkIfPkExistsInMaps(primaryKey);
     this._tempInsertedRecordsMap.set(primaryKey, record);
   }
@@ -260,13 +260,13 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * Retrieves the temporary changes from a committed record based on the primary key.
    *
    * @param {string} primaryKey - The primary key of the committed record.
-   * @param {RecordWithId<T>} committedRecord - The committed record to check for temporary changes.
-   * @returns {RecordWithId<T> | null} 
+   * @param {Versioned<T>} committedRecord - The committed record to check for temporary changes.
+   * @returns {Versioned<T> | null} 
    *  - The temporary changes if they exist.
    *  - null if the record has been deleted.
    *  - The committed record passed as a parameter if there are no temporary changes.
    */
-  private getTempChangesFromCommittedRecord(primaryKey: string, committedRecord: RecordWithId<T>): RecordWithId<T> | null {
+  private getTempChangesFromCommittedRecord(primaryKey: string, committedRecord: Versioned<T>): Versioned<T> | null {
     if (this._tempDeletedRecordsSet.has(primaryKey)) return null;
     return this._tempUpdatedMap.get(primaryKey) ?? committedRecord;
   }
@@ -274,15 +274,26 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   /**
    * Creates a new updated record by merging the committed record with the updated fields.
    * 
-   * @param {RecordWithId<T>} committedRecord - The committed record.
+   * @param {Versioned<T>} committedRecord - The committed record.
    * @param {Partial<T>} updatedFields - The fields to update in the record.
-   * @returns {RecordWithId<T>} - The new updated record.
+   * @returns {Versioned<T>} - The new updated record.
    */
-  private createNewUpdatedRecord(committedRecord: RecordWithId<T>, updatedFields: Partial<T>): RecordWithId<T> {
+  private createNewUpdatedRecord(committedRecord: Versioned<T>, updatedFields: Partial<T>): Versioned<T> {
     return {
-      ...committedRecord,
-      ...updatedFields
+      data: { ...committedRecord.data, ...updatedFields },
+      // The version only changes on the commit phase
+      version: committedRecord.version 
     }
+  }
+
+  /**
+   * Updates a record with the updated fields.
+   * 
+   * @param record The record to be updated.
+   * @param updatedFields The fields to update in the record.
+   */
+  private updateRecord(record: Versioned<T>, updatedFields: Partial<T>): void {
+    Object.assign(record.data, updatedFields);
   }
 
   override size(): number {
@@ -290,14 +301,14 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   }
 
   override async insert(record: T): Promise<T> {
-    const newRecord = this.createNewRecordWithId(record);
+    const newRecord = this.createNewVersionedRecord(record);
     this.insertInTemporaryMap(newRecord);
-    return { ...newRecord };
+    return { ...newRecord.data };
   }
 
   override async bulkInsert(records: T[]): Promise<void> {
     for (let record of records) {
-      const newRecord = this.createNewRecordWithId(record);
+      const newRecord = this.createNewVersionedRecord(record);
       this.insertInTemporaryMap(newRecord);
     }
   }
@@ -324,7 +335,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     if (!insertedRecord) return null;
 
     this.releaseLock(primaryKey);
-    return { ...insertedRecord };
+    return { ...insertedRecord.data };
   }
 
   /**
@@ -340,7 +351,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     const updatedRecord = this._tempUpdatedMap.get(committedPk);
     if (!updatedRecord) return null;
 
-    return { ...updatedRecord };
+    return { ...updatedRecord.data };
   }
 
   /**
@@ -358,12 +369,11 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
       return null;
     }
 
-    if (this._tempDeletedRecordsSet.has(primaryKey) || 
-        this._tempUpdatedMap.has(primaryKey)) {
+    if (this._tempDeletedRecordsSet.has(primaryKey) || this._tempUpdatedMap.has(primaryKey)) {
       return null;
     }
 
-    return { ...committedRecord };
+    return { ...committedRecord.data };
   }
   //#endregion
 
@@ -374,24 +384,25 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
 
     const areFieldsToSelectEmpty = (fields.length === 0);
 
-    const committedSelectProcess = async ([committedRecordPk, committedRecord]: [string, RecordWithId<T>]) => {
+    const committedSelectProcess = async ([committedRecordPk, committedRecord]: [string, Versioned<T>]) => {
       await this.waitUlockToRead(committedRecordPk);
 
       const recordWithTempChanges = this.getTempChangesFromCommittedRecord(committedRecordPk, committedRecord);
       // Finish because the record is null, which means that it was deleted and should be ignored.
       if (recordWithTempChanges === null) return;
 
-      if (!matchRecord(recordWithTempChanges, compiledFilter)) return;
+      if (!matchRecord(recordWithTempChanges.data, compiledFilter)) return;
 
       await this.acquireReadLock(committedRecordPk);
 
       committedResults.push(areFieldsToSelectEmpty
-        ? { ...recordWithTempChanges }
-        : this.extractSelectedFields(fields, recordWithTempChanges)
+        ? { ...recordWithTempChanges.data }
+        : this.extractSelectedFields(fields, recordWithTempChanges.data)
       );
     }
 
-    const newestSelectProcess = async (newestRecord: RecordWithId<T>) => {
+    const newestSelectProcess = async (versioned: Versioned<T>) => {
+      const newestRecord = versioned.data;
       if (!matchRecord(newestRecord, compiledFilter)) return;
       newestResults.push(areFieldsToSelectEmpty
         ? { ...newestRecord }
@@ -431,19 +442,19 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
 
     const committedUpdateProcess = async (committedRecordPk: string) => {
       const committedRecord = this._recordsMap.get(committedRecordPk);
+      
       if (!committedRecord) return;
+      const versionSnapshot = committedRecord.version;
 
       const recordWithTempChanges = this.getTempChangesFromCommittedRecord(committedRecordPk, committedRecord);
       // Finish because the record is null, which means that it was deleted and should be ignored.
       if (recordWithTempChanges === null) return;
 
-      const hadExclusiveLock = this._exclusiveLocks.has(committedRecordPk); // TODO: Reevaluar
-
-      if (!matchRecord(recordWithTempChanges, compiledFilter)) return;
+      if (!matchRecord(recordWithTempChanges.data, compiledFilter)) return;
       await this.acquireExclusiveLock(committedRecordPk);
 
-      if(!hadExclusiveLock && !matchRecord(recordWithTempChanges, compiledFilter)) {
-        // TODO: Reevaluar este bloque
+      if((versionSnapshot !== committedRecord.version) 
+          && !matchRecord(recordWithTempChanges.data, compiledFilter)) {
         this.releaseLock(committedRecordPk);
         return;
       }
@@ -460,7 +471,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     }
 
     for (const newestRecord of Array.from(this._tempInsertedRecordsMap.values())) {
-      if (!matchRecord(newestRecord, compiledFilter)) continue;
+      if (!matchRecord(newestRecord.data, compiledFilter)) continue;
       this.handleNewestRecordUpdate(updatedFields, newestRecord, willPkBeModified);
       affectedRecords++;
     }
@@ -477,17 +488,17 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * @param {RecordWithId<T>} newestRecord - The newest record to update.
    * @param {boolean} willPkBeModified - Indicates if the primary key will be modified.
    */
-  private handleNewestRecordUpdate(updatedFields: Partial<T>, newestRecord: RecordWithId<T>, willPkBeModified: boolean): void {
+  private handleNewestRecordUpdate(updatedFields: Partial<T>, newestRecord: Versioned<T>, willPkBeModified: boolean): void {
     if (willPkBeModified) {
-      const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, newestRecord);
+      const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, newestRecord.data);
       if (newPk !== oldPk) this.checkIfPkExistsInMaps(newPk);
 
-      Object.assign(newestRecord, updatedFields);
       this._tempInsertedRecordsMap.delete(oldPk);
       this._tempInsertedRecordsMap.set(newPk, newestRecord);
+      this.updateRecord(newestRecord, updatedFields);
     }
     else {
-      Object.assign(newestRecord, updatedFields);
+      this.updateRecord(newestRecord, updatedFields);
     }
   }
 
@@ -498,8 +509,8 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * @param {RecordWithId<T>} record - The record to update.
    * @param {boolean} isFirstUpdate - Indicates if this is the first update for the record.
    */
-  private handleUpdateWithPKUpdated(updatedFields: Partial<T>, record: RecordWithId<T>, isFirstUpdate: boolean): void {
-    const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, record);
+  private handleUpdateWithPKUpdated(updatedFields: Partial<T>, record: Versioned<T>, isFirstUpdate: boolean): void {
+    const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, record.data);
     if (newPk !== oldPk) this.checkIfPkExistsInMaps(newPk);
 
     if (isFirstUpdate) {
@@ -511,7 +522,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     } else {
       // The committed record was already updated previously, `record` have the latest changes. 
       // The reference of the record (latest changes) is updated with the new updated fields.
-      Object.assign(record, updatedFields);
+      this.updateRecord(record, updatedFields);
       const committedPk = this._tempUpdatedWithUpdatedPK.get(oldPk);
       if (committedPk) {
         this._tempUpdatedWithUpdatedPK.delete(oldPk);
@@ -530,7 +541,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    */
   private handleUpdateWithPKNotUpdated(
     updatedFields: Partial<T>,
-    record: RecordWithId<T>,
+    record: Versioned<T>,
     committedRecordPk: string,
     isFirstUpdate: boolean
   ): void {
@@ -544,7 +555,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     else {
       // The committed record was already updated previously, `record` have the latest changes. 
       // The reference of the record (latest changes) is updated with the new updated fields.
-      Object.assign(record, updatedFields);
+      this.updateRecord(record, updatedFields);
     }
   }
   //#endregion
@@ -571,7 +582,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     this._tempInsertedRecordsMap.delete(primaryKey);
     // Release the lock because it's a temporary record.
     this.releaseLock(primaryKey);
-    return { ...insertedRecord };
+    return { ...insertedRecord.data };
   }
 
   /**
@@ -595,7 +606,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     this._tempUpdatedWithUpdatedPK.delete(primaryKey);
     this._tempUpdatedMap.delete(committedPk);
 
-    return { ...updatedCommittedRecord };
+    return { ...updatedCommittedRecord.data };
   }
 
   /**
@@ -615,7 +626,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     // Mark the committed record as deleted
     this._tempDeletedRecordsSet.add(primaryKey);
 
-    return { ...committedRecord };
+    return { ...committedRecord.data };
   }
   //#endregion
 
@@ -689,11 +700,30 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    */
   public async validateChanges(): Promise<void> {
     // Validate that there are no duplicate PKs
-    for (let pk of this._tempInsertedRecordsMap.keys()) {
+    for (const pk of this._tempInsertedRecordsMap.keys()) {
       if (this._recordsMap.has(pk)
         && !this._tempUpdatedMap.has(pk)
         && !this._tempDeletedRecordsSet.has(pk)) {
+
         throw this.createDuplicatePkValueError(pk);
+      }
+    }
+
+    // Validate that the updated records have not duplicated PKs
+    for (const [newestPk, committedPk] of this._tempUpdatedWithUpdatedPK) {
+      if ((committedPk !== newestPk) 
+        && this._recordsMap.has(newestPk)
+        && !this._tempDeletedRecordsSet.has(newestPk)) {
+
+        throw this.createDuplicatePkValueError(newestPk);
+      }
+    }
+
+    // Validate that the updated records have the correct version
+    for (const [committedPk, updatedRecord] of this._tempUpdatedMap) {
+      const committedRecord = this._recordsMap.get(committedPk);
+      if (!committedRecord || committedRecord.version !== updatedRecord.version) {
+        throw new ExternalModificationError(committedPk);
       }
     }
   }
@@ -719,20 +749,24 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * This method iterates over the temporary updated records map and updates the corresponding
    * committed records. If the primary key (PK) of a record has changed, it updates the reference
    * in the committed records map accordingly.
+   * 
+   * @throws {ExternalModificationError} If the version of the updated record are different
+   * from the original.
    */
   private applyUpdates(): void {
-    for (let [primaryKey, updatedRecord] of this._tempUpdatedMap) {
-      const committedRecord = this._recordsMap.get(primaryKey);
+    for (let [committedPk, updatedRecord] of this._tempUpdatedMap) {
+      const committedRecord = this._recordsMap.get(committedPk);
       if (committedRecord) {
-        const updatedPk = this.buildPkFromRecord(updatedRecord);
+        const updatedPk = this.buildPkFromRecord(updatedRecord.data);
         // Update the reference of the committed record with the updated record,
         // this way the changes of the committed record are reflected in the committed array.
-        Object.assign(committedRecord, updatedRecord);
+        if (committedRecord.version !== updatedRecord.version) throw new ExternalModificationError(committedPk);
+        this.updateVersionedRecord(committedRecord, updatedRecord.data);
 
-        // Delete from the Map because there is a possibility that the PK has changed
-        this._recordsMap.delete(primaryKey);
-        // Add the original reference to the Map with the new PK
-        this._recordsMap.set(updatedPk, committedRecord);
+        if (committedPk !== updatedPk) {
+          this._recordsMap.delete(committedPk);
+          this._recordsMap.set(updatedPk, committedRecord);
+        }
       }
     }
   }
@@ -744,8 +778,6 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * records from the committed records map.
    */
   private applyDeletes(): void {
-    if (this._tempDeletedRecordsSet.size === 0) return;
-
     for (const pk of this._tempDeletedRecordsSet) {
       this._recordsMap.delete(pk);
     }
