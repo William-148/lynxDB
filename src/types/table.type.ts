@@ -1,20 +1,5 @@
 import { Filter } from "./filter.type";
-
-/**
- * Represents a record with a default primary key
- */
-export type RecordWithId<T> = T & { 
-  /** Default primary key if not defined */
-  _id ?: string 
-};
-
-/**
- * Represents a versioned record
- */
-export type Versioned<T> = {
-  data: RecordWithId<T>;
-  version: number;
-}
+import { RecordWithId } from "./record.type";
 
 export type TableConfig<T> = {
   /** Definition of the primary key. Optional. */

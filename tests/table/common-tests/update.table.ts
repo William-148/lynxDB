@@ -31,8 +31,8 @@ const EntityData: Entity[] = [
  * }
  * ```
  */
-export function updateTestWithSinglePK(description: string, createInstance: (testData: Entity[]) => Promise<Table<any>>) {
-  describe(description, () => {
+export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => Promise<Table<any>>) {
+  describe("Simple Primary Key", () => {
     let entityTable: Table<Entity>;
 
     beforeEach(async () => {
@@ -98,15 +98,15 @@ export function updateTestWithSinglePK(description: string, createInstance: (tes
       const ItemToTest = EntityData[1];
       const IdToUpdate = ItemToTest.id;
       const NewId = 99;
+
       const affectedRows = await entityTable.update({ id: NewId }, { id: { eq: IdToUpdate } });
-      expect(affectedRows).toBe(1);
-
-      // Check if the record with the new PK exists
       const updatedRecord = await entityTable.findByPk({ id: NewId });
-      expect(updatedRecord).toEqual({ ...ItemToTest, id: NewId });
-
-      // Check if the record with the old PK no longer exists
       const shouldNotExistRecord = await entityTable.findByPk({ id: IdToUpdate });
+      
+      expect(affectedRows).toBe(1);
+      // Check if the record with the new PK exists
+      expect(updatedRecord).toEqual({ ...ItemToTest, id: NewId });
+      // Check if the record with the old PK no longer exists
       expect(shouldNotExistRecord).toBeNull();
     });
 
@@ -226,10 +226,9 @@ const defaultEntityData: EntityWithDefaultId[] = [
  * ```
  */
 export function updateTestWithoutPK(
-  description: string, 
   createInstance: (testData: Array<any & { _id?: string }>) => Promise<Table<any & { _id?: string }>>
 ) {
-  describe(description, () => {
+  describe("Default Primary Key", () => {
     let entityTable: Table<EntityWithDefaultId>;
 
     beforeEach(async () => {
@@ -365,8 +364,8 @@ const enrollmentData: Enrollment[] = [
  *  return table;
  * }
  */
-export function updateTestWithCompositePK(description: string, createInstance: (testData: Enrollment[]) => Promise<Table<Enrollment>>) {
-  describe(description, () => {
+export function updateTestWithCompositePK(createInstance: (testData: Enrollment[]) => Promise<Table<Enrollment>>) {
+  describe("Composite Primary Key", () => {
     let enrollmentTable: Table<Enrollment>;
 
     beforeEach(async () => {

@@ -14,7 +14,6 @@ describe("Transaction table should", () => {
 
     expect(ttable).toBeInstanceOf(TransactionTable);
     expect(ttable.transactionId).toEqual(transactionId);
-    expect(ttable.primaryKeyDef).toEqual(['id', 'username']);
     expect(ttable.size()).toEqual(0);
   });
 

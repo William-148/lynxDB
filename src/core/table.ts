@@ -3,23 +3,15 @@ import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { generateId } from "../utils/generate-id";
 import { RecordLockManager } from "./record-lock-manager";
 import { Config } from "./config";
-import { 
-  ITable,
-  RecordWithId,
-  TableConfig,
-  Versioned,
-} from "../types/table.type";
-import {
-  DuplicatePrimaryKeyDefinitionError,
-  DuplicatePrimaryKeyValueError,
-  PrimaryKeyValueNullError,
-} from "./errors/table.error";
+import { ITable, TableConfig } from "../types/table.type";
+import { RecordWithId, Versioned } from "../types/record.type";
+import { PrimaryKeyManager } from "./primary-key-manager";
 
 export class Table<T> implements ITable<T> {
   /** Map that stores the records of the table. */
   protected _recordsMap: Map<string, Versioned<T>>;
   /** Definition of the primary key. */
-  protected _primaryKeyDef: (keyof T)[];
+  protected _primaryKeyManager: PrimaryKeyManager<T>;
   protected _lockManager: RecordLockManager;
   protected _config: Config;
   /** Number of records to process in a batch. */
@@ -31,97 +23,15 @@ export class Table<T> implements ITable<T> {
    */
   constructor(definition: TableConfig<T>, config?: Config) {
     this._recordsMap = new Map();
-    this._primaryKeyDef = this.validatePKDefinition(definition.primaryKey ?? []);
+    this._primaryKeyManager = new PrimaryKeyManager(definition.primaryKey ?? []);
     this._config = config ?? new Config();
     this._lockManager = new RecordLockManager(this._config);
   }
 
   get recordsMap(): Map<string, Versioned<T>> { return this._recordsMap; }
-  get primaryKeyDef(): (keyof T)[] { return this._primaryKeyDef; }
+  get primaryKeyManager(): PrimaryKeyManager<T> { return this._primaryKeyManager; }
   get lockManager(): RecordLockManager { return this._lockManager; }
   get config(): Config { return this._config; }
-
-  private validatePKDefinition(primaryKeyDef: (keyof T)[]): (keyof T)[] {
-    const uniqueKeys = new Set(primaryKeyDef);
-    if (uniqueKeys.size !== primaryKeyDef.length) {
-      throw new DuplicatePrimaryKeyDefinitionError(String(primaryKeyDef));
-    }
-    return primaryKeyDef;
-  }
-
-  protected hasPkDefinition(): boolean {
-    return this._primaryKeyDef.length > 0;
-  }
-
-  protected hasNotPkDefinition(): boolean {
-    return this._primaryKeyDef.length === 0;
-  }
-
-  protected isSingleKey(): boolean {
-    return this._primaryKeyDef.length === 1;
-  }
-  
-  /**
-   * Checks if a partial record contains any fields that are part of the primary key.
-   *
-   * @template T
-   * @param {Partial<T>} record - The partial record to check.
-   * @returns {boolean} - Returns true if the record contains any primary key fields, otherwise false.
-   */
-  protected isPartialRecordPartOfPk(record: Partial<T>): boolean {
-    if (this.hasNotPkDefinition()) return (("_id" in record) && record['_id'] !== undefined);
-    if (this.isSingleKey()) return record[this._primaryKeyDef[0]] !== undefined;
-    return this._primaryKeyDef.some(field => record[field] !== undefined);
-  }
-
-  /**
-   * Build a primary key (PK) from a partial record.
-   * 
-   * @param {Partial<T>} record - The partial record containing the primary key fields.
-   * @returns {string} - The built primary key.
-   * @throws {PrimaryKeyValueNullError} - If any primary key values are null or undefined.
-   */
-  protected buildPkFromRecord(record: Partial<RecordWithId<T>>): string {
-    if (this.hasNotPkDefinition()){
-      if (!record._id) throw new PrimaryKeyValueNullError('_id');
-      return record._id;
-    }
-
-    return this._primaryKeyDef.map((pkName: keyof T) => {
-      const pkValue = record[pkName];
-      if (!pkValue) throw new PrimaryKeyValueNullError(String(pkName));
-      return pkValue;
-    }).join('-');
-  }
-
-  /**
-   * Generates new and old primary keys (PK) for updating a record.
-   * 
-   * @param {Partial<T>} updatedFields - The partial record containing the updated fields.
-   * @param {T} registeredRecord - The existing record from which the old primary key is derived.
-   * @returns {{newPk: string, oldPk: string}} - An object containing the new and old primary keys.
-   */
-  protected generatePkForUpdate(updatedFields: Partial<T>, registeredRecord: RecordWithId<T>): { newPk: string; oldPk: string } {
-    const getPkValue = (field: keyof T) => String(updatedFields[field] ?? registeredRecord[field]);
-    if (this.hasNotPkDefinition()) {
-      return {
-        newPk: getPkValue("_id" as keyof T),
-        oldPk: String(registeredRecord._id)
-      };
-    }
-    if (this.isSingleKey()) {
-      const pkDefinitionName = this._primaryKeyDef[0];
-      return {
-        newPk: getPkValue(pkDefinitionName),
-        oldPk: String(registeredRecord[pkDefinitionName])
-      };
-    }
-    // Composite key
-    return {
-      newPk: this._primaryKeyDef.map(getPkValue).join('-'),
-      oldPk: this._primaryKeyDef.map(pkName => registeredRecord[pkName]).join('-')
-    }
-  }
 
   /**
    * Extracts the specified fields from a record and returns a new partial record containing only those fields.
@@ -140,19 +50,6 @@ export class Table<T> implements ITable<T> {
   }
 
   /**
-   * Creates a new error object for a duplicate primary key value.
-   * 
-   * @param primaryKey - Primary key value that is duplicated.
-   * @returns {DuplicatePrimaryKeyValueError} - The error object.
-   */
-  protected createDuplicatePkValueError(primaryKey: string): DuplicatePrimaryKeyValueError {
-    return new DuplicatePrimaryKeyValueError(
-      this.hasPkDefinition() ? this._primaryKeyDef.join(', ') : '_id',
-      primaryKey
-    );
-  }
-
-  /**
    * Checks if the primary key is already in use and throws an error if it is.
    *
    * @param {string} primaryKey - The primary key to check.
@@ -161,7 +58,7 @@ export class Table<T> implements ITable<T> {
   protected checkIfPrimaryKeyIsInUse(primaryKey: string): void {
     if (!this._recordsMap.has(primaryKey)) return;
     
-    throw this.createDuplicatePkValueError(primaryKey);
+    throw this._primaryKeyManager.createDuplicatePkValueError(primaryKey);
   }
 
   /**
@@ -170,7 +67,7 @@ export class Table<T> implements ITable<T> {
    * @param {Versioned<T>} record - The record to be inserted.
    */
   private insertInMap(record: Versioned<T>): void {
-    const primaryKey = this.buildPkFromRecord(record.data);
+    const primaryKey = this._primaryKeyManager.buildPkFromRecord(record.data);
     this.checkIfPrimaryKeyIsInUse(primaryKey);
 
     this._recordsMap.set(primaryKey, record);
@@ -186,7 +83,7 @@ export class Table<T> implements ITable<T> {
   protected createNewVersionedRecord(record: T): Versioned<T> {
     const newRecord: RecordWithId<T> = { ...record } as RecordWithId<T>;
 
-    if (this.hasNotPkDefinition() && !newRecord._id) {
+    if (this._primaryKeyManager.hasNotPkDefinition() && !newRecord._id) {
       newRecord._id = generateId();
     }
 
@@ -231,7 +128,7 @@ export class Table<T> implements ITable<T> {
   }
 
   public async findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
-    const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
+    const primaryKeyBuilt = this._primaryKeyManager.buildPkFromRecord(primaryKey);
 
     await this._lockManager.waitUnlockToRead(primaryKeyBuilt);
 
@@ -270,7 +167,7 @@ export class Table<T> implements ITable<T> {
   public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
-    const willPkBeModified = this.isPartialRecordPartOfPk(updatedFields);
+    const willPkBeModified = this._primaryKeyManager.isPartialRecordPartOfPk(updatedFields);
     const compiledFilter = compileFilter(where);
     const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
@@ -286,7 +183,7 @@ export class Table<T> implements ITable<T> {
       await this._lockManager.waitUnlockToWrite(key);
 
       if (willPkBeModified) { 
-        const { newPk, oldPk } = this.generatePkForUpdate(updatedFields, currentRecord);
+        const { newPk, oldPk } = this._primaryKeyManager.generatePkForUpdate(currentRecord, updatedFields);
 
         if (oldPk !== newPk) this.checkIfPrimaryKeyIsInUse(newPk);
         
@@ -306,7 +203,7 @@ export class Table<T> implements ITable<T> {
   }
 
   public async deleteByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
-    const primaryKeyBuilt = this.buildPkFromRecord(primaryKey);
+    const primaryKeyBuilt = this._primaryKeyManager.buildPkFromRecord(primaryKey);
 
     await this._lockManager.waitUnlockToWrite(primaryKeyBuilt);
 
