@@ -1,4 +1,4 @@
-import { Table } from "../../../../src/core/table";
+import { ITable } from "../../../../src/types/table.type";
 
 type GenericData = {
   id: number;
@@ -31,9 +31,9 @@ const genericDataList: GenericData[] = [
  * ```
  * 
  */
-export function selectEqTests(description: string, createInstance: (dataTest: GenericData[]) => Promise<Table<any>>) {
+export function selectEqTests(description: string, createInstance: (dataTest: GenericData[]) => Promise<ITable<any>>) {
   describe(description, () => {
-    let genericTable: Table<GenericData>;
+    let genericTable: ITable<GenericData>;
   
     beforeEach(async () => {
       genericTable = await createInstance(genericDataList);
@@ -77,18 +77,18 @@ export function selectEqTests(description: string, createInstance: (dataTest: Ge
     });
   
     it("handle edge case with empty table", async () => {
-      const emptyTable = new Table<GenericData>({ primaryKey: ['id'] });
+      const emptyTable = await createInstance([]);
       const result = await emptyTable.select([], { id: { eq: 1 } });
       expect(result).toHaveLength(0);
     });
   
     it("handle null or undefined values gracefully", async () => {
-      const tableWithNulls = new Table<any>({ primaryKey: ['id'] });
+      const tableWithNulls = await createInstance([]);
       tableWithNulls.bulkInsert([
         { id: 1, name: null },
         { id: 2, name: undefined },
         { id: 3, name: "Charlie" }
-      ]);
+      ] as any[]);
       const resultWithNull = await tableWithNulls.select([], { name: { eq: null } });
       expect(resultWithNull).toHaveLength(1);
       expect(resultWithNull[0]).toEqual({ id: 1, name: null });
@@ -117,16 +117,16 @@ export function selectEqTests(description: string, createInstance: (dataTest: Ge
  * }
  * ```
  */
-export function selectEqTestsWithObjects(description: string, createInstance: () => Promise<Table<any>>) {
+export function selectEqTestsWithObjects(description: string, createInstance: () => Promise<ITable<any>>) {
   describe(description, () => {
-    let genericTable: Table<any>;
+    let genericTable: ITable<any>;
   
     beforeEach(async () => {
       genericTable = await createInstance();
     });
   
     it("filter records with array fields", async () => {
-      genericTable as Table<GenericData>;
+      genericTable as ITable<GenericData>;
       genericTable.bulkInsert(genericDataList);
       const expectedItemA = genericDataList[1];
       const expectedItemB = genericDataList[3];

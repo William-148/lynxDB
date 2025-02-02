@@ -1,21 +1,33 @@
+import { ITable } from "../types/table.type";
+import { Table } from "./table";
 import { Filter } from "../types/filter.type";
 import { LockType } from "../types/lock.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
-import { Table } from "./table";
 import { RecordWithId, Versioned } from "../types/record.type";
 import { IsolationLevel, TwoPhaseCommitParticipant } from "../types/transaction.type";
 import { Config } from "./config";
-import { isRecordDeleted, TransactionTempStore } from "./transaction-temp-store";
+import { TransactionTempStore } from "./transaction-temp-store";
+import { RecordLockManager } from "./record-lock-manager";
+import { PrimaryKeyManager } from "./primary-key-manager";
+import { 
+  extractFieldsFromRecord,
+  isCommittedRecordDeleted,
+  updateVersionedRecord
+} from "./record";
+import { processPromiseBatch } from "../utils/batch-processor";
 import { ExternalModificationError } from "./errors/transaction-table.error";
 import { TransactionCompletedError, TransactionConflictError } from "./errors/transaction.error";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 
-export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParticipant {
+export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant {
   private _transactionId: string;
   private _isActive: boolean;
   private _transactionConfig: Config;
   private _tempStore: TransactionTempStore<T>;
+  private _recordsMap: Map<string, Versioned<T>>;
+  private _lockManager: RecordLockManager;
+  private _primaryKeyManager: PrimaryKeyManager<T>;
 
   /** Contain the PKs that have a shared lock in the current transaction. */
   private _sharedLocks: Set<string>;
@@ -28,7 +40,6 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    * @param transactionConfig The configuration object for the transaction.
    */
   constructor(transactionId: string, table: Table<T>, transactionConfig?: Config) {
-    super({ primaryKey: [] }, transactionConfig);
     this._transactionId = transactionId;
     this._isActive = true;
     this._transactionConfig = transactionConfig ?? new Config();
@@ -43,7 +54,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   }
 
   get transactionId(): string { return this._transactionId; }
-  get config(): Config { return this._config; }
+  get transactionConfig(): Config { return this._transactionConfig; }
 
   /**
    * Releases all current locks, including shared and exclusive locks, and clears the lock sets.
@@ -146,28 +157,28 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    */
   private async waitUlockToRead(key: string): Promise<void> {
     if (this._sharedLocks.has(key) || this._exclusiveLocks.has(key)) return;
-    await this._lockManager.waitUnlockToRead(key, this._config.get("lockTimeout"));
+    await this._lockManager.waitUnlockToRead(key, this._transactionConfig.get("lockTimeout"));
   }
   //#endregion
 
-  override size(): number {
+  size(): number {
     return this._tempStore.size;
   }
 
-  override async insert(record: T): Promise<T> {
+  async insert(record: T): Promise<T> {
     const created = this._tempStore.insert(record);
 
     return { ...created.data };
   }
 
-  override async bulkInsert(records: T[]): Promise<void> {
+  async bulkInsert(records: T[]): Promise<void> {
     for (const record of records) {
       this._tempStore.insert(record);
     }
   }
 
-  override async findByPk(objectPrimaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
-    const primaryKeyBuilt = this.primaryKeyManager.buildPkFromRecord(objectPrimaryKey);
+  async findByPk(objectPrimaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
+    const primaryKeyBuilt = this._primaryKeyManager.buildPkFromRecord(objectPrimaryKey);
     await this.acquireReadLock(primaryKeyBuilt);
 
     const result = this._tempStore.findByPk(primaryKeyBuilt);
@@ -176,7 +187,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     return null;
   }
 
-  override async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
+  async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
     const compiledFilter = compileFilter(where);
     const committedResults: Partial<T>[] = [];
     const newestResults: Partial<T>[] = [];
@@ -184,13 +195,13 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     const areFieldsEmpty = (fields.length === 0);
 
     const processFields = (data: RecordWithId<T>): Partial<T> => 
-      areFieldsEmpty ? {...data} : this.extractSelectedFields(fields, data);
+      areFieldsEmpty ? {...data} : extractFieldsFromRecord(fields, data);
 
     const committedSelectProcess = async (committedRecordPk: string) => {
       await this.waitUlockToRead(committedRecordPk);
       const record = this._tempStore.getRecordState(committedRecordPk);
       if (!record) return;
-      if (isRecordDeleted(record)) return;
+      if (isCommittedRecordDeleted(record)) return;
 
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
       if (!matchRecord(recordToEvaluate.data, compiledFilter)) return;
@@ -217,8 +228,8 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
     }
 
     await Promise.all([
-      this.processPromiseBatch(committedPromises),
-      this.processPromiseBatch(uncommittedPromises)
+      processPromiseBatch(committedPromises),
+      processPromiseBatch(uncommittedPromises)
     ]);
 
     return committedResults.concat(newestResults);
@@ -238,7 +249,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
 
       const versionSnapshot = record.committed.version;
 
-      if (isRecordDeleted(record)) return;
+      if (isCommittedRecordDeleted(record)) return;
 
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
 
@@ -268,12 +279,12 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
       affectedRecords++;
     }
 
-    await this.processPromiseBatch(keys.map(committedUpdateProcess));
+    await processPromiseBatch(keys.map(committedUpdateProcess));
 
     return affectedRecords;
   }
 
-  override async deleteByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
+  async deleteByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
     const primaryKeyBuilt = this._primaryKeyManager.buildPkFromRecord(primaryKey);
     await this.acquireExclusiveLock(primaryKeyBuilt);
 
@@ -405,7 +416,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
         this._recordsMap.delete(committedPk);
       }else {
         if (committed.version !== committedChanges.changes.version) throw new ExternalModificationError(committedPk);
-        this.updateVersionedRecord(committed, committedChanges.changes.data);
+        updateVersionedRecord(committed, committedChanges.changes.data);
         if (!committedChanges.hasTheOriginalPk){
           // Update primary key in the Map
           this._recordsMap.delete(committedPk);

@@ -1,4 +1,4 @@
-import { Table } from "../../../../src/core/table";
+import { ITable } from "../../../../src/types/table.type";
 
 const defaultData = [
   { id: 1, name: 'Alpha', value: 100, active: true, score: 45.6, date: new Date('2022-01-01') },
@@ -22,9 +22,9 @@ const defaultData = [
  * }
  * ```
  */
-export function selectLtLteTests(description: string, createInstance: (data: any[]) => Promise<Table<any>>) {
+export function selectLtLteTests(description: string, createInstance: (data: any[]) => Promise<ITable<any>>) {
   describe(description, () => {
-    let genericTable: Table<any>;
+    let genericTable: ITable<any>;
   
     beforeEach(async () => {
       genericTable = await createInstance(defaultData);

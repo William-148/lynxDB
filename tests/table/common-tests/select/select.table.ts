@@ -1,4 +1,4 @@
-import { Table } from "../../../../src/core/table";
+import { ITable } from "../../../../src/types/table.type";
 import { thirtyItemsUserList } from "../../../data/data-test";
 import { User, userPropertyList } from "../../../types/user-test.type";
 
@@ -16,9 +16,9 @@ import { User, userPropertyList } from "../../../types/user-test.type";
  * }
  * ```
  */
-export function selectTestsWithFields(description: string, createInstance: (testData: User[]) => Promise<Table<User>>) {
+export function selectTestsWithFields(description: string, createInstance: (testData: User[]) => Promise<ITable<User>>) {
   describe(description, () => {
-    let userTable: Table<User>;
+    let userTable: ITable<User>;
     
     beforeEach(async () => {
       userTable = await createInstance(thirtyItemsUserList);
@@ -84,9 +84,9 @@ export function selectTestsWithFields(description: string, createInstance: (test
  * const createInstance = async () => new Table<any>({ primaryKey: ['id'] });
  * ```
  */
-export function selectWithOperatorTest(description: string, createInstance: () => Promise<Table<any>>) {
+export function selectWithOperatorTest(description: string, createInstance: () => Promise<ITable<any>>) {
   describe(description, () => {
-    let defaultTable: Table<any>;
+    let defaultTable: ITable<any>;
 
     beforeEach(async () => {
       defaultTable = await createInstance();

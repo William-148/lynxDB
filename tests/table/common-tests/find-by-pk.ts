@@ -1,8 +1,8 @@
-import { PrimaryKeyValueNullError } from "../../../src/core/errors/table.error";
-import { Table } from "../../../src/core/table";
+import { ITable } from "../../../src/types/table.type";
 import { defaultUser, thirtyItemsUserList, twentyOrderDetails } from "../../data/data-test";
 import { OrderDetail } from "../../types/order-test.type";
 import { User } from "../../types/user-test.type";
+import { PrimaryKeyValueNullError } from "../../../src/core/errors/table.error";
 
 /**
  * Common tests for findByPk() method using a single PK
@@ -21,9 +21,9 @@ import { User } from "../../types/user-test.type";
  * 
  * ```
  */
-export function findByPkTestWithSinglePK(description: string, createInstance: (testData: User[]) => Promise<Table<User>>) {
+export function findByPkTestWithSinglePK(description: string, createInstance: (testData: User[]) => Promise<ITable<User>>) {
   describe(description, () => {
-    let userTable: Table<User>; // primaryKey: ['id']
+    let userTable: ITable<User>; // primaryKey: ['id']
 
     beforeEach(async () => {
       userTable = await createInstance(thirtyItemsUserList);
@@ -70,9 +70,9 @@ export function findByPkTestWithSinglePK(description: string, createInstance: (t
  * 
  * ```
  */
-export function findByPkTestWithCompositePK(description: string, createInstance: (testData: OrderDetail[]) => Promise<Table<OrderDetail>>) {
+export function findByPkTestWithCompositePK(description: string, createInstance: (testData: OrderDetail[]) => Promise<ITable<OrderDetail>>) {
   describe(description, () => {
-    let orderDetailTable: Table<OrderDetail>; // primaryKey: ['orderId', 'productId']
+    let orderDetailTable: ITable<OrderDetail>; // primaryKey: ['orderId', 'productId']
 
     beforeEach(async () => {
       orderDetailTable = await createInstance(twentyOrderDetails);
@@ -139,12 +139,12 @@ export function findByPkTestWithCompositePK(description: string, createInstance:
  */
 export function findByPkTestWithoutPK(
   description: string, 
-  createInstance: (testData: Array<User & { _id?: string }>) => Promise<Table<User & { _id?: string }>>
+  createInstance: (testData: Array<User & { _id?: string }>) => Promise<ITable<User & { _id?: string }>>
 ) {
   describe(description, () => {
     type UserWithDefaultId = User & { _id?: string };
 
-    let userTable: Table<UserWithDefaultId>;
+    let userTable: ITable<UserWithDefaultId>;
 
     beforeEach(async () => {
       userTable = await createInstance(thirtyItemsUserList);

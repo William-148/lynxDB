@@ -1,4 +1,4 @@
-import { Table } from "../../../../src/core/table";
+import { ITable } from "../../../../src/types/table.type";
 
 export type ScoreRecord = {
   id: number;
@@ -31,10 +31,10 @@ const scoreDataList: ScoreRecord[] = [
  * }
  * ```
  */
-export function selectGtGteTests(description: string, createInstance: (dataTest: ScoreRecord[]) => Promise<Table<ScoreRecord>>) {
+export function selectGtGteTests(description: string, createInstance: (dataTest: ScoreRecord[]) => Promise<ITable<ScoreRecord>>) {
   describe (description, () => {
     
-    let genericTable: Table<any>;
+    let genericTable: ITable<any>;
   
     beforeEach(async () => {
       genericTable = await createInstance(scoreDataList);

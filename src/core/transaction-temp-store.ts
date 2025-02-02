@@ -2,15 +2,6 @@ import { Versioned, TemporalChange, RecordWithId, RecordState } from "../types/r
 import { PrimaryKeyManager } from "./primary-key-manager";
 import { createNewVersionedRecord } from "./record";
 
-/**
- * Determines if a record was deleted.
- * 
- * @param record The record to check if it was deleted
- */
-export function isRecordDeleted<T>(record: RecordState<T>): boolean {
-  return record.tempChanges?.action === 'deleted';
-}
-
 export class TransactionTempStore<T> {
   private _primaryKeyManager: PrimaryKeyManager<T>;
   private _committedMap: Map<string, Versioned<T>>;

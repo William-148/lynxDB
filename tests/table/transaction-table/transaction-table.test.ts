@@ -36,9 +36,9 @@ describe("Transaction table should", () => {
     const ttableB = new TransactionTable(generateId(), table, customConfigB);
     const ttableC = new TransactionTable(generateId(), table, customConfigC);
 
-    expect(ttableA.config).toEqual(customConfigA);
-    expect(ttableB.config).toEqual(customConfigB);
-    expect(ttableC.config).toEqual(customConfigC);
+    expect(ttableA.transactionConfig).toEqual(customConfigA);
+    expect(ttableB.transactionConfig).toEqual(customConfigB);
+    expect(ttableC.transactionConfig).toEqual(customConfigC);
   });
 
 });

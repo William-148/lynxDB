@@ -1,12 +1,16 @@
 import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
-import { generateId } from "../utils/generate-id";
 import { RecordLockManager } from "./record-lock-manager";
 import { Config } from "./config";
 import { ITable, TableConfig } from "../types/table.type";
 import { RecordWithId, Versioned } from "../types/record.type";
 import { PrimaryKeyManager } from "./primary-key-manager";
-import { createNewVersionedRecord } from "./record";
+import { 
+  createNewVersionedRecord, 
+  extractFieldsFromRecord, 
+  updateVersionedRecord 
+} from "./record";
+import { processPromiseBatch } from "../utils/batch-processor";
 
 export class Table<T> implements ITable<T> {
   /** Map that stores the records of the table. */
@@ -15,8 +19,6 @@ export class Table<T> implements ITable<T> {
   protected _primaryKeyManager: PrimaryKeyManager<T>;
   protected _lockManager: RecordLockManager;
   protected _config: Config;
-  /** Number of records to process in a batch. */
-  protected _batchSize: number = 500;
 
   /**
    * @param definition Definition object for the table
@@ -35,28 +37,12 @@ export class Table<T> implements ITable<T> {
   get config(): Config { return this._config; }
 
   /**
-   * Extracts the specified fields from a record and returns a new partial record containing only those fields.
-   *
-   * @template T
-   * @param {Array<keyof T>} fields - The fields to extract from the record.
-   * @param {T} record - The record from which to extract the fields.
-   * @returns {Partial<T>} - A new partial record containing only the specified fields.
-   */
-  protected extractSelectedFields(fields: (keyof T)[], record: RecordWithId<T>): Partial<RecordWithId<T>> {
-    const newRecord: Partial<RecordWithId<T>> = {};
-    for (let field of fields) {
-      newRecord[field] = record[field];
-    }
-    return newRecord;
-  }
-
-  /**
    * Checks if the primary key is already in use and throws an error if it is.
    *
    * @param {string} primaryKey - The primary key to check.
    * @throws {DuplicatePrimaryKeyValueError} - If the primary key is already in use.
    */
-  protected checkIfPrimaryKeyIsInUse(primaryKey: string): void {
+  private checkIfPrimaryKeyIsInUse(primaryKey: string): void {
     if (this._recordsMap.has(primaryKey)){
       throw this._primaryKeyManager.createDuplicatePkValueError(primaryKey);
     }
@@ -79,28 +65,6 @@ export class Table<T> implements ITable<T> {
     this.checkIfPrimaryKeyIsInUse(primaryKey);
     this._recordsMap.set(primaryKey, versionedRecord);
     return versionedRecord;
-  }
-
-  /**
-   * Updates the data and version of a versioned record.
-   * 
-   * @param versioned Versioned record to update.
-   * @param updatedFields The updated fields to apply to the record.
-   */
-  protected updateVersionedRecord(versioned: Versioned<T>, updatedFields: Partial<T>): void {
-    Object.assign(versioned.data, updatedFields);
-    versioned.version++;
-  }
-
-  /**
-   * Processes a list of promises in batches.
-   * 
-   * @param promises List of promises to process in batches.
-   */
-  protected async processPromiseBatch(promises: Promise<void>[]): Promise<void> {
-    for (let i = 0; i < promises.length; i += this._batchSize) {
-      await Promise.all(promises.slice(i, i + this._batchSize));
-    }
   }
 
   public size(): number { return this._recordsMap.size; }
@@ -139,7 +103,7 @@ export class Table<T> implements ITable<T> {
 
       result.push(areFieldsToSelectEmpty 
         ? { ...currentRecord }
-        : this.extractSelectedFields(fields, currentRecord)
+        : extractFieldsFromRecord(fields, currentRecord)
       );
     }
 
@@ -148,7 +112,7 @@ export class Table<T> implements ITable<T> {
       promises.push(processSelect(data));
     }
 
-    await this.processPromiseBatch(promises);
+    await processPromiseBatch(promises);
 
     return result;
   }
@@ -178,15 +142,15 @@ export class Table<T> implements ITable<T> {
         
         this._recordsMap.delete(oldPk);
         this._recordsMap.set(newPk, currentVersioned);
-        this.updateVersionedRecord(currentVersioned, updatedFields);
+        updateVersionedRecord(currentVersioned, updatedFields);
       }
       else {
-        this.updateVersionedRecord(currentVersioned, updatedFields);
+        updateVersionedRecord(currentVersioned, updatedFields);
       }
       affectedRecords++;
     }
 
-    await this.processPromiseBatch(keys.map(proccessUpdate));
+    await processPromiseBatch(keys.map(proccessUpdate));
 
     return affectedRecords;
   }

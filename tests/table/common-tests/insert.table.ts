@@ -1,4 +1,4 @@
-import { Table } from "../../../src/core/table";
+import { ITable } from "../../../src/types/table.type";
 import { defaultUser, thirtyItemsUserList } from "../../data/data-test";
 import { User } from "../../types/user-test.type";
 import { OrderDetail } from "../../types/order-test.type";
@@ -18,9 +18,9 @@ import {
  * const createInstance = () => new Table<User>({ primaryKey: ['id'] });
  * ```
  */
-export function insertTestWithSinglePK(description: string, createInstance: () => Table<User>) {
+export function insertTestWithSinglePK(description: string, createInstance: () => ITable<User>) {
   describe(description, () => {
-    let userTable: Table<User>;
+    let userTable: ITable<User>;
   
     beforeEach(() => {
       userTable = createInstance();
@@ -76,9 +76,9 @@ const orderDetails: OrderDetail[] = [
  * ```ts
  * const createInstance = () => new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
  */
-export function insertTestWithCompositePK(description: string, createInstance: () => Table<OrderDetail>) {
+export function insertTestWithCompositePK(description: string, createInstance: () => ITable<OrderDetail>) {
   describe(description, () => {
-    let orderDetailTable: Table<OrderDetail>;
+    let orderDetailTable: ITable<OrderDetail>;
   
     beforeEach(() => {
       orderDetailTable = createInstance();
@@ -141,10 +141,10 @@ export function insertTestWithCompositePK(description: string, createInstance: (
  * const createInstance = () => new Table<User & { _id?: string }>({ primaryKey: [] });
  * ```
  */
-export function insertTestWithoutPK(description: string, createInstance: () => Table<User & { _id?: string }>) {
+export function insertTestWithoutPK(description: string, createInstance: () => ITable<User & { _id?: string }>) {
   describe(description, () => {
     type UserWithDefaultId = User & { _id?: string };
-    let userTable: Table<UserWithDefaultId>;
+    let userTable: ITable<UserWithDefaultId>;
   
     beforeEach(() => {
       userTable = createInstance();

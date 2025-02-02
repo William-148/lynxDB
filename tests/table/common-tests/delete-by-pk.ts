@@ -1,5 +1,5 @@
 import { PrimaryKeyValueNullError } from "../../../src/core/errors/table.error";
-import { Table } from "../../../src/core/table";
+import { ITable } from "../../../src/types/table.type";
 import { Enrollment } from "../../types/enrollment-test.type";
 import { Product } from "../../types/product-test.type";
 
@@ -28,9 +28,9 @@ const products: Product[] = [
  * 
  * ```
  */
-export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[]) => Promise<Table<Product>>) {
+export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[]) => Promise<ITable<Product>>) {
   describe('Simple Primary Key', () => {
-    let table: Table<Product>;
+    let table: ITable<Product>;
   
     beforeEach(async () => {
       table = await createInstance(products);
@@ -229,9 +229,9 @@ export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[])
  * 
  * ```
  */
-export function deleteByPkTestWithDefaultPK(createInstance: (testData: Product[]) => Promise<Table<Product & { _id?: string }>>) {
+export function deleteByPkTestWithDefaultPK(createInstance: (testData: Product[]) => Promise<ITable<Product & { _id?: string }>>) {
   describe('Default Primary Key', () => {
-    let table: Table<Product & { _id?: string }>;
+    let table: ITable<Product & { _id?: string }>;
 
     beforeEach(async () => {
       table = await createInstance(products);
@@ -308,10 +308,10 @@ const enrollmentsTestData: Enrollment[] = [
  * }
  * ```
  */
-export function deleteByPkTestWithCompositePK(createInstance: (testData: Enrollment[]) => Promise<Table<Enrollment>>) {
+export function deleteByPkTestWithCompositePK(createInstance: (testData: Enrollment[]) => Promise<ITable<Enrollment>>) {
   describe('Composite Primary Key', () => {
   
-    let table: Table<Enrollment>;
+    let table: ITable<Enrollment>;
   
     beforeEach(async () => {
       table = await createInstance(enrollmentsTestData);
