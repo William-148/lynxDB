@@ -7,7 +7,7 @@ import { IsolationLevel } from "../../../../src/types/transaction.type";
 import { generateId } from "../../../../src/utils/generate-id";
 import { Product } from "../../../types/product-test.type";
 
-describe(`Transaction Table Commit ${IsolationLevel.ReadLatest}`, () => {
+describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
   const TestData: Product[] = [
     { id: 1, name: "Laptop", price: 1500, stock: 30 },
     { id: 2, name: "Mouse",  price: 20, stock: 100 },
@@ -26,7 +26,7 @@ describe(`Transaction Table Commit ${IsolationLevel.ReadLatest}`, () => {
     transactionTable = new TransactionTable<Product>(
       generateId(),
       table,
-      new Config({ isolationLevel: IsolationLevel.ReadLatest })
+      new Config({ isolationLevel: IsolationLevel.RepeatableRead })
     );
   });
 

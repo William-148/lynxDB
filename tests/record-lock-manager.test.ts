@@ -15,12 +15,12 @@ describe('RecordLockManager', () => {
   
     it("create a read lock manager with custom config correctly", async () => {
       const customConfigA: Config = new Config({
-        isolationLevel: IsolationLevel.StrictLocking,
+        isolationLevel: IsolationLevel.Serializable,
         lockTimeout: 8767
       });
   
       const customConfigB: Config = new Config({
-        isolationLevel: IsolationLevel.ReadLatest,
+        isolationLevel: IsolationLevel.RepeatableRead,
         lockTimeout: 9887
       });
   

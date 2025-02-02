@@ -8,7 +8,7 @@ export class Config {
   constructor(initialOptions: ConfigOptions = {}) {
     removeUndefinedProperties(initialOptions);
     this.options = {
-      isolationLevel: IsolationLevel.ReadLatest,
+      isolationLevel: IsolationLevel.RepeatableRead,
       lockTimeout: 5000,
       ...initialOptions
     }

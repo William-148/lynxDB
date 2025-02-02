@@ -15,12 +15,12 @@ describe("Table should", () => {
 
   it("create tables with custom config correctly", async () => {
     const customConfigA: Config = new Config({ 
-      isolationLevel: IsolationLevel.StrictLocking,
+      isolationLevel: IsolationLevel.Serializable,
       lockTimeout: 1234
     });
 
     const customConfigB: Config = new Config({ 
-      isolationLevel: IsolationLevel.ReadLatest,
+      isolationLevel: IsolationLevel.RepeatableRead,
       lockTimeout: 4321
     });
 

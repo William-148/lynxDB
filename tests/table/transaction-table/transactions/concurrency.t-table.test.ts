@@ -111,7 +111,7 @@ describe("Transaction Table", () => {
       const transactionTables = generateTransactionTables(
         TransactionCount,
         table,
-        { isolationLevel: IsolationLevel.ReadLatest }
+        { isolationLevel: IsolationLevel.RepeatableRead }
       );
 
       // Insert new products with the same primary key
@@ -141,11 +141,11 @@ describe("Transaction Table", () => {
 
   });
 
-  describe(`Concurrency Commit ${IsolationLevel.ReadLatest}`, () => {
+  describe(`Concurrency Commit ${IsolationLevel.RepeatableRead}`, () => {
     let table: Table<Product>;
 
     let defaultConfig: ConfigOptions = {
-      isolationLevel: IsolationLevel.ReadLatest,
+      isolationLevel: IsolationLevel.RepeatableRead,
       lockTimeout: 5000
     };
 
@@ -240,7 +240,7 @@ describe("Transaction Table", () => {
         table,
         // defaultConfig
         {
-          isolationLevel: IsolationLevel.ReadLatest,
+          isolationLevel: IsolationLevel.RepeatableRead,
           lockTimeout: 5000
         }
       );
@@ -356,7 +356,7 @@ describe("Transaction Table", () => {
 
   });
 
-  describe(`Transaction Table - Concurrency Commit ${IsolationLevel.StrictLocking}`, () => {
+  describe(`Transaction Table - Concurrency Commit ${IsolationLevel.Serializable}`, () => {
     const technologyProducts: Product[] = [
       { id: 1, name: "Laptop", price: 1500, stock: 30 },
       { id: 2, name: "Mouse", price: 20, stock: 100 },
@@ -366,7 +366,7 @@ describe("Transaction Table", () => {
     ];
 
     let table: Table<Product>;
-    const defaultConfig: ConfigOptions = { isolationLevel: IsolationLevel.StrictLocking };
+    const defaultConfig: ConfigOptions = { isolationLevel: IsolationLevel.Serializable };
 
     beforeEach(() => {
       table = new Table<Product>({ primaryKey: ["id"] });

@@ -139,9 +139,9 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
    */
   private async acquireReadLock(key: string): Promise<void> {
     switch (this._transactionConfig.get("isolationLevel")) {
-      case IsolationLevel.ReadLatest:
+      case IsolationLevel.RepeatableRead:
         return this.acquireSharedLock(key);
-      case IsolationLevel.StrictLocking:
+      case IsolationLevel.Serializable:
         return this.acquireExclusiveLock(key);
     }
   }

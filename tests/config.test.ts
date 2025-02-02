@@ -10,12 +10,12 @@ describe('Config', () => {
 
   it("create an instance of Config with custom config correctly", async () => {
     const customConfigA: ConfigOptions = {
-      isolationLevel: IsolationLevel.StrictLocking,
+      isolationLevel: IsolationLevel.Serializable,
       lockTimeout: 8767
     }
 
     const customConfigB: ConfigOptions = {
-      isolationLevel: IsolationLevel.ReadLatest,
+      isolationLevel: IsolationLevel.RepeatableRead,
       lockTimeout: 9887
     }
 
@@ -45,11 +45,11 @@ describe('Config', () => {
     }
 
     const customB: ConfigOptions = {
-      isolationLevel: IsolationLevel.StrictLocking
+      isolationLevel: IsolationLevel.Serializable
     }
 
     const config = new Config({
-      isolationLevel: IsolationLevel.ReadLatest,
+      isolationLevel: IsolationLevel.RepeatableRead,
       lockTimeout: 6000
     });
 
@@ -83,7 +83,7 @@ describe('Config', () => {
 
   it("update a config property correctly", async () => {
     const config = new Config();
-    const newIsolationLevel = IsolationLevel.StrictLocking;
+    const newIsolationLevel = IsolationLevel.Serializable;
     const newLockTimeout = 888;
 
     config.set("isolationLevel", newIsolationLevel);

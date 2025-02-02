@@ -20,12 +20,12 @@ describe("Transaction table should", () => {
   it("create a transaction table with custom config correctly", async () => {
     const table = new Table<User>({ primaryKey: ['id'] });
     const customConfigA: Config = new Config({ 
-      isolationLevel: IsolationLevel.StrictLocking,
+      isolationLevel: IsolationLevel.Serializable,
       lockTimeout: 1234
     });
 
     const customConfigB: Config = new Config({ 
-      isolationLevel: IsolationLevel.ReadLatest,
+      isolationLevel: IsolationLevel.RepeatableRead,
       lockTimeout: 4321
     });
 
