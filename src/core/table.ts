@@ -6,6 +6,7 @@ import { Config } from "./config";
 import { ITable, TableConfig } from "../types/table.type";
 import { RecordWithId, Versioned } from "../types/record.type";
 import { PrimaryKeyManager } from "./primary-key-manager";
+import { createNewVersionedRecord } from "./record";
 
 export class Table<T> implements ITable<T> {
   /** Map that stores the records of the table. */
@@ -56,38 +57,28 @@ export class Table<T> implements ITable<T> {
    * @throws {DuplicatePrimaryKeyValueError} - If the primary key is already in use.
    */
   protected checkIfPrimaryKeyIsInUse(primaryKey: string): void {
-    if (!this._recordsMap.has(primaryKey)) return;
-    
-    throw this._primaryKeyManager.createDuplicatePkValueError(primaryKey);
+    if (this._recordsMap.has(primaryKey)){
+      throw this._primaryKeyManager.createDuplicatePkValueError(primaryKey);
+    }
   }
 
   /**
    * Inserts a record into the record map.
    * 
-   * @param {Versioned<T>} record - The record to be inserted.
+   * @param {T} record - The record to be inserted.
+   * @returns {Versioned<T>} - The versioned record that was created and inserted.
+   * @throws {DuplicatePrimaryKeyValueError} If the primary key is already in use
    */
-  private insertInMap(record: Versioned<T>): void {
-    const primaryKey = this._primaryKeyManager.buildPkFromRecord(record.data);
+  private insertInMap(record: T): Versioned<T> {
+    const versionedRecord = createNewVersionedRecord(
+      record, 
+      this._primaryKeyManager.hasNotPkDefinition()
+    );
+    const primaryKey = this._primaryKeyManager.buildPkFromRecord(versionedRecord.data);
+
     this.checkIfPrimaryKeyIsInUse(primaryKey);
-
-    this._recordsMap.set(primaryKey, record);
-  }
-
-  /**
-   * Creates a new record with an initial version. Generates a new primary key 
-   * if no primary key definition exists.
-   * 
-   * @param {T} record - The original record.
-   * @returns {Versioned<T>} - The new record with an initial version.
-   */
-  protected createNewVersionedRecord(record: T): Versioned<T> {
-    const newRecord: RecordWithId<T> = { ...record } as RecordWithId<T>;
-
-    if (this._primaryKeyManager.hasNotPkDefinition() && !newRecord._id) {
-      newRecord._id = generateId();
-    }
-
-    return { data: newRecord, version: 1 };
+    this._recordsMap.set(primaryKey, versionedRecord);
+    return versionedRecord;
   }
 
   /**
@@ -115,15 +106,13 @@ export class Table<T> implements ITable<T> {
   public size(): number { return this._recordsMap.size; }
   
   public async insert(record: T): Promise<T> {
-    const newRecord = this.createNewVersionedRecord(record);
-    this.insertInMap(newRecord);
-    return { ...newRecord.data };
+    const inserted = this.insertInMap(record);
+    return { ...inserted.data };
   }
 
   public async bulkInsert(records: T[]): Promise<void> {
     for (let record of records) {
-      const newRecord = this.createNewVersionedRecord(record);
-      this.insertInMap(newRecord);
+      this.insertInMap(record);
     }
   }
 

@@ -1,4 +1,4 @@
-import { RecordWithId } from "../types/record.type";
+import { RecordWithId, Versioned } from "../types/record.type";
 import { 
   DuplicatePrimaryKeyDefinitionError, 
   DuplicatePrimaryKeyValueError, 

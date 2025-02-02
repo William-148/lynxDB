@@ -46,13 +46,6 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   get config(): Config { return this._config; }
 
   /**
-   * Clears all temporary changes, new inserts, updates and deletions.
-   */
-  public clearState(): void {
-    this._tempStore.clear();
-  }
-
-  /**
    * Releases all current locks, including shared and exclusive locks, and clears the lock sets.
    */
   private releaseCurrentLocks(): void {
@@ -74,7 +67,7 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   private finishTransaction(): void {
     this._isActive = false;
     this.releaseCurrentLocks();
-    this.clearState();
+    this._tempStore.clear();
   }
 
 
@@ -162,16 +155,14 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
   }
 
   override async insert(record: T): Promise<T> {
-    const newRecord = this.createNewVersionedRecord(record);
-    this._tempStore.insert(newRecord);
+    const created = this._tempStore.insert(record);
 
-    return { ...newRecord.data };
+    return { ...created.data };
   }
 
   override async bulkInsert(records: T[]): Promise<void> {
-    for (let record of records) {
-      const newRecord = this.createNewVersionedRecord(record);
-      this._tempStore.insert(newRecord);
+    for (const record of records) {
+      this._tempStore.insert(record);
     }
   }
 

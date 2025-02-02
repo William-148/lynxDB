@@ -1,5 +1,6 @@
 import { Versioned, TemporalChange, RecordWithId, RecordState } from "../types/record.type";
 import { PrimaryKeyManager } from "./primary-key-manager";
+import { createNewVersionedRecord } from "./record";
 
 /**
  * Determines if a record was deleted.
@@ -186,18 +187,24 @@ export class TransactionTempStore<T> {
   /**
    * Insert a record into the temporal transaction store
    * 
-   * @param primaryKey The primary key of the record to be inserted
    * @param record The record to be inserted
+   * @returns The versioned record that was created and inserted
    * @throws {DuplicatePrimaryKeyValueError} If the primary key is already in use
    */
-  public insert(record: Versioned<T>): void {
-    const primaryKey = this._primaryKeyManager.buildPkFromRecord(record.data);
+  public insert(record: T): Versioned<T> {
+    const versioned = createNewVersionedRecord(
+      record,
+      this._primaryKeyManager.hasNotPkDefinition()
+    );
+    const primaryKey = this._primaryKeyManager.buildPkFromRecord(versioned.data);
 
     if (this.isPrimaryKeyInUse(primaryKey)) {
       throw this._primaryKeyManager.createDuplicatePkValueError(primaryKey);
     }
 
-    this._tempInserts.set(primaryKey, record);
+    this._tempInserts.set(primaryKey, versioned);
+
+    return versioned;
   }
 
   /**
