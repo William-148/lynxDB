@@ -252,11 +252,11 @@ export class TransactionTable<T> extends Table<T> implements TwoPhaseCommitParti
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
 
       if (!matchRecord(recordToEvaluate.data, compiledFilter)) return;
+
       await this.acquireExclusiveLock(committedRecordPk);
       // TODO: Hacer un test para ver que pasa cuando bloquea un registro que su pk fue modificado
 
-      if ((versionSnapshot !== record.committed.version)
-        && !matchRecord(recordToEvaluate.data, compiledFilter)) {
+      if ((versionSnapshot !== record.committed.version) && !matchRecord(recordToEvaluate.data, compiledFilter)) {
         this.releaseLock(committedRecordPk);
         return;
       }
