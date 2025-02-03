@@ -5,12 +5,12 @@ import { Config } from "./config";
 import { ITable, TableConfig } from "../types/table.type";
 import { RecordWithId, Versioned } from "../types/record.type";
 import { PrimaryKeyManager } from "./primary-key-manager";
+import { processPromiseBatch } from "../utils/batch-processor";
 import { 
   createNewVersionedRecord, 
   extractFieldsFromRecord, 
   updateVersionedRecord 
 } from "./record";
-import { processPromiseBatch } from "../utils/batch-processor";
 
 export class Table<T> implements ITable<T> {
   /** Map that stores the records of the table. */
@@ -21,8 +21,8 @@ export class Table<T> implements ITable<T> {
   protected _config: Config;
 
   /**
-   * @param definition Definition object for the table
-   * @param config Configuration object for the table
+   * @param definition - Definition object for the table
+   * @param config - Configuration object for the table
    */
   constructor(definition: TableConfig<T>, config?: Config) {
     this._recordsMap = new Map();
@@ -39,7 +39,7 @@ export class Table<T> implements ITable<T> {
   /**
    * Checks if the primary key is already in use and throws an error if it is.
    *
-   * @param {string} primaryKey - The primary key to check.
+   * @param primaryKey - The primary key to check.
    * @throws {DuplicatePrimaryKeyValueError} - If the primary key is already in use.
    */
   private checkIfPrimaryKeyIsInUse(primaryKey: string): void {
@@ -51,8 +51,8 @@ export class Table<T> implements ITable<T> {
   /**
    * Inserts a record into the record map.
    * 
-   * @param {T} record - The record to be inserted.
-   * @returns {Versioned<T>} - The versioned record that was created and inserted.
+   * @param record - The record to be inserted.
+   * @returns - The versioned record that was created and inserted.
    * @throws {DuplicatePrimaryKeyValueError} If the primary key is already in use
    */
   private insertInMap(record: T): Versioned<T> {

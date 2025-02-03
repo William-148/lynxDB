@@ -9,14 +9,10 @@ import { Config } from "./config";
 import { TransactionTempStore } from "./transaction-temp-store";
 import { RecordLockManager } from "./record-lock-manager";
 import { PrimaryKeyManager } from "./primary-key-manager";
-import { 
-  extractFieldsFromRecord,
-  isCommittedRecordDeleted,
-  updateVersionedRecord
-} from "./record";
+import { extractFieldsFromRecord, isCommittedRecordDeleted } from "./record";
 import { processPromiseBatch } from "../utils/batch-processor";
-import { ExternalModificationError } from "./errors/transaction-table.error";
 import { TransactionCompletedError, TransactionConflictError } from "./errors/transaction.error";
+import { ExternalModificationError } from "./errors/transaction-table.error";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 
@@ -103,8 +99,7 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
   /**
    * Acquires an exclusive lock for the specified key.
    *
-   * @param {string} key - The key for which to acquire the lock.
-   * @returns {Promise<void>} - A promise that resolves when the lock is acquired.
+   * @param key - The key for which to acquire the lock.
    */
   private async acquireExclusiveLock(key: string): Promise<void> {
     if (this._exclusiveLocks.has(key)) return;
@@ -124,8 +119,7 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
   /**
    * Acquires exclusive locks for the specified keys.
    *
-   * @param {string[]} keys - The keys for which to acquire exclusive locks.
-   * @returns {Promise<void[]>} - A promise that resolves when all locks are acquired.
+   * @param keys - The keys for which to acquire exclusive locks.
    */
   private async acquireExclusiveLocks(keys: string[]): Promise<void[]> {
     const promises: Promise<void>[] = [];
@@ -138,8 +132,7 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
   /**
    * Acquires a read lock for the specified key based on the isolation level.
    *
-   * @param {string} key - The key for which to acquire the read lock.
-   * @returns {Promise<void>} - A promise that resolves when the lock is acquired.
+   * @param key - The key for which to acquire the read lock.
    */
   private async acquireReadLock(key: string): Promise<void> {
     switch (this._transactionConfig.get("isolationLevel")) {
@@ -305,39 +298,6 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
   }
 
   //#region TWO-PHASE COMMIT METHODS ****************************************************
-  public async prepare(): Promise<void> {
-    if (!this._isActive) throw new TransactionCompletedError();
-    try {
-      const keysToLock = this._tempStore.getKeysToLock();
-      await this.acquireExclusiveLocks(keysToLock);
-      await this.validateChanges();
-    }
-    catch (error: any) {
-      this.rollback();
-      throw new TransactionConflictError(this._transactionId, error?.message);
-    }
-  }
-
-  public async apply(): Promise<void> {
-    if (!this._isActive) throw new TransactionCompletedError();
-    try {
-      // Apply the changes
-      this.applyChanges();
-      this.applyNewInsertions();
-
-      // Release locks and clear temporary records
-      this.finishTransaction();
-    }
-    catch (error: any) {
-      this.rollback();
-      throw new TransactionConflictError(this._transactionId, error?.message);
-    }
-  }
-
-  public async rollback(): Promise<void> {
-    this.finishTransaction();
-  }
-
   /**
    * Commits the changes.
    * 
@@ -358,90 +318,33 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
     await this.apply();
   }
 
-  /**
-   * Validates the data integrity by acquiring shared locks and checking for duplicate primary keys.
-   *
-   * This method acquires shared locks for the specified keys and validates the data integrity.
-   * It checks for duplicate primary keys and ensures that the version of the updated records
-   * matches the committed version. If any validation fails, an appropriate error is thrown.
-   *
-   * @throws {LockTimeoutError} If the locks cannot be acquired within the timeout.
-   * @throws {DuplicatePrimaryKeyValueError} If there are duplicate primary keys.
-   */
-  public async validateChanges(): Promise<void> {
-    // Validate that there are no duplicate PKs
-    for (const pk of this._tempStore.tempInserts.keys()) {
-      if (this._recordsMap.has(pk)) {
-        const committedChanges = this._tempStore.originalPrimaryKeyMap.get(pk)
-        if (!committedChanges) throw this._primaryKeyManager.createDuplicatePkValueError(pk);
-        if (committedChanges.action === 'updated' && committedChanges.hasTheOriginalPk){
-          throw this._primaryKeyManager.createDuplicatePkValueError(pk);
-        }
-      }
+  public async prepare(): Promise<void> {
+    if (!this._isActive) throw new TransactionCompletedError();
+    try {
+      const keysToLock = this._tempStore.getKeysToLock();
+      await this.acquireExclusiveLocks(keysToLock);
+      await this._tempStore.validateChanges();
     }
-
-    // Validate that the updated records have not duplicated PKs
-    for (const [newestPk, tempChanges] of this._tempStore.updatedPrimaryKeyMap) {
-      if (tempChanges.action === 'deleted') continue;
-      if (this._recordsMap.has(newestPk)) {
-        const committedChanges = this._tempStore.originalPrimaryKeyMap.get(newestPk)
-        if (!committedChanges) throw this._primaryKeyManager.createDuplicatePkValueError(newestPk);
-        if (committedChanges.action === 'updated' && committedChanges.hasTheOriginalPk){
-          throw this._primaryKeyManager.createDuplicatePkValueError(newestPk);
-        }
-      }
-    }
-
-    // Validate that the updated records have the correct version
-    for (const [committedPk, committedChanges] of this._tempStore.originalPrimaryKeyMap) {
-      const committedRecord = this._recordsMap.get(committedPk);
-      if (!committedRecord || committedRecord.version !== committedChanges.changes.version) {
-        throw new ExternalModificationError(committedPk);
-      }
+    catch (error: any) {
+      this.rollback();
+      throw new TransactionConflictError(this._transactionId, error?.message);
     }
   }
 
-  /**
-   * Applies updates to the committed records map.
-   * 
-   * @throws {ExternalModificationError} If the version of the updated record are different
-   * from the original.
-   */
-  private applyChanges(): void {
-    for (let [committedPk, committedChanges] of this._tempStore.originalPrimaryKeyMap) {
-      const committed = this._recordsMap.get(committedPk);
-      if (!committed) throw new ExternalModificationError(committedPk);
-      
-      if (committedChanges.action === 'deleted'){
-        this._recordsMap.delete(committedPk);
-      }else {
-        if (committed.version !== committedChanges.changes.version) throw new ExternalModificationError(committedPk);
-        updateVersionedRecord(committed, committedChanges.changes.data);
-        if (!committedChanges.hasTheOriginalPk){
-          // Update primary key in the Map
-          this._recordsMap.delete(committedPk);
-          this._recordsMap.set(this._primaryKeyManager.buildPkFromRecord(committed.data), committed);
-        }
-      }
+  public async apply(): Promise<void> {
+    if (!this._isActive) throw new TransactionCompletedError();
+    try {
+      this._tempStore.applyChanges();
+      this.finishTransaction();
+    }
+    catch (error: any) {
+      this.rollback();
+      throw new TransactionConflictError(this._transactionId, error?.message);
     }
   }
 
-  /**
-   * Inserts new records into the committed records map and array.
-   *
-   * This method should be invoked after applying updates and deletions, because if a record 
-   * is inserted with a primary key that already exists, an error is thrown, although this 
-   * was already validated in the preparation phase, it is necessary to validate again.
-   * 
-   * @throws {DuplicatePrimaryKeyValueError} If a duplicate primary key is found.
-   */
-  private applyNewInsertions(): void {
-    for (const [primaryKey, newRecord] of this._tempStore.tempInserts) {
-      if (this._recordsMap.has(primaryKey)) {
-        throw this._primaryKeyManager.createDuplicatePkValueError(primaryKey);
-      }
-      this._recordsMap.set(primaryKey, newRecord);
-    }
+  public async rollback(): Promise<void> {
+    this.finishTransaction();
   }
   //#endregion
 }

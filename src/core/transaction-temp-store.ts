@@ -1,6 +1,20 @@
-import { Versioned, TemporalChange, RecordWithId, RecordState } from "../types/record.type";
+import { ExternalModificationError } from "./errors/transaction-table.error";
 import { PrimaryKeyManager } from "./primary-key-manager";
-import { createNewVersionedRecord } from "./record";
+import { 
+  Versioned,
+  TemporalChange,
+  RecordWithId,
+  RecordState
+} from "../types/record.type";
+import { 
+  createNewTempDeletedObject,
+  createNewTempUpdatedObject,
+  createNewVersionedRecord,
+  updateRecord,
+  updateTempChangeAsDeleted,
+  updateTempChangeObject,
+  updateVersionedRecord
+} from "./record";
 
 export class TransactionTempStore<T> {
   private _primaryKeyManager: PrimaryKeyManager<T>;
@@ -63,82 +77,14 @@ export class TransactionTempStore<T> {
   }
 
   public getKeysToLock(): string[] {
-    const keysToLock = Array.from(this._originalPrimaryKeyMap.keys());
-    return keysToLock;
-  }
-
-  /**
-   * Creates a new TemporalChange object by merging the committed record with the updated fields.
-   * 
-   * @param {Versioned<T>} committedRecord - The committed record.
-   * @param {Partial<T>} updatedFields - The fields to update in the record.
-   * @returns {Versioned<T>} - The new updated record.
-   */
-  private createNewTempUpdatedObject(committedRecord: Versioned<T>, updatedFields: Partial<T>, hasTheOriginalPk: boolean): TemporalChange<T> {
-    return {
-      action: 'updated',
-      changes: {
-        data: { ...committedRecord.data, ...updatedFields },
-        version: committedRecord.version
-      },
-      hasTheOriginalPk
-    }
-  }
-
-  /**
-   * Creates a new TemporalChange object for a deleted record.
-   * 
-   * @param {Versioned<T>} committedRecord - The committed record to delete.
-   * @returns {TemporalChange<T>} - The object representing the deleted record.
-   */
-  private createNewTempDeletedObject(committedRecord: Versioned<T>): TemporalChange<T> {
-    return {
-      action: 'deleted',
-      changes: {
-        data: { ...committedRecord.data },
-        version: committedRecord.version
-      },
-      hasTheOriginalPk: true
-    }
-  }
-
-  /**
-   * Updates the record in the TemporalChange object.
-   * 
-   * @param tempChange The TemporalChange object to be updated.
-   * @param updatedFields The fields to update in the record.
-   * @param hasTheOriginalPk Indicates if the primary key was modified.
-   */
-  private updateTempChangeObject(tempChange: TemporalChange<T>, updatedFields: Partial<T>, hasTheOriginalPk: boolean): void {
-    Object.assign(tempChange.changes.data, updatedFields);
-    tempChange.hasTheOriginalPk = hasTheOriginalPk;
-  }
-
-  /**
-   * Updates the data of a versioned record with the updated fields.
-   * 
-   * @param record The versioned record that has the data to be updated
-   * @param updatedFields The updated fields to be merged with the record data
-   */
-  private updateVersionedRecord(record: Versioned<T>, updatedFields: Partial<T>): void {
-    Object.assign(record.data, updatedFields);
-  }
-
-  /**
-   * Changes the TemporalChange object to represent a deleted record.
-   * 
-   * @param tempChange The TemporalChange object to be updated.
-   */
-  private updateTempChangeAsDeleted(tempChange: TemporalChange<T>): void {
-    tempChange.action = 'deleted';
-    tempChange.hasTheOriginalPk = true;
+    return Array.from(this._originalPrimaryKeyMap.keys());
   }
 
   /**
    * Check if the primary key is in use in the temporal transaction store.
    * 
-   * @param primaryKey The primary key to check if it is in use.
-   * @returns True if the primary key is in use, otherwise false.
+   * @param primaryKey - The primary key to check if it is in use.
+   * @returns - True if the primary key is in use, otherwise false.
    */
   public isPrimaryKeyInUse(primaryKey: string): boolean {
     if (this._tempInserts.has(primaryKey)) return true;
@@ -162,7 +108,7 @@ export class TransactionTempStore<T> {
   /**
    * Retrieve the committed record and the temporal changes of a record with the given primary key.
    * 
-   * @param primaryKey The committed primary key of the record to be found.
+   * @param primaryKey - The committed primary key of the record to be found.
    * @returns - The record state if found. 
    *  - `undefined` if the committed record does not exist.
    */
@@ -178,8 +124,8 @@ export class TransactionTempStore<T> {
   /**
    * Insert a record into the temporal transaction store
    * 
-   * @param record The record to be inserted
-   * @returns The versioned record that was created and inserted
+   * @param record - The record to be inserted
+   * @returns - The versioned record that was created and inserted
    * @throws {DuplicatePrimaryKeyValueError} If the primary key is already in use
    */
   public insert(record: T): Versioned<T> {
@@ -202,7 +148,7 @@ export class TransactionTempStore<T> {
    * Find a record in the temporal transaction store. Creates a new object with the same 
    * properties as the record found.
    * 
-   * @param primaryKey The primary key of the record to be found
+   * @param primaryKey - The primary key of the record to be found
    * @returns - The record if found
    *  - `null` if the record was deleted
    *  - `undefined` if the record with the primary key does not exist
@@ -238,9 +184,9 @@ export class TransactionTempStore<T> {
   /**
    * Handles the update of the newest record, including primary key modification if necessary.
    *
-   * @param {Partial<T>} updatedFields - The fields to update in the record.
-   * @param {RecordWithId<T>} insertedRecord - The newest record to update.
-   * @param {boolean} willPkBeModified - Indicates if the primary key will be modified.
+   * @param updatedFields - The fields to update in the record.
+   * @param insertedRecord - The newest record to update.
+   * @param willPkBeModified - Indicates if the primary key will be modified.
    */
   public updateInsertedRecord(insertedRecord: Versioned<T>, updatedFields: Partial<T>, willPkBeModified: boolean): void {
     if (willPkBeModified) {
@@ -251,19 +197,19 @@ export class TransactionTempStore<T> {
 
       this._tempInserts.delete(oldPk);
       this._tempInserts.set(newPk, insertedRecord);
-      this.updateVersionedRecord(insertedRecord, updatedFields);
+      updateRecord(insertedRecord.data, updatedFields);
     }
     else {
-      this.updateVersionedRecord(insertedRecord, updatedFields);
+      updateRecord(insertedRecord.data, updatedFields);
     }
   }
 
   /**
    * Handles the update of a record when the primary key is modified.
    *
-   * @param {Partial<T>} updatedFields - The fields to update in the record.
-   * @param {RecordWithId<T>} record - The record to update.
-   * @param {boolean} isFirstUpdate - Indicates if this is the first update for the record.
+   * @param updatedFields - The fields to update in the record.
+   * @param record - The record to update.
+   * @param isFirstUpdate - Indicates if this is the first update for the record.
    */
   public handleUpdateWithPKUpdated(record: RecordState<T>, updatedFields: Partial<T>): void {
     const { committed, tempChanges } = record;
@@ -278,12 +224,12 @@ export class TransactionTempStore<T> {
 
     if (tempChanges) {
       // Update the temporal changes and update the PKs in the maps
-      this.updateTempChangeObject(tempChanges, updatedFields, false);
+      updateTempChangeObject(tempChanges, updatedFields, false);
       this._updatedPrimaryKeyMap.delete(oldPk);
       this._updatedPrimaryKeyMap.set(newPk, tempChanges);
     } else {
       // Create a new object to not modify the committed record
-      const newTempChanges = this.createNewTempUpdatedObject(committed, updatedFields, false);
+      const newTempChanges = createNewTempUpdatedObject(committed, updatedFields, false);
       this._updatedPrimaryKeyMap.set(newPk, newTempChanges);
       this._originalPrimaryKeyMap.set(oldPk, newTempChanges);
     }
@@ -302,12 +248,11 @@ export class TransactionTempStore<T> {
     if (tempChanges) {
       // Update only the temporal changes because the committed record was already 
       // updated previously
-      Object.assign(tempChanges.changes.data, updatedFields);
-      this.updateTempChangeObject(tempChanges, updatedFields, true);
+      updateTempChangeObject(tempChanges, updatedFields, true);
     }
     else {
       // Create a new object to not modify the committed record
-      const newTempChanges = this.createNewTempUpdatedObject(committed, updatedFields, true);
+      const newTempChanges = createNewTempUpdatedObject(committed, updatedFields, true);
       this._originalPrimaryKeyMap.set(committedRecordPk, newTempChanges);
     }
   }
@@ -317,7 +262,7 @@ export class TransactionTempStore<T> {
   /**
    * Try to delete a recently inserted record.
    * 
-   * @param primaryKey The primary key of the record to be deleted.
+   * @param primaryKey - The primary key of the record to be deleted.
    * @returns - The deleted record if it exists.
    *  - If the record does not exist in the temporal inserts, returns `undefined`.
    */
@@ -333,7 +278,7 @@ export class TransactionTempStore<T> {
   /**
    * Try to delete a record that has been updated or deleted.
    * 
-   * @param primaryKey The primary key of the record to be deleted.
+   * @param primaryKey - he primary key of the record to be deleted.
    * @returns - The deleted record if it exists.
    *  - If the record was already deleted, returns `null`.
    *  - If the record does not exist in the Maps, returns `undefined`.
@@ -344,7 +289,7 @@ export class TransactionTempStore<T> {
     if (tempChangesWithNewPk && tempChangesWithNewPk.action === 'updated') {
       // Remove the record from the updated map
       this._updatedPrimaryKeyMap.delete(primaryKey);
-      this.updateTempChangeAsDeleted(tempChangesWithNewPk);
+      updateTempChangeAsDeleted(tempChangesWithNewPk);
       this._committedDeleteCount++;
       return { ...tempChangesWithNewPk.changes.data };
     }
@@ -354,7 +299,7 @@ export class TransactionTempStore<T> {
 
     if(tempChangesWithOriginalPk.action === 'deleted') return null;
     if (tempChangesWithOriginalPk.action === 'updated') {
-      this.updateTempChangeAsDeleted(tempChangesWithOriginalPk);
+      updateTempChangeAsDeleted(tempChangesWithOriginalPk);
       this._committedDeleteCount++;
       return { ...tempChangesWithOriginalPk.changes.data };
     }
@@ -365,7 +310,7 @@ export class TransactionTempStore<T> {
   /**
    * Try to delete a committed record, in other words, a record that has not been modified.
    * 
-   * @param primaryKey The primary key of the record to be deleted.
+   * @param primaryKey - The primary key of the record to be deleted.
    * @returns - The deleted record if it exists.
    *  - If the record does not exist in the temporal inserts, returns `undefined`.
    */
@@ -373,11 +318,126 @@ export class TransactionTempStore<T> {
     const committedRecord = this._committedMap.get(primaryKey);
     if (!committedRecord) return undefined;
 
-    const deleteChange = this.createNewTempDeletedObject(committedRecord);
+    const deleteChange = createNewTempDeletedObject(committedRecord);
     this._originalPrimaryKeyMap.set(primaryKey, deleteChange);
     this._committedDeleteCount++;
 
     return { ...committedRecord.data };
+  }
+  //#endregion
+
+  /**
+   * Validates the changes made to the records.
+   * 
+   * This method performs the following validations:
+   * 1. Ensures that the inserted records do not have duplicated primary keys (PKs).
+   * 2. Ensures that the updated records do not have duplicated PKs.
+   * 3. Ensures that the updated records have the correct version.
+   * 
+   * @throws {DuplicatePkValueError} - If a duplicated PK is found in the inserted or updated records.
+   * @throws {ExternalModificationError} - If the version of an updated record does not match the committed version.
+   */
+  public async validateChanges(): Promise<void> {
+    // Validate that the inserted records have not duplicated PKs
+    for (const newInsertedPk of this._tempInserts.keys()) {
+      if (this._committedMap.has(newInsertedPk)) {
+        const committedChanges = this._originalPrimaryKeyMap.get(newInsertedPk)
+
+        if (!committedChanges || (committedChanges.action === 'updated' && committedChanges.hasTheOriginalPk)){
+          throw this._primaryKeyManager.createDuplicatePkValueError(newInsertedPk);
+        }
+      }
+    }
+
+    // Validate that the updated records have not duplicated PKs
+    for (const [newestPk, tempChanges] of this._updatedPrimaryKeyMap) {
+      if (tempChanges.action === 'deleted') continue;
+      if (this._committedMap.has(newestPk)) {
+        const committedChanges = this._originalPrimaryKeyMap.get(newestPk);
+        
+        if (!committedChanges || (committedChanges.action === 'updated' && committedChanges.hasTheOriginalPk)){
+          throw this._primaryKeyManager.createDuplicatePkValueError(newestPk);
+        }
+      }
+    }
+
+    // Validate that the updated records have the correct version
+    for (const [committedPk, committedChanges] of this._originalPrimaryKeyMap) {
+      const committedRecord = this._committedMap.get(committedPk);
+      
+      if (!committedRecord || committedRecord.version !== committedChanges.changes.version) {
+        throw new ExternalModificationError(committedPk);
+      }
+    }
+  }
+
+  //#region APPLY CHANGES ******************************************************
+  /**
+   * Applies all changes to the committed Map.
+   * 
+   * This method performs the following actions:
+   * 1. Applies updates and deletions to the committed Map.
+   * 2. Applies new insertions to the committed Map.
+   * 
+   * @throws {DuplicatePkValueError} If a duplicated PK is found in the committed map.
+   * @throws {ExternalModificationError} If the version of the updated record are different
+   * from the original.
+   */
+  public applyChanges(): void {
+    this.applyUpdatesAndDeletes();
+    this.applyNewInsertions();
+  }
+
+  /**
+   * Applies updates and deletes to the committed records Map.
+   * 
+   * @throws {ExternalModificationError} If the version of the updated record are different
+   * from the original.
+   */
+  private applyUpdatesAndDeletes(): void {
+    for (let [committedPk, committedChanges] of this._originalPrimaryKeyMap) {
+      const committed = this._committedMap.get(committedPk);
+      if (!committed) throw new ExternalModificationError(committedPk);
+
+      switch (committedChanges.action) {
+        case 'updated':
+          if (committed.version !== committedChanges.changes.version) {
+            throw new ExternalModificationError(committedPk);
+          }
+
+          updateVersionedRecord(committed, committedChanges.changes.data);
+
+          if (!committedChanges.hasTheOriginalPk){
+            // Update primary key in the Map
+            // At this point `commited` has been updated
+            this._committedMap.delete(committedPk);
+            this._committedMap.set(this._primaryKeyManager.buildPkFromRecord(committed.data), committed);
+          }
+        break;
+        case 'deleted':
+          this._committedMap.delete(committedPk);
+        break;
+      }
+    }
+  }
+
+  /**
+   * Applies new insertions to the committed Map.
+   * 
+   * This method should be invoked after applying updates and deletions, because if a record 
+   * is inserted with a primary key that already exists, an error is thrown, although this 
+   * was already validated in the preparation phase, it is necessary to validate again.
+   * 
+   * @throws {DuplicatePkValueError} If a duplicated PK is found in the committed Map.
+   */
+  private applyNewInsertions(): void {
+    for (const [primaryKey, newRecord] of this._tempInserts) {
+      if (this._committedMap.has(primaryKey)) {
+        throw this._primaryKeyManager.createDuplicatePkValueError(primaryKey);
+      }
+
+      this._committedMap.set(primaryKey, newRecord);
+    }
   }
   //#endregion
 
