@@ -1,9 +1,6 @@
 # LynxDB
 
-<div style="display: flex; align-items: center;">
-<img src="./assets/images/logo.svg" alt="Logo LynxDB" style="fill: blue; width: 100px; height: 100px; margin-right: 10px;">
-  <span style="font-size: 3rem">LynxDB</span>
-</div>
+<img src="./assets/images/lynxDB-logo-text.svg" alt="Logo LynxDB" style="height: 250px;">
 
 ## **LynxDB - In-Memory Database for Fast Testing**
 
@@ -20,7 +17,7 @@ LynxDB is the perfect choice for developers who need a fast, easy-to-use, and fl
 
 # Transactions
 LynxDB implements transactions using locks—both shared and exclusive—without support for MVCC. Each transaction acquires the necessary locks that are held for the entire duration of the transaction, until a commit or rollback occurs. This mechanism ensures data consistency, but it also means that transactions may become blocked if locks are not managed properly.
-> **Note**:
+>**Note**:
 >
 > Locks have a default timeout of 5000 milliseconds. This value is configurable to suit different scenarios and workloads.
 
