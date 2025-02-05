@@ -159,4 +159,65 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     await expect(transactionTable.rollback()).resolves.not.toThrow();
   });
 
+  // it.only('update the composite PK of multiple records 2 times', async () => {
+  //   const YearToTest = 2025;
+  //   const OriginalSemester = 'Fall';
+  //   const SemesterToUpdate = 'Summer';
+
+  //   // Update the PK for the first time
+  //   const affectedRowsFirstUpdate = await enrollmentTable.update(
+  //     { semester: SemesterToUpdate }, 
+  //     {
+  //       year: { eq: YearToTest },
+  //       semester: { eq: OriginalSemester }
+  //     }
+  //   );
+
+  //   expect(affectedRowsFirstUpdate).toBe(4);
+
+  //   // Get the updated records, these records shouldn't exist after the second update
+  //   const shouldNotExistAtEnd = await enrollmentTable.select([], {
+  //     year: { eq: YearToTest },
+  //     semester: { eq: SemesterToUpdate }
+  //   });
+
+  //   expect(shouldNotExistAtEnd).toHaveLength(6);
+
+  //   // Update the PK for the second time
+  //   const affectedRowsSecondUpdate = await enrollmentTable.update(
+  //     { semester: OriginalSemester }, 
+  //     {
+  //       year: { eq: YearToTest },
+  //       semester: { eq: SemesterToUpdate }
+  //     }
+  //   );
+
+  //   expect(affectedRowsSecondUpdate).toBe(6);
+
+  //   // Check if the records with the original semester
+  //   const secondUpdatedRecords = await enrollmentTable.select([], {
+  //     year: { eq: YearToTest },
+  //     semester: { eq: OriginalSemester }
+  //   });
+  //   expect(secondUpdatedRecords).toHaveLength(6);
+  //   secondUpdatedRecords.forEach(item => {
+  //     expect(item.year).toBe(YearToTest);
+  //     expect(item.semester).toBe(OriginalSemester);
+  //   });
+
+  //   console.log('shouldNotExistAtEnd', await enrollmentTable.select([], {}));
+  //   // console.log('shouldNotExistAtEnd', shouldNotExistAtEnd);
+
+  //   // Check if the records with the old semester no longer exist
+  //   for (let item of shouldNotExistAtEnd) {
+  //     const record = await enrollmentTable.findByPk({
+  //       year: item.year,
+  //       semester: item.semester,
+  //       courseId: item.courseId,
+  //       studentId: item.studentId
+  //     });
+  //     expect(record).toBeNull();
+  //   }
+  //   expect(enrollmentTable.size()).toBe(enrollmentData.length);
+  // });
 });

@@ -68,6 +68,19 @@ export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[])
       expect(found).toBeNull();
     });
 
+    it('should return the deleted record then return null when deleting 2 times', async () => {
+      const productToDelete = products[1];
+      // Act
+      const deleted1 = await table.deleteByPk({ id: productToDelete.id });
+      const deleted2 = await table.deleteByPk({ id: productToDelete.id });
+      const found = await table.findByPk({ id: productToDelete.id });
+
+      // Assert
+      expect(deleted1).toEqual(productToDelete);
+      expect(deleted2).toBeNull();
+      expect(found).toBeNull();
+    });
+
     it('should throw an error when the PK is not provided', async () => {
       // Act & Assert
       await expect(table.deleteByPk({})).rejects.toThrow(PrimaryKeyValueNullError);

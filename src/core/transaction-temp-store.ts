@@ -4,7 +4,8 @@ import {
   Versioned,
   TemporalChange,
   RecordWithId,
-  RecordState
+  RecordState,
+  UpdatedFieldsDetails
 } from "../types/record.type";
 import { 
   createNewTempDeletedObject,
@@ -51,23 +52,6 @@ export class TransactionTempStore<T> {
 
   get size(): number { return this._committedMap.size + this._tempInserts.size - this._committedDeleteCount; }
   get tempInserts(): Map<string, Versioned<T>> { return this._tempInserts; }
-  /**
-   * This Map is used to keep track of the newest primary key of a record that was updated.
-   * 
-   * Map structure:
-   * - Key: newest/updated primary key
-   * - Value: TemporalChange object, only updated changes
-   */
-  get updatedPrimaryKeyMap(): Map<string, TemporalChange<T>> { return this._updatedPrimaryKeyMap; }
-  /**
-   * This Map is used to keep track of the original primary key of a record that was updated 
-   * or deleted.
-   * 
-   * Map structure:
-   * - Key: original primary key
-   * - Value: TemporalChange object, updated and deleted changes
-   */
-  get originalPrimaryKeyMap(): Map<string, TemporalChange<T>> { return this._originalPrimaryKeyMap; }
 
   public clear() {
     this._tempInserts.clear();
@@ -116,6 +100,7 @@ export class TransactionTempStore<T> {
     const committed = this._committedMap.get(primaryKey);
     if (!committed) return undefined;
     return {
+      committedPk: primaryKey,
       committed,
       tempChanges: this._originalPrimaryKeyMap.get(primaryKey)
     };
@@ -131,7 +116,7 @@ export class TransactionTempStore<T> {
   public insert(record: T): Versioned<T> {
     const versioned = createNewVersionedRecord(
       record,
-      this._primaryKeyManager.hasNotPkDefinition()
+      this._primaryKeyManager.hasDefaultPk
     );
     const primaryKey = this._primaryKeyManager.buildPkFromRecord(versioned.data);
 
@@ -188,72 +173,61 @@ export class TransactionTempStore<T> {
    * @param insertedRecord - The newest record to update.
    * @param willPkBeModified - Indicates if the primary key will be modified.
    */
-  public updateInsertedRecord(insertedRecord: Versioned<T>, updatedFields: Partial<T>, willPkBeModified: boolean): void {
-    if (willPkBeModified) {
-      const { newPk, oldPk } = this._primaryKeyManager.generatePkForUpdate(insertedRecord.data, updatedFields);
-      if ((newPk !== oldPk) && this.isPrimaryKeyInUse(newPk)) {
+  public updateInsertedRecord([currentPk, currentRecord]: [string, Versioned<T>], updateDetails: UpdatedFieldsDetails<T>): void {
+    if (updateDetails.isPartOfPrimaryKey) {
+      const newPk = this._primaryKeyManager.buildUpdatedPk(currentRecord.data, updateDetails.updatedFields);
+      if ((newPk !== currentPk) && this.isPrimaryKeyInUse(newPk)) {
         throw this._primaryKeyManager.createDuplicatePkValueError(newPk);
       }
-
-      this._tempInserts.delete(oldPk);
-      this._tempInserts.set(newPk, insertedRecord);
-      updateRecord(insertedRecord.data, updatedFields);
+      this._tempInserts.delete(currentPk);
+      this._tempInserts.set(newPk, currentRecord);
     }
-    else {
-      updateRecord(insertedRecord.data, updatedFields);
-    }
+    updateRecord(currentRecord.data, updateDetails.updatedFields);
   }
 
   /**
-   * Handles the update of a record when the primary key is modified.
+   * Handles the update of the committed record, including primary key modification if necessary.
    *
-   * @param updatedFields - The fields to update in the record.
-   * @param record - The record to update.
-   * @param isFirstUpdate - Indicates if this is the first update for the record.
+   * @param record - The committed record with his temporal changes to update.
+   * @param updateDetails - Contains the details of the fields to update.
    */
-  public handleUpdateWithPKUpdated(record: RecordState<T>, updatedFields: Partial<T>): void {
-    const { committed, tempChanges } = record;
-    const { newPk, oldPk } = this._primaryKeyManager.generatePkForUpdate(
-      tempChanges?.changes.data || committed.data,
-      updatedFields
-    );
+  public handleUpdate(record: RecordState<T>, updateDetails: UpdatedFieldsDetails<T>): void {
+    const { committedPk, committed, tempChanges } = record;
+    let oldPk: string = committedPk;
+    let newPk: string = committedPk;
+    let arePkDifferents = false;
+    
+    if (updateDetails.isPartOfPrimaryKey) {
+      // Generate the new and old PK to avoid the conflict of not deleting 
+      // the temporal record (it will change PK) from `_updatedPrimaryKeyMap`.
+      const generated = this._primaryKeyManager.generateNewAndOldPk(
+        tempChanges?.changes.data || committed.data,
+        updateDetails.updatedFields
+      );
+      
+      oldPk = generated.oldPk;
+      newPk = generated.newPk;
+      arePkDifferents = (oldPk !== newPk);
 
-    if ((newPk !== oldPk) && this.isPrimaryKeyInUse(newPk)) {
-      throw this._primaryKeyManager.createDuplicatePkValueError(newPk);
+      if (arePkDifferents && this.isPrimaryKeyInUse(newPk)) {
+        throw this._primaryKeyManager.createDuplicatePkValueError(newPk);
+      }
     }
 
     if (tempChanges) {
       // Update the temporal changes and update the PKs in the maps
-      updateTempChangeObject(tempChanges, updatedFields, false);
-      this._updatedPrimaryKeyMap.delete(oldPk);
-      this._updatedPrimaryKeyMap.set(newPk, tempChanges);
+      updateTempChangeObject(tempChanges, updateDetails.updatedFields, !arePkDifferents);
+      if (arePkDifferents){
+        this._updatedPrimaryKeyMap.delete(oldPk);
+        this._updatedPrimaryKeyMap.set(newPk, tempChanges);
+      }
     } else {
       // Create a new object to not modify the committed record
-      const newTempChanges = createNewTempUpdatedObject(committed, updatedFields, false);
-      this._updatedPrimaryKeyMap.set(newPk, newTempChanges);
+      const newTempChanges = createNewTempUpdatedObject(committed, updateDetails.updatedFields, !arePkDifferents);
       this._originalPrimaryKeyMap.set(oldPk, newTempChanges);
-    }
-  }
-
-  /**
-   * Handles the update of a record when the primary key is not modified.
-   * 
-   * @param updatedFields - The fields to update in the record.
-   * @param record - The record to update.
-   * @param committedRecordPk - The primary key of the committed record.
-   * @param isFirstUpdate - Indicates if this is the first update for the record.
-   */
-  public handleUpdateWithPKNotUpdated(record: RecordState<T>, updatedFields: Partial<T>, committedRecordPk: string): void {
-    const { committed, tempChanges } = record;
-    if (tempChanges) {
-      // Update only the temporal changes because the committed record was already 
-      // updated previously
-      updateTempChangeObject(tempChanges, updatedFields, true);
-    }
-    else {
-      // Create a new object to not modify the committed record
-      const newTempChanges = createNewTempUpdatedObject(committed, updatedFields, true);
-      this._originalPrimaryKeyMap.set(committedRecordPk, newTempChanges);
+      if (arePkDifferents){
+        this._updatedPrimaryKeyMap.set(newPk, newTempChanges);
+      }
     }
   }
   //#endregion
@@ -303,8 +277,6 @@ export class TransactionTempStore<T> {
       this._committedDeleteCount++;
       return { ...tempChangesWithOriginalPk.changes.data };
     }
-
-    return undefined;
   }
 
   /**

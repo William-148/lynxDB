@@ -126,14 +126,14 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
     });
 
     it('throw an error when updating a record with an existing PK', async () => {
-      const ItemPkToTest = 2;
+      const itemPkToTest = 2;
       const pkAlreadyRegistered = 3;
-      const errorUpdate = async () => {
-        await entityTable.update({ id: pkAlreadyRegistered }, { id: { gt: ItemPkToTest } });
-      }
-      await expect(errorUpdate)
-        .rejects
-        .toThrow(DuplicatePrimaryKeyValueError);
+      const newInserted = await entityTable.insert({ id: 100, name: 'Iota', value: 43, status: 'inserted' });
+
+      await expect(entityTable.update({ id: pkAlreadyRegistered }, { id: { gt: itemPkToTest } }))
+        .rejects.toThrow(DuplicatePrimaryKeyValueError);
+      await expect(entityTable.update({ id: pkAlreadyRegistered }, { id: { eq: newInserted.id } }))
+        .rejects.toThrow(DuplicatePrimaryKeyValueError);
     });
 
     it('throw an error when updating many records with an unregistered PK', async () => {
@@ -153,6 +153,41 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
         const record = await entityTable.findByPk({ id: expectedId });
         expect(record?.id).toBe(expectedId);
       }
+    });
+
+    it('update the PK then update it again with the initial PK', async () => {
+      const itemToTest = EntityData[1];
+      const originalPk = itemToTest.id;
+      const newPk = 1000;
+
+      // Update the PK for the first time
+      const affectedRowsFirstUpdate = await entityTable.update(
+        { id: newPk }, 
+        { id: { eq: originalPk } }
+      );
+
+      // Get the updated records, these records shouldn't exist after the second update
+      const shouldNotExistAtEnd = await entityTable.select([], { id: { eq: newPk } });
+      // Update the PK for the second time
+      const affectedRowsSecondUpdate = await entityTable.update(
+        { id: originalPk }, 
+        { id: { eq: newPk} }
+      );
+      // Check if the records with the original semester
+      const secondUpdatedRecords = await entityTable.select([], { id: { eq: originalPk } });
+      // Check if the records with the old semester no longer exist
+      const record = await entityTable.findByPk({ id: shouldNotExistAtEnd[0].id });
+      
+
+      expect(affectedRowsFirstUpdate).toBe(1);
+      expect(shouldNotExistAtEnd).toHaveLength(1);
+      expect(affectedRowsSecondUpdate).toBe(1);
+
+      expect(secondUpdatedRecords).toHaveLength(1);
+      expect(secondUpdatedRecords[0]).toEqual(itemToTest);
+
+      expect(record).toBeNull();
+      expect(entityTable.size()).toBe(EntityData.length);
     });
 
     it("update the PK of a record and insert a new record with the old PK", async () => {

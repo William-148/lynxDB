@@ -15,6 +15,22 @@ export type Versioned<T> = {
 }
 
 /**
+ * Represents the information required for an update operation.
+ */
+export type UpdatedFieldsDetails<T> = {
+  /**
+   * The fields that have been updated.
+   */
+  updatedFields: Partial<T>;
+
+  /**
+   * Indicates whether the updated fields are part of the primary key.
+   */
+  isPartOfPrimaryKey: boolean;
+};
+
+
+/**
  * Represents a temporal change in a record
  */
 export type TemporalChange<T> = {
@@ -30,6 +46,7 @@ export type TemporalChange<T> = {
  * Represents a committed record with his temporal changes.
  */
 export type RecordState<T> = {
+  committedPk: string;
   committed: Versioned<T>;
   /** Temporal changes of the committed record. */
   tempChanges?: TemporalChange<T>;

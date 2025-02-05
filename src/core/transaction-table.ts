@@ -3,7 +3,7 @@ import { Table } from "./table";
 import { Filter } from "../types/filter.type";
 import { LockType } from "../types/lock.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
-import { RecordWithId, Versioned } from "../types/record.type";
+import { RecordWithId, UpdatedFieldsDetails, Versioned } from "../types/record.type";
 import { IsolationLevel, TwoPhaseCommitParticipant } from "../types/transaction.type";
 import { Config } from "./config";
 import { TransactionTempStore } from "./transaction-temp-store";
@@ -231,7 +231,10 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
   public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
-    const willPkBeModified = this._primaryKeyManager.isPartialRecordPartOfPk(updatedFields);
+    const updatedDetails: UpdatedFieldsDetails<T> = { 
+      updatedFields, 
+      isPartOfPrimaryKey: this._primaryKeyManager.isPartialRecordPartOfPk(updatedFields) 
+    };
     const compiledFilter = compileFilter(where);
     const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
@@ -256,19 +259,14 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
         return;
       }
 
-      if (willPkBeModified) {
-        this._tempStore.handleUpdateWithPKUpdated(record, updatedFields);
-      }
-      else {
-        this._tempStore.handleUpdateWithPKNotUpdated(record, updatedFields, committedRecordPk);
-      }
+      this._tempStore.handleUpdate(record, updatedDetails);
 
       affectedRecords++;
     }
 
-    for (const newestRecord of Array.from(this._tempStore.tempInserts.values())) {
-      if (!matchRecord(newestRecord.data, compiledFilter)) continue;
-      this._tempStore.updateInsertedRecord(newestRecord, updatedFields, willPkBeModified);
+    for (const newestRecord of Array.from(this._tempStore.tempInserts.entries())) {
+      if (!matchRecord(newestRecord[1].data, compiledFilter)) continue;
+      this._tempStore.updateInsertedRecord(newestRecord, updatedDetails);
       affectedRecords++;
     }
 
@@ -286,7 +284,6 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
       this.releaseLock(primaryKeyBuilt);
       return insertedDeletion;
     }
-
     const tempChangesDeletion = this._tempStore.handleTempChangesDeletion(primaryKeyBuilt);
     if (tempChangesDeletion !== undefined) return tempChangesDeletion;
 

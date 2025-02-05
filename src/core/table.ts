@@ -58,7 +58,7 @@ export class Table<T> implements ITable<T> {
   private insertInMap(record: T): Versioned<T> {
     const versionedRecord = createNewVersionedRecord(
       record, 
-      this._primaryKeyManager.hasNotPkDefinition()
+      this._primaryKeyManager.hasDefaultPk
     );
     const primaryKey = this._primaryKeyManager.buildPkFromRecord(versionedRecord.data);
 
@@ -125,28 +125,29 @@ export class Table<T> implements ITable<T> {
     const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
 
-    const proccessUpdate = async (key: string) => {
-      const currentVersioned = this._recordsMap.get(key);
-      const currentRecord = currentVersioned?.data;
+    const proccessUpdate = async (currentPrimaryKey: string) => {
+      await this._lockManager.waitUnlockToRead(currentPrimaryKey);
 
-      await this._lockManager.waitUnlockToRead(key);
+      const currentVersioned = this._recordsMap.get(currentPrimaryKey);
+      if (!currentVersioned) return;
+      const versionSnapshot = currentVersioned.version;
 
-      if (!currentRecord || !matchRecord(currentRecord, compiledFilter)) return;
+      if (!matchRecord(currentVersioned.data, compiledFilter)) return;
       
-      await this._lockManager.waitUnlockToWrite(key);
+      await this._lockManager.waitUnlockToWrite(currentPrimaryKey);
+      if ((versionSnapshot !== currentVersioned.version) && !matchRecord(currentVersioned.data, compiledFilter)) {
+        return;
+      }
 
       if (willPkBeModified) { 
-        const { newPk, oldPk } = this._primaryKeyManager.generatePkForUpdate(currentRecord, updatedFields);
-
-        if (oldPk !== newPk) this.checkIfPrimaryKeyIsInUse(newPk);
-        
-        this._recordsMap.delete(oldPk);
+        const newPk = this._primaryKeyManager.buildUpdatedPk(currentVersioned.data, updatedFields);
+        if (currentPrimaryKey !== newPk) this.checkIfPrimaryKeyIsInUse(newPk);
+        this._recordsMap.delete(currentPrimaryKey);
         this._recordsMap.set(newPk, currentVersioned);
-        updateVersionedRecord(currentVersioned, updatedFields);
       }
-      else {
-        updateVersionedRecord(currentVersioned, updatedFields);
-      }
+
+      updateVersionedRecord(currentVersioned, updatedFields);
+
       affectedRecords++;
     }
 
