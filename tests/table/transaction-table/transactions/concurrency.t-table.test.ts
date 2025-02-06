@@ -48,9 +48,7 @@ describe("Transaction Table", () => {
       const commonConfig = {
         lockTimeout: 20
       }
-      const tTables = generateTransactionTables(2, table, commonConfig);
-      const tx1 = tTables[0];
-      const tx2 = tTables[1];
+      const [tx1, tx2] = generateTransactionTables(2, table, commonConfig);
 
       // TX1 make update
       await tx1.update({ price: 9999 }, { id: { eq: 1 } });
@@ -74,9 +72,7 @@ describe("Transaction Table", () => {
       const commonConfig = {
         lockTimeout: 500
       }
-      const tTables = generateTransactionTables(2, table, commonConfig);
-      const tx1 = tTables[0];
-      const tx2 = tTables[1];
+      const [tx1, tx2] = generateTransactionTables(2, table, commonConfig);
 
       // Make the same insert in both transactions
       await tx1.insert(newProduct);
@@ -96,6 +92,57 @@ describe("Transaction Table", () => {
       // A new product should be inserted because one of the transactions should be commited
       expect(await table.findByPk({ id: newProduct.id })).not.toBeNull();
       expect(table.size()).toBe(clothesProducts.length + 1);
+    });
+
+    it("should handle record locking and ensure correct record deletion with concurrent transactions", async () => {
+      const [tx1, tx2] = generateTransactionTables(2, table);
+      const itemTest = clothesProducts[2];
+
+      // The record should be locked by tx1
+      const tx1DeletePromise = tx1.deleteByPk({ id: itemTest.id });
+      // Tx2 should wait for the lock to be released by tx1
+      const tx2SelectPromise = tx2.select([], { id: { eq: itemTest.id } });
+      // Tx1 release the lock by commit
+      await tx1.commit();
+
+      // Tx1 should delete the record and return the deleted record
+      await expect(tx1DeletePromise).resolves.toEqual(itemTest);
+      // Tx2 should be able to read the record but it should be deleted
+      await expect(tx2SelectPromise).resolves.toHaveLength(0);
+      await expect(tx2.commit()).resolves.not.toThrow();
+      // Main table should not have the record
+      await expect(table.findByPk({ id: itemTest.id })).resolves.toBeNull();
+      expect(table.size()).toBe(clothesProducts.length - 1);
+    });
+
+    it("should throw an error when trying to update a record that has been deleted by another transaction", async () => {
+      const [tx1, tx2, tx3] = generateTransactionTables(3, table);
+      const itemTest = clothesProducts[2];
+
+      // The record should be locked by tx1
+      const tx1DeletePromise = tx1.deleteByPk({ id: itemTest.id });
+      // Tx2 and tx3 should wait for the lock to be released by tx1
+      const tx2UpdatePromise = tx2.update({ stock: 123 }, { id: { eq: itemTest.id } });
+      const tx3UpdatePromise = tx3.update({ stock: 321 }, { id: { eq: itemTest.id } });
+      // Tx1 release the lock by commit
+      await tx1.commit();
+
+      // Tx1 should delete the record and return the deleted record
+      await expect(tx1DeletePromise).resolves.toEqual(itemTest);
+      // Tx2 should be able to update the record
+      await expect(tx2UpdatePromise).resolves.toBe(1);
+      // Tx2 try to commit the changes but throw an error because the record was deleted
+      await expect(tx2.commit()).rejects.toThrow(/has been externally modified/);
+
+      // Tx3 should be able to update the record
+      await expect(tx3UpdatePromise).resolves.toBe(1);
+      // Tx3 try to commit the changes using apply() but throw an error 
+      // because the record was deleted
+      await expect(tx3.apply()).rejects.toThrow(/has been externally modified/);
+
+      // Main table should not have the record
+      await expect(table.findByPk({ id: itemTest.id })).resolves.toBeNull();
+      expect(table.size()).toBe(clothesProducts.length - 1);
     });
 
     it("should commit the first insert and the others should throw an Duplicate PK error", async () => {
