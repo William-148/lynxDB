@@ -323,8 +323,7 @@ export class TransactionTempStore<T> {
 
     // Validate that the updated records have not duplicated PKs
     for (const [newestPk, tempChanges] of this._updatedPrimaryKeyMap) {
-      if (tempChanges.action === 'deleted') continue;
-      if (this._committedMap.has(newestPk)) {
+      if (tempChanges.action === 'updated' && this._committedMap.has(newestPk)) {
         const committedChanges = this._originalPrimaryKeyMap.get(newestPk);
         
         if (!committedChanges || (committedChanges.action === 'updated' && committedChanges.hasTheOriginalPk)){

@@ -307,8 +307,7 @@ export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant
    * If any phase fails, the changes are rolled back automatically.
    * 
    * @throws {TransactionCompletedError} If the transaction is already completed.
-   * @throws {LockTimeoutError} If the locks cannot be acquired within the timeout.
-   * @throws {DuplicatePrimaryKeyValueError} If there are duplicate primary keys.
+   * @throws {TransactionConflictError} If there is a conflict during the commit process.
    */
   public async commit(): Promise<void> {
     await this.prepare();

@@ -1,6 +1,7 @@
 import { Config } from "../../../../src/core/config";
 import { LockTimeoutError } from "../../../../src/core/errors/record-lock-manager.error";
-import { TransactionCompletedError } from "../../../../src/core/errors/transaction.error";
+import { DuplicatePrimaryKeyValueError } from "../../../../src/core/errors/table.error";
+import { TransactionCompletedError, TransactionConflictError } from "../../../../src/core/errors/transaction.error";
 import { Table } from "../../../../src/core/table";
 import { TransactionTable } from "../../../../src/core/transaction-table";
 import { IsolationLevel } from "../../../../src/types/transaction.type";
@@ -133,6 +134,56 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     expect(await table.findByPk({ id: newProduct.id })).toEqual(newProduct);
   });
 
+  it("should update the record many times with the same data", async () => {
+    const productToTest = TestData[0];
+    const updateData = { ...productToTest, price: 1500, stock: 30 };
+
+    // Update the record 3 times
+    await transactionTable.update(updateData, { id: { eq: productToTest.id } });
+    await transactionTable.update(updateData, { id: { eq: productToTest.id } });
+    await transactionTable.update(updateData, { id: { eq: productToTest.id } });
+
+    // Commit the transaction
+    await expect(transactionTable.commit()).resolves.not.toThrow();
+    // Check the record after the commit
+    expect(await table.findByPk({ id: productToTest.id })).toEqual({ ...updateData });
+    expect(table.size()).toBe(TestData.length);
+  });
+
+  it("should update a record and the normal table filter does not match the record for an update operation", async () => {
+    const itemToTest = TestData[3];
+    // Lock with shared lock
+    await transactionTable.findByPk({ id: itemToTest.id });
+    // Normal table try to update the same record (it's locked by the transaction)
+    // The update operation should not affect any record 
+    const tableUpdatePromise = table.update({ price: 8888, stock: 70 }, { 
+      id: { eq: itemToTest.id }, 
+      price: { eq: itemToTest.price }
+    });
+    // Update the record in the transaction table
+    const transactionUpdatePromise = transactionTable.update({ price: 9999, stock: 100 }, { 
+      id: { eq: itemToTest.id } 
+    });
+
+    await expect(transactionUpdatePromise).resolves.toBe(1);
+    await expect(transactionTable.commit()).resolves.not.toThrow();
+    await expect(tableUpdatePromise).resolves.toBe(0);
+  });
+
+  it("should delete a record and the normal table cannot perform any operation on the record", async () => {
+    const itemToTest = TestData[4];
+    
+    // Delete the record in the transaction table
+    const recordDeleted = await transactionTable.deleteByPk({ id: itemToTest.id });
+    // Normal table try to update the same record (it's locked by the transaction)
+    // The update operation should not affect any record 
+    const tableUpdatePromise = table.update({ price: 8888, stock: 70 }, { id: { eq: itemToTest.id } });
+    
+    expect(recordDeleted).toEqual(itemToTest);
+    await expect(transactionTable.commit()).resolves.not.toThrow();
+    await expect(tableUpdatePromise).resolves.toBe(0);
+  });
+
   it("should discard all changes on rollback", async () => {
     const doomedProduct: Product = { id: 888, name: "Doomed", price: 0, stock: 0 };
     const ooopsName = "ooops";
@@ -159,65 +210,122 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     await expect(transactionTable.rollback()).resolves.not.toThrow();
   });
 
-  // it.only('update the composite PK of multiple records 2 times', async () => {
-  //   const YearToTest = 2025;
-  //   const OriginalSemester = 'Fall';
-  //   const SemesterToUpdate = 'Summer';
+  it("should throw an error when trying to commit and exist conflicts with primary keys", async () => {
+    const productTransaction: Product = { id: 100, name: "Tablet", price: 800, stock: 10 };
+    const productMainTable: Product = { id: 100, name: "Print", price: 800, stock: 10 }
 
-  //   // Update the PK for the first time
-  //   const affectedRowsFirstUpdate = await enrollmentTable.update(
-  //     { semester: SemesterToUpdate }, 
-  //     {
-  //       year: { eq: YearToTest },
-  //       semester: { eq: OriginalSemester }
-  //     }
-  //   );
+    // Insert new record in transaction table
+    await transactionTable.insert(productTransaction);
+    // Insert a record with the same primary key in the main table
+    table.insert(productMainTable);
 
-  //   expect(affectedRowsFirstUpdate).toBe(4);
+    // Should throw an error because the PKs are the same
+    await expect(transactionTable.commit()).rejects.toThrow(TransactionConflictError);
+    expect(await table.findByPk({ id: productTransaction.id })).toEqual(productMainTable);
+  });
 
-  //   // Get the updated records, these records shouldn't exist after the second update
-  //   const shouldNotExistAtEnd = await enrollmentTable.select([], {
-  //     year: { eq: YearToTest },
-  //     semester: { eq: SemesterToUpdate }
-  //   });
+  it("should throw an error when trying to update a primary key to a value that already exists in the table", async () => {
+    const productToModify = TestData[2];
+    const productTransaction: Product = { id: productToModify.id, name: "Tablet", price: 800, stock: 10 };
 
-  //   expect(shouldNotExistAtEnd).toHaveLength(6);
+    // Update the PK of the original record
+    await transactionTable.update({ id: 100 }, { id: { eq: productToModify.id } });
+    // Insert new record in transaction table with the original PK
+    await transactionTable.insert(productTransaction);
+    // Try to update the PK of the updated record to the original PK
+    const promiseUpdate =  transactionTable.update({ id: productToModify.id }, { id: { eq: 100 } });
 
-  //   // Update the PK for the second time
-  //   const affectedRowsSecondUpdate = await enrollmentTable.update(
-  //     { semester: OriginalSemester }, 
-  //     {
-  //       year: { eq: YearToTest },
-  //       semester: { eq: SemesterToUpdate }
-  //     }
-  //   );
+    // Should throw an error because the PK is the same as the record that was inserted
+    await expect(promiseUpdate).rejects.toThrow(DuplicatePrimaryKeyValueError);
+    await expect(transactionTable.commit()).resolves.not.toThrow();
+    expect(table.size()).toBe(TestData.length + 1);
+  });
 
-  //   expect(affectedRowsSecondUpdate).toBe(6);
+  it("should throw an error when trying to update a record to a primary key that already exists in the table", async () => {
+    const productToModify = TestData[2];
+    const productTransaction: Product = { id: productToModify.id, name: "Tablet", price: 800, stock: 10 };
 
-  //   // Check if the records with the original semester
-  //   const secondUpdatedRecords = await enrollmentTable.select([], {
-  //     year: { eq: YearToTest },
-  //     semester: { eq: OriginalSemester }
-  //   });
-  //   expect(secondUpdatedRecords).toHaveLength(6);
-  //   secondUpdatedRecords.forEach(item => {
-  //     expect(item.year).toBe(YearToTest);
-  //     expect(item.semester).toBe(OriginalSemester);
-  //   });
+    // Update the PK of the original record
+    await transactionTable.update({ id: 100 }, { id: { eq: productToModify.id } });
+    // Insert new record in transaction table with the original PK
+    await transactionTable.insert(productTransaction);
+    // Try to update the inserted record to an existing PK
+    const promiseUpdate =  transactionTable.update({ id: 100 }, { id: { eq: productTransaction.id } });
 
-  //   console.log('shouldNotExistAtEnd', await enrollmentTable.select([], {}));
-  //   // console.log('shouldNotExistAtEnd', shouldNotExistAtEnd);
+    // Should throw an error because the PK is the same as the record that was inserted
+    await expect(promiseUpdate).rejects.toThrow(DuplicatePrimaryKeyValueError);
+    await expect(transactionTable.commit()).resolves.not.toThrow();
+    expect(table.size()).toBe(TestData.length + 1);
+  });
 
-  //   // Check if the records with the old semester no longer exist
-  //   for (let item of shouldNotExistAtEnd) {
-  //     const record = await enrollmentTable.findByPk({
-  //       year: item.year,
-  //       semester: item.semester,
-  //       courseId: item.courseId,
-  //       studentId: item.studentId
-  //     });
-  //     expect(record).toBeNull();
-  //   }
-  //   expect(enrollmentTable.size()).toBe(enrollmentData.length);
-  // });
+  it("should throw an error when trying to commit an update operation with primary keys conflicts", async () => {
+    const productToTest = TestData[3];
+    const newPk = 1000;
+    const productMainTable: Product = { id: newPk, name: "Print", price: 800, stock: 10 }
+
+    // Update a record with the new PK in the transaction table
+    await transactionTable.update({ id: newPk }, { id: { eq: productToTest.id } });
+    // Insert a record with the same primary key in the main table
+    table.insert(productMainTable);
+
+    // Should throw an error because the PKs are the same
+    await expect(transactionTable.commit()).rejects.toThrow(TransactionConflictError);
+    expect(await table.findByPk({ id: productMainTable.id })).toEqual(productMainTable);
+    expect(table.size()).toBe(TestData.length + 1);
+  });
+
+  it("should correctly update and swap primary keys of two records", async () => {
+    const productToModifyA = TestData[2];
+    const productToModifyB = TestData[3];
+
+    // Modify the PK of the record A
+    const modifyA = await transactionTable.update({ id: 100 }, { id: { eq: productToModifyA.id } });
+    // Modify the PK of the record B to the PK of the record A
+    const modifyB = await transactionTable.update({ id: productToModifyA.id }, { id: { eq: productToModifyB.id } });
+
+    expect(modifyA).toBe(1);
+    expect(modifyB).toBe(1);
+    await expect(transactionTable.commit()).resolves.not.toThrow();
+    // Validate the committed changes
+    expect(await table.findByPk({ id: 100 })).toEqual({ ...productToModifyA, id: 100 });
+    expect(await table.findByPk({ id: productToModifyA.id })).toEqual({ ...productToModifyB, id: productToModifyA.id });
+    await expect(table.findByPk({ id: productToModifyB.id })).resolves.toBeNull();
+    expect(table.size()).toBe(TestData.length);
+  });
+
+  it('update the PK of a record 2 times and commit it', async () => {
+    const itemToTest = TestData[2];
+    const originalPk = itemToTest.id;
+    const newPk = 1000;
+
+    // Update the PK for the first time
+    const affectedRowsFirstUpdate = await transactionTable.update(
+      { id: newPk }, { id: { eq: originalPk } }
+    );
+    
+    // Get the updated records, these records shouldn't exist after the second update
+    const shouldNotExistAtEnd = await transactionTable.findByPk({ id: newPk });
+    
+    // Update the PK for the second time
+    const affectedRowsSecondUpdate = await transactionTable.update(
+      { id: originalPk }, { id: { eq: newPk } }
+    );
+
+    const secondUpdatedRecord = await transactionTable.findByPk({ id: originalPk });
+    const record = await transactionTable.findByPk({ id: shouldNotExistAtEnd?.id || newPk });
+
+    expect(affectedRowsFirstUpdate).toBe(1);
+    expect(shouldNotExistAtEnd).not.toBeNull();
+    expect(affectedRowsSecondUpdate).toBe(1);
+
+    // Check if the records with the original PK exists
+    expect(secondUpdatedRecord).toEqual(itemToTest);
+    // Check if the records with the new PK no longer exist
+    expect(record).toBeNull();
+    expect(transactionTable.size()).toBe(TestData.length);
+    await expect(transactionTable.commit()).resolves.not.toThrow();
+    // After commit
+    await expect(transactionTable.findByPk({ id: shouldNotExistAtEnd?.id || newPk })).resolves.toBeNull();
+    expect(table.size()).toBe(TestData.length);
+  });
 });
