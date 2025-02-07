@@ -1,6 +1,6 @@
 <div align="center">
   <picture>
-      <img src="./assets/images/lynxDB-logo-text.svg" alt="Logo LynxDB" style="height: 180px;">
+      <img src="./assets/images/lynxDB-logo-text.svg" alt="Logo LynxDB" style="height: 80px;">
   </picture>
 </div>
 
