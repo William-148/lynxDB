@@ -1,10 +1,10 @@
-import { ITable, RecordWithId } from "../types/table.type";
+import { ITable } from "../types/table.type";
 import { Filter } from "../types/filter.type";
-import { Table } from "./table";
+import { RecordWithId } from "../types/record.type";
 
 export class TableManager <T> implements ITable <T> {
 
-  constructor(private table: Table<T>) {}
+  constructor(private table: ITable<T>) {}
 
   size(): number {
     return this.table.size();
@@ -28,6 +28,10 @@ export class TableManager <T> implements ITable <T> {
 
   update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
     return this.table.update(updatedFields, where);
+  }
+
+  deleteByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null> {
+    return this.table.deleteByPk(primaryKey);
   }
 
 }

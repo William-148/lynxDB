@@ -8,11 +8,11 @@ import { Config } from "./config";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 
-export class LynxDb<Tables extends Record<string, any>> {
+export class LynxDB<Tables extends Record<string, any>> {
   /** Map of tables in the database */
-  private tablesMap: Map<string, Table<any>>;
+  private tablesMap: Map<string, Table<Tables[any]>>;
   /** Map of table managers in the database */
-  private tableManagersMap: Map<string, TableManager<any>>;
+  private tableManagersMap: Map<string, TableManager<Tables[any]>>;
   /** Gobal configuration for the database */
   private dbConfig: Config;
 
@@ -45,8 +45,7 @@ export class LynxDb<Tables extends Record<string, any>> {
   /**
    * Retrieves a table for the specified table name.
    * 
-   * @template K - Union type of keys from the Tables interface/type
-   * @param {K} name - Name of the table to retrieve (type-safe key from Tables)
+   * @param name - Name of the table to retrieve (type-safe key from Tables)
    * @returns {ITable<Tables[K]>} Transaction table manager instance for the specified table
    * @throws {TransactionCompletedError} If the transaction has already been committed or rolled back
    * @throws {TableNotFoundError} If the table doesn't exist in the main tables collection (via createTransactionTable)
@@ -98,17 +97,4 @@ export class LynxDb<Tables extends Record<string, any>> {
       throw error;
     }
   }
-}
-
-/**
- * Creates a new instance of LynxDb with the provided table definitions and configuration options.
- * 
- * @param {TablesDefinition<Tables>} tablesDef - The definitions of the tables to be used 
- * in the LynxDb instance.
- * @param {ConfigOptions} [databaseOptions={}] - Optional configuration options for the LynxDb 
- * instance. Defaults to an empty object.
- * @returns {LynxDb<Tables>} The newly created LynxDb instance.
- */
-export function Lynx<Tables extends Record<string, any>>(tablesDef: TablesDefinition<Tables>, databaseOptions: ConfigOptions = {}): LynxDb<Tables> {
-  return new LynxDb<Tables>(tablesDef, databaseOptions);
 }

@@ -1,12 +1,14 @@
-# LynxDB
+<div align="center">
+  <picture>
+      <img src="./assets/images/lynxDB-logo-text.svg" alt="Logo LynxDB" style="height: 180px;">
+  </picture>
+</div>
 
-<img src="./assets/images/lynxDB-logo-text.svg" alt="Logo LynxDB" style="height: 250px;">
-
-## **LynxDB - In-Memory Database for Fast Testing**
+# **LynxDB - In-Memory Database for Fast Testing**
 
 LynxDB is a lightweight, in-memory database designed specifically for fast testing in applications built with JavaScript or TypeScript. It is ideal for developers who need a quick and efficient database solution for testing complex data models without the overhead of configuring and maintaining full-fledged relational databases.
 
-### Key Features:
+## Key Features:
 - **In-Memory Storage**: All data is stored in memory, offering extremely fast read and write operations, perfect for testing scenarios.
 - **Quick Setup**: Easily configure databases without the complexity of traditional database setup and management.
 - **Support for Simple and Composite Primary Keys**: LynxDB allows you to define both simple and composite primary keys, enabling flexibility for complex data structures.

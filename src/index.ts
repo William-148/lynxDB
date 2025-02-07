@@ -1,4 +1,4 @@
-import { Lynx } from "./core/data-base";
+import { LynxDB } from "./core/data-base";
 import { TablesDefinition } from "./types/table.type";
 
 type User = { cui: string; name: string; }
@@ -17,7 +17,7 @@ const tableConfigs: TablesDefinition<{
   }
 };
 
-const db = Lynx(tableConfigs);
+const db = new LynxDB(tableConfigs);
 const userTable = db.get("users");
 userTable.insert({ cui: "7845674320103", name: "Kenneth Jhoel" });
 
