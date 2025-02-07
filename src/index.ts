@@ -1,16 +1,16 @@
 import { LynxDB } from "./core/data-base";
 import { TablesDefinition } from "./types/table.type";
 
-type User = { cui: string; name: string; }
-type Post = { id: number; title: string; content: string; }
+type User = { id: number; name: string; email: string; }
+type Post = { id: number; title: string; content: string; ownerId: number; }
 
-// Define las configuraciones para las tablas
+// Define the configurations for the tables
 const tableConfigs: TablesDefinition<{
   users: User,
   post: Post
 }> = {
   users: {
-    primaryKey: ["cui"]
+    primaryKey: ["id"]
   },
   post: {
     primaryKey: ["id"]
@@ -18,30 +18,35 @@ const tableConfigs: TablesDefinition<{
 };
 
 const db = new LynxDB(tableConfigs);
-const userTable = db.get("users");
-userTable.insert({ cui: "7845674320103", name: "Kenneth Jhoel" });
 
-async function main (){
-  try{
-    const result = await db.transaction(async (t) => {
-      const userA = await t.get("users").insert({ cui: "7546575640103", name: "Josué Alfredo Gonzalez Caal" });
-      const userB = await t.get("users").insert({ cui: "3485128450101", name: "Edin Roberto Ramirez Perez" });
-      const affectedRows = await t.get("users").update({ name: "Kenneth Jhoel Moreno Perez" }, { cui: { eq: "7845674320103"} });
-      if (affectedRows !== 1) throw new Error("No se actualizo el usuario");
-      return [userA, userB];
-    });
-    console.log("TRANSACTION RESULT:");
-    console.table(result);
-  }
-  catch(error){
-    console.log("TRANSACTION ERROR:");
-    console.error(error);
-  }
-  console.log("AFTER TRANSACTION:");
-  console.table(await db.get('users').select([], {}));
-}
+const users = db.get("users");
+const posts = db.get("post");
 
-main();
+users.insert({ id: 1 , name: "Jhon Smith", email: "some@domain.com" });
+posts.insert({ id: 1, title: "First Post", content: "This is the first post", ownerId: 1 });
+
+
+// async function main (){
+//   try{
+//     const result = await db.transaction(async (t) => {
+//       const userA = await t.get("users").insert({ id:1, name: "Josué Alfredo Gonzalez Caal" });
+//       const userB = await t.get("users").insert({ id: "3485128450101", name: "Edin Roberto Ramirez Perez" });
+//       const affectedRows = await t.get("users").update({ name: "Kenneth Jhoel Moreno Perez" }, { cui: { eq: "7845674320103"} });
+//       if (affectedRows !== 1) throw new Error("No se actualizo el usuario");
+//       return [userA, userB];
+//     });
+//     console.log("TRANSACTION RESULT:");
+//     console.table(result);
+//   }
+//   catch(error){
+//     console.log("TRANSACTION ERROR:");
+//     console.error(error);
+//   }
+//   console.log("AFTER TRANSACTION:");
+//   console.table(await db.get('users').select([], {}));
+// }
+
+// main();
 
 
 /**

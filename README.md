@@ -4,11 +4,23 @@
   </picture>
 </div>
 
-# **LynxDB - In-Memory Database for Fast Testing**
+## Content
+
+- [Introduction](#lynxdb---in-memory-database-for-fast-testing)
+- [Quick Start](#quick-start)
+  - [Installation](#installation)
+  - [Example](#example)
+- [Supported Opeartions](#supported-operations)
+- [Transactions](#transactions)
+  - [Isolation Levels](#isolation-levels)
+  - [Locks](#locks)
+  - [Phenomena occurrence](#phenomena-occurrence)
+
+## **LynxDB - In-Memory Database for Fast Testing**
 
 LynxDB is a lightweight, in-memory database designed specifically for fast testing in applications built with JavaScript or TypeScript. It is ideal for developers who need a quick and efficient database solution for testing complex data models without the overhead of configuring and maintaining full-fledged relational databases.
 
-## Key Features:
+### Key Features:
 - **In-Memory Storage**: All data is stored in memory, offering extremely fast read and write operations, perfect for testing scenarios.
 - **Quick Setup**: Easily configure databases without the complexity of traditional database setup and management.
 - **Support for Simple and Composite Primary Keys**: LynxDB allows you to define both simple and composite primary keys, enabling flexibility for complex data structures.
@@ -16,6 +28,61 @@ LynxDB is a lightweight, in-memory database designed specifically for fast testi
 - **Fast and Lightweight**: Built for speed and efficiency, LynxDB is perfect for testing environments where rapid data manipulation and retrieval are essential.
 
 LynxDB is the perfect choice for developers who need a fast, easy-to-use, and flexible in-memory database to simulate more complex database interactions during testing without the overhead of setting up a full database system.
+
+# Quick Start
+
+Welcome to LynxDB, the in-memory database built for fast testing in JavaScript and TypeScript environments. This quick start guide will help you install the package and perform basic operations to get you up and running in no time.
+
+## Installation
+
+Install the LynxDB package using npm (or pnpm):
+
+```bash
+  npm install lynxdb
+```
+
+Or, if you prefer yarn:
+```bash
+  pnpm install lynxdb
+```
+
+
+## Example
+For more, see the following [examples](examples.md).
+
+Below is a minimal example demonstrating how to define tables, create a LynxDB instance, and perform basic operations:
+```typescript
+import { LynxDB } from "./core/data-base";
+import { TablesDefinition } from "./types/table.type";
+
+type User = { id: number; name: string; email: string; }
+type Post = { id: number; title: string; content: string; ownerId: number; }
+
+// Define the configurations for the tables
+const tableConfigs: TablesDefinition<{
+  users: User,
+  post: Post
+}> = {
+  users: {
+    primaryKey: ["id"]
+  },
+  post: {
+    primaryKey: ["id"]
+  }
+};
+
+// Create LynxDb instance
+const db = new LynxDB(tableConfigs);
+
+const users = db.get("users");
+const posts = db.get("post");
+
+users.insert({ id: 1 , name: "Jhon Smith", email: "some@domain.com" });
+posts.insert({ id: 1, title: "First Post", content: "This is the first post", ownerId: 1 });
+```
+
+# Supported Operations
+descriptions
 
 # Transactions
 LynxDB implements transactions using locks—both shared and exclusive—without support for MVCC. Each transaction acquires the necessary locks that are held for the entire duration of the transaction, until a commit or rollback occurs. This mechanism ensures data consistency, but it also means that transactions may become blocked if locks are not managed properly.
@@ -33,7 +100,7 @@ LynxDB offers two isolation levels for its transactions:
 These levels determine how locks behave during read and write operations, affecting the types of concurrency anomalies (phenomena) that may occur.
 
 
-### Locks
+## Locks
 LynxDB utilizes two types of locks:
 
 * **Shared Lock**:
@@ -53,7 +120,7 @@ The following table summarizes the locking behavior by isolation level:
 > * Locks are held until the transaction completes (commit or rollback).
 > * This means that once acquired, locks are not released until the transaction ends, which can affect concurrency in high-load environments.
 
-### Phenomena occurrence
+## Phenomena occurrence
 Since LynxDB’s transaction implementation relies solely on locks (without MVCC), the occurrence of certain phenomena varies depending on the isolation level: 
 
 | Phenomena           | Repeatable Read | Serializable |
@@ -66,7 +133,7 @@ Since LynxDB’s transaction implementation relies solely on locks (without MVCC
 | Write Skew          | Yes             | No           | 
 | Lost Update         | Yes             | No           |
 
-#### Description of Phenomena:
+### Description of Phenomena:
 * **Dirty Write**: Prevented at both isolation levels since no other process can write to a locked record.
 
 * **Dirty Read**:
