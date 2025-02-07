@@ -109,8 +109,8 @@ export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[])
       const updatedProductA = { ...originalProductA, price: 190 };
       const updatedProductB = { ...originalProductB, price: 180 };
 
-      await table.update(updatedProductA, { id: { eq: originalProductA.id} });
-      await table.update(updatedProductB, { id: { eq: originalProductB.id} });
+      await table.update(updatedProductA, { id: { $eq: originalProductA.id} });
+      await table.update(updatedProductB, { id: { $eq: originalProductB.id} });
       // Act
       const deletedA = await table.deleteByPk({ id: originalProductA.id });
       const foundA = await table.findByPk({ id: originalProductA.id });
@@ -131,7 +131,7 @@ export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[])
       const original = { id: 105, name: 'Webcam', price: 80, stock: 30 };
       await table.bulkInsert([original]);
       const updated = { id: 106, name: 'Webcam HD', price: 100, stock: 25 };
-      await table.update(updated, { id: { eq: original.id } });
+      await table.update(updated, { id: { $eq: original.id } });
   
       // Act & Assert
       const deleteOldPk = await table.deleteByPk({ id: original.id });
@@ -187,7 +187,7 @@ export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[])
 
       for (let i = 0; i < LoopCount; i++) {
       // Act
-        await table.update(updatedExistingProduct, { id: { eq: existingProduct.id } });
+        await table.update(updatedExistingProduct, { id: { $eq: existingProduct.id } });
         // Delete and try to find the updated record
         const toDeleteIdA = updatedExistingProduct.id;
         const deletedA = await table.deleteByPk({ id: toDeleteIdA });
@@ -198,7 +198,7 @@ export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[])
         const foundAgainA = await table.findByPk({ id: existingProduct.id });
 
 
-        await table.update(updatedNewProduct, { id: { eq: newProduct.id } });
+        await table.update(updatedNewProduct, { id: { $eq: newProduct.id } });
         // Delete and try to find the updated record
         const toDeletIdB = updatedNewProduct.id;
         const deletedB = await table.deleteByPk({ id: toDeletIdB });
@@ -259,11 +259,11 @@ export function deleteByPkTestWithDefaultPK(createInstance: (testData: Product[]
       await table.bulkInsert(newProducts);
 
       // Act
-      const withIdA = (await table.select([], { id: { eq: 1 } }))[0];
+      const withIdA = (await table.select([], { id: { $eq: 1 } }))[0];
       const deletedA = await table.deleteByPk({ _id: withIdA._id });
       const foundA = await table.findByPk({ _id: withIdA._id });
 
-      const withIdB = (await table.select([], { id: { eq: 101 } }))[0];
+      const withIdB = (await table.select([], { id: { $eq: 101 } }))[0];
       const deletedB = await table.deleteByPk({ _id: withIdB._id });
       const foundB = await table.findByPk({ _id: withIdB._id });
 
@@ -408,10 +408,10 @@ export function deleteByPkTestWithCompositePK(createInstance: (testData: Enrollm
         grade: 95
       };
       await table.update(updated, { 
-        year: { eq: original.year },
-        semester: { eq: original.semester },
-        courseId: { eq: original.courseId },
-        studentId: { eq: original.studentId }
+        year: { $eq: original.year },
+        semester: { $eq: original.semester },
+        courseId: { $eq: original.courseId },
+        studentId: { $eq: original.studentId }
       });
   
       // Act
@@ -504,10 +504,10 @@ export function deleteByPkTestWithCompositePK(createInstance: (testData: Enrollm
       // Act 
         //----
         await table.update(updatedExistingEnrrollment, { 
-          year: { eq: existingEnrrollment.year },
-          semester: { eq: existingEnrrollment.semester },
-          courseId: { eq: existingEnrrollment.courseId },
-          studentId: { eq: existingEnrrollment.studentId }
+          year: { $eq: existingEnrrollment.year },
+          semester: { $eq: existingEnrrollment.semester },
+          courseId: { $eq: existingEnrrollment.courseId },
+          studentId: { $eq: existingEnrrollment.studentId }
         });
         // Delete and try to find the updated record
         const deletedA = await table.deleteByPk(updatedExistingEnrrollment);
@@ -519,10 +519,10 @@ export function deleteByPkTestWithCompositePK(createInstance: (testData: Enrollm
 
         //----
         await table.update(updatedNewEnrrollment, { 
-          year: { eq: newEnrrollment.year },
-          semester: { eq: newEnrrollment.semester },
-          courseId: { eq: newEnrrollment.courseId },
-          studentId: { eq: newEnrrollment.studentId }
+          year: { $eq: newEnrrollment.year },
+          semester: { $eq: newEnrrollment.semester },
+          courseId: { $eq: newEnrrollment.courseId },
+          studentId: { $eq: newEnrrollment.studentId }
         });
         // Delete and try to find the updated record
         const deletedB = await table.deleteByPk(updatedNewEnrrollment);

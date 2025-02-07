@@ -4,28 +4,29 @@
  * 
  * The available operators are:
  * 
- * - `eq`: Equal to
- * - `gt`: Greater than
- * - `lt`: Less than
- * - `gte`: Greater than or equal to
- * - `lte`: Less than or equal to
- * - `includes`: Array inclusion check
+ * - `$eq`: Equal to
+ * - `$gt`: Greater than
+ * - `$lt`: Less than
+ * - `$gte`: Greater than or equal to
+ * - `$lte`: Less than or equal to
+ * - `$includes`: Array inclusion check
+ * - `$like`: String pattern match
  */
-export enum OperatorType {
+export enum ComparisonOperatorType {
   /** Equal to */
-  eq = 'eq',
+  $eq = '$eq',
   /** Greater than */
-  gt = 'gt',
-  /** Less than */
-  lt = 'lt',
+  $gt = '$gt',
   /** Greater than or equal to */
-  gte = 'gte',
+  $gte = '$gte',
+  /** Less than */
+  $lt = '$lt',
   /** Less than or equal to */
-  lte = 'lte',
+  $lte = '$lte',
   /** Array inclusion check */
-  includes = 'includes',
+  $includes = '$includes',
   /** String pattern match */
-  like = 'like'
+  $like = '$like'
 }
 
 /**
@@ -34,12 +35,13 @@ export enum OperatorType {
  * This type allows for various comparison operations that can be used
  * to filter data. The available operators are:
  * 
- * - `eq`: Equal to
- * - `gt`: Greater than
- * - `lt`: Less than
- * - `gte`: Greater than or equal to
- * - `lte`: Less than or equal to
- * - `includes`: Array inclusion check
+ * - `$eq`: Equal to
+ * - `$gt`: Greater than
+ * - `$lt`: Less than
+ * - `$gte`: Greater than or equal to
+ * - `$lte`: Less than or equal to
+ * - `$includes`: Array inclusion check
+ * - `$like`: String pattern match
  * 
  * Each operator is optional and can be used to specify the corresponding
  * comparison value for the type `T`.
@@ -47,13 +49,13 @@ export enum OperatorType {
  * @template T - The type of the value to be compared.
  */
 export type FilterOperator<T> = {
-  [OperatorType.eq]?: T;
-  [OperatorType.gt]?: T;
-  [OperatorType.lt]?: T;
-  [OperatorType.gte]?: T;
-  [OperatorType.lte]?: T;
-  [OperatorType.includes]?: T[];
-  [OperatorType.like]?: string;
+  [ComparisonOperatorType.$eq]?: T;
+  [ComparisonOperatorType.$gt]?: T;
+  [ComparisonOperatorType.$lt]?: T;
+  [ComparisonOperatorType.$gte]?: T;
+  [ComparisonOperatorType.$lte]?: T;
+  [ComparisonOperatorType.$includes]?: T[];
+  [ComparisonOperatorType.$like]?: string;
 };
 
 /**
@@ -71,7 +73,7 @@ export type OperatorHandler<T> = (recordValue: T, conditionValue: any) => boolea
  * 
  * @template T - The type of the value to be compared.
  */
-export type OperatorHandlerMap<T> = Record<OperatorType, OperatorHandler<T>>;
+export type OperatorHandlerMap<T> = Record<ComparisonOperatorType, OperatorHandler<T>>;
 
 /**
  * Represents a filter object for a given type `T`.

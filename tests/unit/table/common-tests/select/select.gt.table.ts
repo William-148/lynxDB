@@ -41,31 +41,31 @@ export function selectGtGteTests(description: string, createInstance: (dataTest:
     });
   
     it('filter records with gt operator for numeric values', async () => {
-      const result = await genericTable.select([], { age: { gt: 28 } });
+      const result = await genericTable.select([], { age: { $gt: 28 } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.age)).toEqual([30, 35]);
     });
   
     it('filter records with gte operator for numeric values', async () => {
-      const result = await genericTable.select([], { age: { gte: 28 } });
+      const result = await genericTable.select([], { age: { $gte: 28 } });
       expect(result).toHaveLength(3);
       expect(result.map(record => record.age)).toEqual([30, 35, 28]);
     });
   
     it('filter records with gt operator for float values', async () => {
-      const result = await genericTable.select([], { score: { gt: 60.0 } });
+      const result = await genericTable.select([], { score: { $gt: 60.0 } });
       expect(result).toHaveLength(3);
       expect(result.map(record => record.score)).toEqual([75.0, 88.8, 62.2]);
     });
   
     it('filter records with gte operator for float values', async () => {
-      const result = await genericTable.select([], { score: { gte: 62.2 } });
+      const result = await genericTable.select([], { score: { $gte: 62.2 } });
       expect(result).toHaveLength(3);
       expect(result.map(record => record.score)).toEqual([75.0, 88.8, 62.2]);
     });
   
     it('filter records with gt operator for dates', async () => {
-      const result = await genericTable.select([], { date: { gt: new Date('2023-01-01') } });
+      const result = await genericTable.select([], { date: { $gt: new Date('2023-01-01') } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.date.toISOString())).toEqual([
         new Date('2023-06-01').toISOString(),
@@ -74,7 +74,7 @@ export function selectGtGteTests(description: string, createInstance: (dataTest:
     });
   
     it('filter records with gte operator for dates', async () => {
-      const result = await genericTable.select([], { date: { gte: new Date('2023-01-01') } });
+      const result = await genericTable.select([], { date: { $gte: new Date('2023-01-01') } });
       expect(result).toHaveLength(3);
       expect(result.map(record => record.date.toISOString())).toEqual([
         new Date('2023-01-01').toISOString(),
@@ -84,23 +84,23 @@ export function selectGtGteTests(description: string, createInstance: (dataTest:
     });
   
     it('return an empty array when no records match for gt', async () => {
-      const result = await genericTable.select([], { age: { gt: 40 } });
+      const result = await genericTable.select([], { age: { $gt: 40 } });
       expect(result).toHaveLength(0);
     });
   
     it('return an empty array when no records match for gte', async () => {
-      const result = await genericTable.select([], { age: { gte: 50 } });
+      const result = await genericTable.select([], { age: { $gte: 50 } });
       expect(result).toHaveLength(0);
     });
   
     it('handle edge case with gt operator for boolean values', async () => {
-      const result = await genericTable.select([], { active: { gt: false } });
+      const result = await genericTable.select([], { active: { $gt: false } });
       expect(result).toHaveLength(2); // True values
       expect(result.map(record => record.name)).toEqual(['Alice', 'Charlie']);
     });
   
     it('handle edge case with gte operator for boolean values', async () => {
-      const result = await genericTable.select([], { active: { gte: false } });
+      const result = await genericTable.select([], { active: { $gte: false } });
       expect(result).toHaveLength(4); // All values since false <= true
     });
   

@@ -41,7 +41,7 @@ Install the LynxDB package using npm (or pnpm):
   npm install lynxdb
 ```
 
-Or, if you prefer yarn:
+Or, if you prefer pnpm:
 ```bash
   pnpm install lynxdb
 ```

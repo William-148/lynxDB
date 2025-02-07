@@ -38,7 +38,7 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     const NewProduct: Product = { id: 100, name: "Tablet", price: 800, stock: 10 };
     const UpdateProduct: Partial<Product> = { price: 1100, stock: 10 };
 
-    const promiseUpdate = transactionTable.update(UpdateProduct, { id: { eq: CommitedProduct.id }});
+    const promiseUpdate = transactionTable.update(UpdateProduct, { id: { $eq: CommitedProduct.id }});
     const promiseInsert = transactionTable.insert(NewProduct);
     expect(await promiseUpdate).toBe(1);
     await expect(promiseInsert).resolves.not.toThrow();
@@ -81,12 +81,12 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     // Block record in transaction
     await transactionTable.update(
       transactionTableUpdateAttempt, 
-      { id: { eq: productToLock.id } }
+      { id: { $eq: productToLock.id } }
     );
 
     // Try to update the same record in the main table
     await expect(
-      table.update(mainTableUpdateAttempt, { id: { eq: productToLock.id } })
+      table.update(mainTableUpdateAttempt, { id: { $eq: productToLock.id } })
     ).rejects.toThrow(LockTimeoutError);
 
     // Commit to release the lock
@@ -98,7 +98,7 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
       .toEqual({...productToLock, ...transactionTableUpdateAttempt});
 
     await expect(
-      table.update(mainTableUpdateAttempt, { id: { eq: productToLock.id }})
+      table.update(mainTableUpdateAttempt, { id: { $eq: productToLock.id }})
     ).resolves.toBe(1);
 
     await expect(table.findByPk({ id: productToLock.id }))
@@ -116,7 +116,7 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     // Multiple operations
     await transactionTable.insert(newProduct);
     for (const { id, update } of updates) {
-      await transactionTable.update(update, { id: { eq: id } });
+      await transactionTable.update(update, { id: { $eq: id } });
     }
 
     // Pre-commit: Main Table intact
@@ -139,9 +139,9 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     const updateData = { ...productToTest, price: 1500, stock: 30 };
 
     // Update the record 3 times
-    await transactionTable.update(updateData, { id: { eq: productToTest.id } });
-    await transactionTable.update(updateData, { id: { eq: productToTest.id } });
-    await transactionTable.update(updateData, { id: { eq: productToTest.id } });
+    await transactionTable.update(updateData, { id: { $eq: productToTest.id } });
+    await transactionTable.update(updateData, { id: { $eq: productToTest.id } });
+    await transactionTable.update(updateData, { id: { $eq: productToTest.id } });
 
     // Commit the transaction
     await expect(transactionTable.commit()).resolves.not.toThrow();
@@ -157,12 +157,12 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     // Normal table try to update the same record (it's locked by the transaction)
     // The update operation should not affect any record 
     const tableUpdatePromise = table.update({ price: 8888, stock: 70 }, { 
-      id: { eq: itemToTest.id }, 
-      price: { eq: itemToTest.price }
+      id: { $eq: itemToTest.id }, 
+      price: { $eq: itemToTest.price }
     });
     // Update the record in the transaction table
     const transactionUpdatePromise = transactionTable.update({ price: 9999, stock: 100 }, { 
-      id: { eq: itemToTest.id } 
+      id: { $eq: itemToTest.id } 
     });
 
     await expect(transactionUpdatePromise).resolves.toBe(1);
@@ -177,7 +177,7 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     const recordDeleted = await transactionTable.deleteByPk({ id: itemToTest.id });
     // Normal table try to update the same record (it's locked by the transaction)
     // The update operation should not affect any record 
-    const tableUpdatePromise = table.update({ price: 8888, stock: 70 }, { id: { eq: itemToTest.id } });
+    const tableUpdatePromise = table.update({ price: 8888, stock: 70 }, { id: { $eq: itemToTest.id } });
     
     expect(recordDeleted).toEqual(itemToTest);
     await expect(transactionTable.commit()).resolves.not.toThrow();
@@ -190,9 +190,9 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     
     // Operations in transaction
     await transactionTable.insert(doomedProduct);
-    const updatedCount = await transactionTable.update({ name: ooopsName }, { id: { gt: 0 } });
+    const updatedCount = await transactionTable.update({ name: ooopsName }, { id: { $gt: 0 } });
     expect(updatedCount).toBe(TestData.length + 1);
-    expect(await transactionTable.select([], { name: { eq: ooopsName }}))
+    expect(await transactionTable.select([], { name: { $eq: ooopsName }}))
       .toHaveLength(TestData.length + 1);
     
     // Explicit rollback
@@ -200,7 +200,7 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
 
     // Post-rollback: Original state
     expect(table.size()).toBe(TestData.length);
-    expect(await table.select([], { name: { eq: ooopsName }}))
+    expect(await table.select([], { name: { $eq: ooopsName }}))
       .toHaveLength(0);
     expect(await table.findByPk({ id: doomedProduct.id })).toBeNull();
 
@@ -229,11 +229,11 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     const productTransaction: Product = { id: productToModify.id, name: "Tablet", price: 800, stock: 10 };
 
     // Update the PK of the original record
-    await transactionTable.update({ id: 100 }, { id: { eq: productToModify.id } });
+    await transactionTable.update({ id: 100 }, { id: { $eq: productToModify.id } });
     // Insert new record in transaction table with the original PK
     await transactionTable.insert(productTransaction);
     // Try to update the PK of the updated record to the original PK
-    const promiseUpdate =  transactionTable.update({ id: productToModify.id }, { id: { eq: 100 } });
+    const promiseUpdate =  transactionTable.update({ id: productToModify.id }, { id: { $eq: 100 } });
 
     // Should throw an error because the PK is the same as the record that was inserted
     await expect(promiseUpdate).rejects.toThrow(DuplicatePrimaryKeyValueError);
@@ -246,11 +246,11 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     const productTransaction: Product = { id: productToModify.id, name: "Tablet", price: 800, stock: 10 };
 
     // Update the PK of the original record
-    await transactionTable.update({ id: 100 }, { id: { eq: productToModify.id } });
+    await transactionTable.update({ id: 100 }, { id: { $eq: productToModify.id } });
     // Insert new record in transaction table with the original PK
     await transactionTable.insert(productTransaction);
     // Try to update the inserted record to an existing PK
-    const promiseUpdate =  transactionTable.update({ id: 100 }, { id: { eq: productTransaction.id } });
+    const promiseUpdate =  transactionTable.update({ id: 100 }, { id: { $eq: productTransaction.id } });
 
     // Should throw an error because the PK is the same as the record that was inserted
     await expect(promiseUpdate).rejects.toThrow(DuplicatePrimaryKeyValueError);
@@ -264,7 +264,7 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     const productMainTable: Product = { id: newPk, name: "Print", price: 800, stock: 10 }
 
     // Update a record with the new PK in the transaction table
-    await transactionTable.update({ id: newPk }, { id: { eq: productToTest.id } });
+    await transactionTable.update({ id: newPk }, { id: { $eq: productToTest.id } });
     // Insert a record with the same primary key in the main table
     table.insert(productMainTable);
 
@@ -279,9 +279,9 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     const productToModifyB = TestData[3];
 
     // Modify the PK of the record A
-    const modifyA = await transactionTable.update({ id: 100 }, { id: { eq: productToModifyA.id } });
+    const modifyA = await transactionTable.update({ id: 100 }, { id: { $eq: productToModifyA.id } });
     // Modify the PK of the record B to the PK of the record A
-    const modifyB = await transactionTable.update({ id: productToModifyA.id }, { id: { eq: productToModifyB.id } });
+    const modifyB = await transactionTable.update({ id: productToModifyA.id }, { id: { $eq: productToModifyB.id } });
 
     expect(modifyA).toBe(1);
     expect(modifyB).toBe(1);
@@ -300,7 +300,7 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
 
     // Update the PK for the first time
     const affectedRowsFirstUpdate = await transactionTable.update(
-      { id: newPk }, { id: { eq: originalPk } }
+      { id: newPk }, { id: { $eq: originalPk } }
     );
     
     // Get the updated records, these records shouldn't exist after the second update
@@ -308,7 +308,7 @@ describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
     
     // Update the PK for the second time
     const affectedRowsSecondUpdate = await transactionTable.update(
-      { id: originalPk }, { id: { eq: newPk } }
+      { id: originalPk }, { id: { $eq: newPk } }
     );
 
     const secondUpdatedRecord = await transactionTable.findByPk({ id: originalPk });

@@ -51,11 +51,11 @@ describe("Transaction Table", () => {
       const [tx1, tx2] = generateTransactionTables(2, table, commonConfig);
 
       // TX1 make update
-      await tx1.update({ price: 9999 }, { id: { eq: 1 } });
+      await tx1.update({ price: 9999 }, { id: { $eq: 1 } });
 
       // TX2 try to update the same record
       await expect(
-        tx2.update({ price: 8888 }, { id: { eq: 1 } })
+        tx2.update({ price: 8888 }, { id: { $eq: 1 } })
       ).rejects.toThrow(LockTimeoutError);
 
       // TX1 commit
@@ -63,7 +63,7 @@ describe("Transaction Table", () => {
 
       // TX2 retry after TX1 commit
       await expect(
-        tx2.update({ price: 8888 }, { id: { eq: 1 } })
+        tx2.update({ price: 8888 }, { id: { $eq: 1 } })
       ).resolves.toBe(1);
     });
 
@@ -101,7 +101,7 @@ describe("Transaction Table", () => {
       // The record should be locked by tx1
       const tx1DeletePromise = tx1.deleteByPk({ id: itemTest.id });
       // Tx2 should wait for the lock to be released by tx1
-      const tx2SelectPromise = tx2.select([], { id: { eq: itemTest.id } });
+      const tx2SelectPromise = tx2.select([], { id: { $eq: itemTest.id } });
       // Tx1 release the lock by commit
       await tx1.commit();
 
@@ -122,8 +122,8 @@ describe("Transaction Table", () => {
       // The record should be locked by tx1
       const tx1DeletePromise = tx1.deleteByPk({ id: itemTest.id });
       // Tx2 and tx3 should wait for the lock to be released by tx1
-      const tx2UpdatePromise = tx2.update({ stock: 123 }, { id: { eq: itemTest.id } });
-      const tx3UpdatePromise = tx3.update({ stock: 321 }, { id: { eq: itemTest.id } });
+      const tx2UpdatePromise = tx2.update({ stock: 123 }, { id: { $eq: itemTest.id } });
+      const tx3UpdatePromise = tx3.update({ stock: 321 }, { id: { $eq: itemTest.id } });
       // Tx1 release the lock by commit
       await tx1.commit();
 
@@ -207,7 +207,7 @@ describe("Transaction Table", () => {
       const tx1 = tTables[0];
       const tx2 = tTables[1];
 
-      await tx1.update({ stock: 25 }, { id: { eq: itemTest.id } });
+      await tx1.update({ stock: 25 }, { id: { $eq: itemTest.id } });
       await tx1.commit();
 
       const productInTx2 = await tx2.findByPk({ id: itemTest.id });
@@ -221,7 +221,7 @@ describe("Transaction Table", () => {
       const tx2 = tTables[1];
 
       const tx1ProductFirstRead = await tx1.findByPk({ id: itemTest.id });
-      const tx2UpdatePromise = tx2.update({ stock: 123 }, { id: { eq: itemTest.id } });
+      const tx2UpdatePromise = tx2.update({ stock: 123 }, { id: { $eq: itemTest.id } });
       await delay(100);
       const tx1ProductSecondRead = await tx1.findByPk({ id: itemTest.id });
 
@@ -246,13 +246,13 @@ describe("Transaction Table", () => {
       const tx2 = tTables[1];
 
       // Update then read the item in tx1
-      await tx1.update({ stock: 15 }, { id: { eq: itemTest.id } });
+      await tx1.update({ stock: 15 }, { id: { $eq: itemTest.id } });
       const tx1Updated = await tx1.findByPk({ id: itemTest.id });
       expect(tx1Updated).toEqual({ ...itemTest, stock: 15 });
 
       // Try to update the same item in tx2, but the item is locked by tx1
       // so it should wait for the lock to be released
-      const tx2UpdatePromise = tx2.update({ stock: 10 }, { id: { eq: itemTest.id } });
+      const tx2UpdatePromise = tx2.update({ stock: 10 }, { id: { $eq: itemTest.id } });
 
       // tx1 should commit and release the lock
       await tx1.commit();
@@ -279,7 +279,7 @@ describe("Transaction Table", () => {
           // Release the shared lock and lock the record with exclusive lock
           const affected = await transactionTable.update(
             { stock: found.stock - 1 },
-            { id: { eq: found.id }, stock: { eq: found.stock } }
+            { id: { $eq: found.id }, stock: { $eq: found.stock } }
           );
           if (affected !== 1) throw new Error("Product external change");
 
@@ -342,7 +342,7 @@ describe("Transaction Table", () => {
           return;
         }
 
-        const affected = await transactionTable.update({ stock: newStock }, { id: { eq: commitedProduct.id } });
+        const affected = await transactionTable.update({ stock: newStock }, { id: { $eq: commitedProduct.id } });
         expect(affected).toBe(1);
         // Execute commit
         await expect(transactionTable.commit()).resolves.not.toThrow();
@@ -364,7 +364,7 @@ describe("Transaction Table", () => {
           const found = await tx.findByPk({ id: newProduct.id });
           if (!found) return;
           // Lock the record with shared lock
-          const affected = await tx.update({ stock: found.stock - 1 }, { id: { eq: newProduct.id } });
+          const affected = await tx.update({ stock: found.stock - 1 }, { id: { $eq: newProduct.id } });
           if (affected !== 1) throw new Error("Product external changes");
           tx.commit();
         }

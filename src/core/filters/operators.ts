@@ -1,4 +1,4 @@
-import { OperatorType, OperatorHandlerMap, OperatorHandler } from "../../types/filter.type";
+import { ComparisonOperatorType, OperatorHandlerMap, OperatorHandler } from "../../types/filter.type";
 
 let operators: OperatorHandlerMap<any> | undefined;
 
@@ -6,20 +6,20 @@ let operators: OperatorHandlerMap<any> | undefined;
  * Retrieves the handler function for a specified operator type.
  * 
  * @template T - The type of the values being compared.
- * @param {OperatorType} operatorType - The type of operator for which the handler is to be retrieved.
+ * @param {ComparisonOperatorType} operatorType - The type of operator for which the handler is to be retrieved.
  * @returns {OperatorHandler<T>} - The handler function corresponding to the specified operator type.
  * @throws {Error} - Throws an error if the specified operator type is unsupported.
  */
-export function getOperatorHandler<T>(operatorType: OperatorType): OperatorHandler<T> {
+export function getOperatorHandler<T>(operatorType: ComparisonOperatorType): OperatorHandler<T> {
   if (!operators) {
     operators = Object.freeze({
-      [OperatorType.eq]: deepEqual,
-      [OperatorType.gt]: (recordValue: T, conditionValue: T) => recordValue > conditionValue,
-      [OperatorType.lt]: (recordValue: T, conditionValue: T) => recordValue < conditionValue,
-      [OperatorType.gte]: (recordValue: T, conditionValue: T) => recordValue >= conditionValue,
-      [OperatorType.lte]: (recordValue: T, conditionValue: T) => recordValue <= conditionValue,
-      [OperatorType.includes]: (recordValue: T, conditionValue: T[]) => Array.isArray(conditionValue) && conditionValue.includes(recordValue),
-      [OperatorType.like]: likeComparison<T>
+      [ComparisonOperatorType.$eq]: deepEqual,
+      [ComparisonOperatorType.$gt]: (recordValue: T, conditionValue: T) => recordValue > conditionValue,
+      [ComparisonOperatorType.$lt]: (recordValue: T, conditionValue: T) => recordValue < conditionValue,
+      [ComparisonOperatorType.$gte]: (recordValue: T, conditionValue: T) => recordValue >= conditionValue,
+      [ComparisonOperatorType.$lte]: (recordValue: T, conditionValue: T) => recordValue <= conditionValue,
+      [ComparisonOperatorType.$includes]: (recordValue: T, conditionValue: T[]) => Array.isArray(conditionValue) && conditionValue.includes(recordValue),
+      [ComparisonOperatorType.$like]: likeComparison<T>
     });
   }
   const operatorHandlerFound = operators[operatorType];
@@ -35,12 +35,12 @@ export function getOperatorHandler<T>(operatorType: OperatorType): OperatorHandl
  * 
  * @template T - The type of the condition value.
  * @param {T} conditionValue - The value to be transformed.
- * @param {OperatorType} operatorType - The type of operator to apply for the transformation.
+ * @param {ComparisonOperatorType} operatorType - The type of operator to apply for the transformation.
  * @returns {T | RegExp} - The transformed condition value. If the operator type is 'like' and the condition value is a string, 
  * it returns a RegExp object. Otherwise, it returns the original condition value.
  */
-export function transformConditionValue<T>(conditionValue: T, operatorType: OperatorType): T | RegExp {
-  if (operatorType === OperatorType.like && typeof conditionValue === 'string') {
+export function transformConditionValue<T>(conditionValue: T, operatorType: ComparisonOperatorType): T | RegExp {
+  if (operatorType === ComparisonOperatorType.$like && typeof conditionValue === 'string') {
     const regexPattern = escapeRegExp(conditionValue)
       .replace(/%/g, '.*')
       .replace(/_/g, '.'); 

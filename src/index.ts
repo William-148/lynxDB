@@ -1,37 +1,151 @@
 import { LynxDB } from "./core/data-base";
 import { TablesDefinition } from "./types/table.type";
 
-type User = { id: number; name: string; email: string; }
-type Post = { id: number; title: string; content: string; ownerId: number; }
+type User = { 
+  id: number; 
+  name: string;
+  email: string; 
+}
+type Enrollment = {
+  year: number;
+  semester: 'Spring' | 'Summer' | 'Fall';
+  courseId: number; 
+  studentId: number; 
+  grade: number;
+  resultStatus: 'pending' | 'approved' | 'reproved';
+  gradeStatus: 'pending' | 'loaded';
+}
+
 
 // Define the configurations for the tables
 const tableConfigs: TablesDefinition<{
   users: User,
-  post: Post
+  enrrollments: Enrollment
 }> = {
   users: {
-    primaryKey: ["id"]
+    primaryKey: ["id"] // Single primary key
   },
-  post: {
-    primaryKey: ["id"]
+  enrrollments: {
+    primaryKey: ["year", "semester", "courseId", "studentId"] // Composite primary key
   }
 };
-
+// Create a new instance of LynxDB
 const db = new LynxDB(tableConfigs);
 
+// Get tables
 const users = db.get("users");
-const posts = db.get("post");
+const enrrollments = db.get("enrrollments");
 
-users.insert({ id: 1 , name: "Jhon Smith", email: "some@domain.com" });
-posts.insert({ id: 1, title: "First Post", content: "This is the first post", ownerId: 1 });
+async function main(){
+  // Operation Insert 
+  const userInserted: User = await users.insert({ id: 1 , name: "Jhon Smith", email: "some@domain.com" });
+  const enrrollmentInserted: Enrollment = await enrrollments.insert({ 
+    year: 2025, 
+    semester: "Spring", 
+    courseId: 1, 
+    studentId: 1, 
+    grade: 0, 
+    resultStatus: "pending", 
+    gradeStatus: "pending" 
+  });
+
+  console.table([userInserted]);
+  console.table([enrrollmentInserted]);
+  
+  // Operation Bulk Insert
+  await users.bulkInsert([
+    { id: 2, name: "Alice Doe", email: "alice@domain.com" },
+    // ... more records
+  ]);
+  await enrrollments.bulkInsert([
+    { 
+      year: 2025, 
+      semester: "Spring", 
+      courseId: 1, 
+      studentId: 2, 
+      grade: 0, 
+      resultStatus: "pending", 
+      gradeStatus: "pending" 
+    },
+    // ... more records
+  ]);
+  
+  // Opeartion Find By Primary Key
+  const userFound: User | null = await users.findByPk({ id: 1 });
+  const enrrollmentFound: Enrollment | null = await enrrollments.findByPk({ 
+    year: 2025, 
+    semester: "Spring", 
+    courseId: 1, 
+    studentId: 1 
+  });
+
+  console.table([userFound]);
+  console.table([enrrollmentFound]);
+
+  // Select
+  const usersSelected: Partial<User>[] = await users.select(
+    ["id", "name"], // Fields to select, array empty ([]) to select all fields
+    { id: { $gt: 1 } } // Where clause, empty object({}) to select all records
+  );
+  const enrollmentSelected: Partial<Enrollment>[] = await enrrollments.select(
+    [], // Select all fields 
+    { // Where clause
+      year: { $gt: 2025 },
+      semester: { $eq: "Spring" }
+    }
+  );
+
+  console.table(usersSelected);
+  console.table(enrollmentSelected);
+
+  // Operation Update
+  const affectedRowsUser = await users.update(
+    { name: "Jhon Doe" }, // Fields to update
+    { id: { $eq: 1 } } // Where clause
+  );
+  const affectedRowsEnrrollment = await enrrollments.update(
+    { // Fields to update
+      grade: 72,
+      resultStatus: "approved",
+      gradeStatus: "loaded"
+    },
+    { // Where clause
+      year: { $eq: 2025 }, 
+      semester: { $eq: "Spring" }, 
+      courseId: { $eq: 1 }, 
+      studentId: { $eq: 1 } 
+    }
+  );
+
+  console.log("Affected rows user:", affectedRowsUser);
+  console.log("Affected rows enrrollment:", affectedRowsEnrrollment);
+
+  // Operation Delete By Primary Key
+  const userDelete: User | null = await users.deleteByPk({ id: 1 });
+  const enrrollmentDelete: Enrollment | null = await enrrollments.deleteByPk({ 
+    year: 2025, 
+    semester: "Spring", 
+    courseId: 1, 
+    studentId: 1 
+  });
+
+  console.table([userDelete]); // If null, the record was not found
+  console.table([enrrollmentDelete]); // If null, the record was not found
+}
 
 
+// type Post = { 
+//   id: number; 
+//   title: string; 
+//   content: string; 
+//   ownerId: number; 
+// }
 // async function main (){
 //   try{
 //     const result = await db.transaction(async (t) => {
 //       const userA = await t.get("users").insert({ id:1, name: "Josué Alfredo Gonzalez Caal" });
 //       const userB = await t.get("users").insert({ id: "3485128450101", name: "Edin Roberto Ramirez Perez" });
-//       const affectedRows = await t.get("users").update({ name: "Kenneth Jhoel Moreno Perez" }, { cui: { eq: "7845674320103"} });
+//       const affectedRows = await t.get("users").update({ name: "Kenneth Jhoel Moreno Perez" }, { cui: { $eq: "7845674320103"} });
 //       if (affectedRows !== 1) throw new Error("No se actualizo el usuario");
 //       return [userA, userB];
 //     });
@@ -75,26 +189,4 @@ Clases principales:
 
 
 
-
-
-
-
-######################################################################################################
-¿Cómo podría llamar a los niveles de aislamiento de mi base de datos en memoria si cumplen con lo siguiente?:
-
-Aislamiento 1:
-- En operaciones de lectura bloquea las filas con shared lock.
-- En operaciones de escritura bloquea las filas con exclusive lock.
-- Sin MVCC
-- Permite ver los datos confirmados mas recientes por otras transacciones.
-- Si otro proceso actualiza una fila entre dos consultas dentro de la misma transacción, los datos devueltos reflejarán ese cambio.
-
-Aislamiento 2:
-- En operaciones de lectura bloquea las filas con exclusive lock.
-- En operaciones de escritura bloquea las filas con exclusive lock.
-- Sin MVCC
-- Si otra transacción al realizar el commit ingresa nuevas filas o actualiza registros que no esten bloqueados, estas serán visibles.
-- Si otro proceso intenta leer o escribir una fila bloqueada, debe esperar hasta que sean liberados por la transacción que los tiene bloqueados (al hacer commit o rollback).
-
-
- */
+*/

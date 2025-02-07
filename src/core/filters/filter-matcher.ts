@@ -1,4 +1,4 @@
-import { CompiledCondition, Filter, OperatorType } from "../../types/filter.type";
+import { CompiledCondition, Filter, ComparisonOperatorType } from "../../types/filter.type";
 import { getOperatorHandler, transformConditionValue } from "./operators";
 
 
@@ -9,8 +9,8 @@ export function compileFilter<T>(filter: Filter<T>): CompiledCondition<T>[] {
     for (const [operator, conditionValue] of Object.entries(condition as any)) {
       compiledConditions.push({
         key: key as keyof T,
-        conditionValue: transformConditionValue(conditionValue as T[keyof T], operator as OperatorType),
-        operatorHandler: getOperatorHandler(operator as OperatorType),
+        conditionValue: transformConditionValue(conditionValue as T[keyof T], operator as ComparisonOperatorType),
+        operatorHandler: getOperatorHandler(operator as ComparisonOperatorType),
       });
     }
   }

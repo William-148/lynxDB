@@ -40,7 +40,7 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
     });
 
     it('update a single record based on a specific condition', async () => {
-      const affectedRows = await entityTable.update({ status: 'archived' }, { id: { eq: 1 } });
+      const affectedRows = await entityTable.update({ status: 'archived' }, { id: { $eq: 1 } });
       expect(affectedRows).toBe(1);
 
       const updatedRecord = await entityTable.findByPk({ id: 1 });
@@ -48,28 +48,28 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
     });
 
     it('update multiple records matching a condition', async () => {
-      const affectedRows = await entityTable.update({ status: 'archived' }, { status: { eq: 'inactive' } });
+      const affectedRows = await entityTable.update({ status: 'archived' }, { status: { $eq: 'inactive' } });
       expect(affectedRows).toBe(2);
       
-      const updatedRecords = await entityTable.select([], { status: { eq: 'archived' } });
+      const updatedRecords = await entityTable.select([], { status: { $eq: 'archived' } });
       expect(updatedRecords).toHaveLength(2);
       expect(updatedRecords.map(record => record.name)).toEqual(['Beta', 'Delta']);
     });
 
     it('update records with numeric fields', async () => {
-      const affectedRows = await entityTable.update({ value: 99 }, { value: { lt: 30 } });
+      const affectedRows = await entityTable.update({ value: 99 }, { value: { $lt: 30 } });
       expect(affectedRows).toBe(2);
 
-      const updatedRecords = await entityTable.select([], { value: { eq: 99 } });
+      const updatedRecords = await entityTable.select([], { value: { $eq: 99 } });
       expect(updatedRecords).toHaveLength(2);
       expect(updatedRecords.map(record => record.name)).toEqual(['Alpha', 'Beta']);
     });
 
     it('not update any record if no conditions match', async () => {
-      const affectedRows = await entityTable.update({ status: 'archived' }, { id: { eq: 999 } });
+      const affectedRows = await entityTable.update({ status: 'archived' }, { id: { $eq: 999 } });
       expect(affectedRows).toBe(0);
 
-      const records = await entityTable.select([], { status: { eq: 'archived' } });
+      const records = await entityTable.select([], { status: { $eq: 'archived' } });
       expect(records).toHaveLength(0);
     });
 
@@ -86,10 +86,10 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
     });
 
     it('update records with partial fields', async () => {
-      const affectedRows = await entityTable.update({ name: 'Updated Name' }, { id: { eq: 3 } });
+      const affectedRows = await entityTable.update({ name: 'Updated Name' }, { id: { $eq: 3 } });
       expect(affectedRows).toBe(1);
 
-      const updatedRecord = await entityTable.select([], { id: { eq: 3 } });
+      const updatedRecord = await entityTable.select([], { id: { $eq: 3 } });
       expect(updatedRecord[0].name).toBe('Updated Name');
       expect(updatedRecord[0].value).toBe(30); // Ensure other fields are not affected
     });
@@ -99,7 +99,7 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
       const IdToUpdate = ItemToTest.id;
       const NewId = 99;
 
-      const affectedRows = await entityTable.update({ id: NewId }, { id: { eq: IdToUpdate } });
+      const affectedRows = await entityTable.update({ id: NewId }, { id: { $eq: IdToUpdate } });
       const updatedRecord = await entityTable.findByPk({ id: NewId });
       const shouldNotExistRecord = await entityTable.findByPk({ id: IdToUpdate });
       
@@ -111,16 +111,16 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
     });
 
     it('handle cases with empty updatedFields', async () => {
-      const affectedRows = await entityTable.update({}, { id: { eq: 2 } });
+      const affectedRows = await entityTable.update({}, { id: { $eq: 2 } });
       expect(affectedRows).toBe(0);
     });
 
     it('handle updates when multiple conditions match', async () => {
       const valuesToUpdate = { status: 'archived', value: 100 };
-      const affectedRows = await entityTable.update(valuesToUpdate, { status: { eq: 'active' } });
+      const affectedRows = await entityTable.update(valuesToUpdate, { status: { $eq: 'active' } });
       expect(affectedRows).toBe(2);
 
-      const updatedRecords = await entityTable.select([], { status: { eq: 'archived' } });
+      const updatedRecords = await entityTable.select([], { status: { $eq: 'archived' } });
       expect(updatedRecords).toHaveLength(2);
       expect(updatedRecords.map(record => record.value)).toEqual([100, 100]);
     });
@@ -130,9 +130,9 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
       const pkAlreadyRegistered = 3;
       const newInserted = await entityTable.insert({ id: 100, name: 'Iota', value: 43, status: 'inserted' });
 
-      await expect(entityTable.update({ id: pkAlreadyRegistered }, { id: { gt: itemPkToTest } }))
+      await expect(entityTable.update({ id: pkAlreadyRegistered }, { id: { $gt: itemPkToTest } }))
         .rejects.toThrow(DuplicatePrimaryKeyValueError);
-      await expect(entityTable.update({ id: pkAlreadyRegistered }, { id: { eq: newInserted.id } }))
+      await expect(entityTable.update({ id: pkAlreadyRegistered }, { id: { $eq: newInserted.id } }))
         .rejects.toThrow(DuplicatePrimaryKeyValueError);
     });
 
@@ -163,18 +163,18 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
       // Update the PK for the first time
       const affectedRowsFirstUpdate = await entityTable.update(
         { id: newPk }, 
-        { id: { eq: originalPk } }
+        { id: { $eq: originalPk } }
       );
 
       // Get the updated records, these records shouldn't exist after the second update
-      const shouldNotExistAtEnd = await entityTable.select([], { id: { eq: newPk } });
+      const shouldNotExistAtEnd = await entityTable.select([], { id: { $eq: newPk } });
       // Update the PK for the second time
       const affectedRowsSecondUpdate = await entityTable.update(
         { id: originalPk }, 
-        { id: { eq: newPk} }
+        { id: { $eq: newPk} }
       );
       // Check if the records with the original semester
-      const secondUpdatedRecords = await entityTable.select([], { id: { eq: originalPk } });
+      const secondUpdatedRecords = await entityTable.select([], { id: { $eq: originalPk } });
       // Check if the records with the old semester no longer exist
       const record = await entityTable.findByPk({ id: shouldNotExistAtEnd[0].id });
       
@@ -202,13 +202,13 @@ export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => P
         // Update a field different from the PK
         const firstUpdateAffectedRows = await entityTable.update(
           { name: `Iota ${i}` },
-          { id: { eq: InitialRegisteredPk } }
+          { id: { $eq: InitialRegisteredPk } }
         );
 
         // Update the PK
         const updatedPkAffectedRows = await entityTable.update(
           { id: currentUnregisteredPK },
-          { id: { eq: InitialRegisteredPk } }
+          { id: { $eq: InitialRegisteredPk } }
         );
 
         // Find the record with the new PK
@@ -274,10 +274,10 @@ export function updateTestWithoutPK(
       const ItemToTest = defaultEntityData[0];
       const NewFieldsValues: Partial<Entity> = { status: 'archived' };
 
-      const affectedRows = await entityTable.update(NewFieldsValues, { id: { eq: ItemToTest.id } });
+      const affectedRows = await entityTable.update(NewFieldsValues, { id: { $eq: ItemToTest.id } });
       expect(affectedRows).toBe(1);
 
-      const updatedRecords = await entityTable.select([], { id: { eq: ItemToTest.id } });
+      const updatedRecords = await entityTable.select([], { id: { $eq: ItemToTest.id } });
       const updatedRecord = updatedRecords[0];
       expect(updatedRecord._id).not.toBeUndefined();
       expect(updatedRecord).toEqual({
@@ -290,18 +290,18 @@ export function updateTestWithoutPK(
     it('update a single record two times withouth changing the PK', async () => {
       const UpdatedData1 = defaultEntityData[4];
       const UpdatedData2 = defaultEntityData[2];
-      const ItemToTest = (await entityTable.select([], { id: { eq: 2 } }))[0];
+      const ItemToTest = (await entityTable.select([], { id: { $eq: 2 } }))[0];
       expect(ItemToTest).not.toBeUndefined();
 
       // First update
-      const affectedUpdate1 = await entityTable.update(UpdatedData1, { _id: { eq: ItemToTest._id } });
+      const affectedUpdate1 = await entityTable.update(UpdatedData1, { _id: { $eq: ItemToTest._id } });
       expect(affectedUpdate1).toBe(1);
 
       const updatedRecord1 = await entityTable.findByPk({ _id: ItemToTest._id });
       expect(updatedRecord1).toEqual({ ...UpdatedData1, _id: ItemToTest._id });
 
       // Second update
-      const affectedUpdate2 = await entityTable.update(UpdatedData2, { _id: { eq: ItemToTest._id } });
+      const affectedUpdate2 = await entityTable.update(UpdatedData2, { _id: { $eq: ItemToTest._id } });
       expect(affectedUpdate2).toBe(1);
 
       const updatedRecord2 = await entityTable.findByPk({ _id: ItemToTest._id });
@@ -312,10 +312,10 @@ export function updateTestWithoutPK(
     it('update multiple records matching a condition', async () => {
       const NewFieldsValues: Partial<Entity> = { id: 1, status: 'freeze' };
 
-      const affectedRows = await entityTable.update(NewFieldsValues, { id: { gte: 1 } });
+      const affectedRows = await entityTable.update(NewFieldsValues, { id: { $gte: 1 } });
       expect(affectedRows).toBe(defaultEntityData.length);
 
-      const updatedRecords = await entityTable.select([], { id: { eq: NewFieldsValues.id } });
+      const updatedRecords = await entityTable.select([], { id: { $eq: NewFieldsValues.id } });
       expect(updatedRecords).toHaveLength(defaultEntityData.length);
       for (const item of updatedRecords) {
         expect(item.id).toBe(NewFieldsValues.id);
@@ -328,11 +328,11 @@ export function updateTestWithoutPK(
       const NewDefaultId = 'new-id';
       const NewFieldsValues: Partial<EntityWithDefaultId> = { _id: NewDefaultId };
 
-      const findBeforUpdate = await entityTable.select([], { id: { eq: ItemToTest.id } });
+      const findBeforUpdate = await entityTable.select([], { id: { $eq: ItemToTest.id } });
       const beforeUpdate = findBeforUpdate[0];
       expect(beforeUpdate?._id).not.toBeUndefined();
 
-      const affectedRows = await entityTable.update(NewFieldsValues, { id: { eq: ItemToTest.id } });
+      const affectedRows = await entityTable.update(NewFieldsValues, { id: { $eq: ItemToTest.id } });
       expect(affectedRows).toBe(1);
 
       const updatedRecord = await entityTable.findByPk({ _id: NewDefaultId });
@@ -363,7 +363,7 @@ export function updateTestWithoutPK(
         .rejects
         .toThrow(DuplicatePrimaryKeyValueError);
 
-      const updated = await entityTable.select([], { _id: { eq: UnregisteredDefaultId } });
+      const updated = await entityTable.select([], { _id: { $eq: UnregisteredDefaultId } });
       expect(updated).toHaveLength(1);
     });
 
@@ -413,12 +413,12 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
       const UpdatedFields: Partial<Enrollment> = { grade: ObtainedGrade, gradeStatus: 'loaded', resultStatus: getResultStatus(ObtainedGrade) };
 
       const affectedRows = await enrollmentTable.update(UpdatedFields, {
-        year: { eq: ItemToTest.year },
-        semester: { eq: ItemToTest.semester },
-        courseId: { eq: ItemToTest.courseId },
-        studentId: { eq: ItemToTest.studentId },
-        gradeStatus: { eq: 'pending' },
-        resultStatus: { eq: 'pending' }
+        year: { $eq: ItemToTest.year },
+        semester: { $eq: ItemToTest.semester },
+        courseId: { $eq: ItemToTest.courseId },
+        studentId: { $eq: ItemToTest.studentId },
+        gradeStatus: { $eq: 'pending' },
+        resultStatus: { $eq: 'pending' }
       });
 
       expect(affectedRows).toBe(1);
@@ -443,10 +443,10 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
         gradeStatus: 'loaded',
         resultStatus: getResultStatus(WrongObtainedGrade)
       }, {
-        year: { eq: ItemToTest.year },
-        semester: { eq: ItemToTest.semester },
-        courseId: { eq: ItemToTest.courseId },
-        studentId: { eq: ItemToTest.studentId }
+        year: { $eq: ItemToTest.year },
+        semester: { $eq: ItemToTest.semester },
+        courseId: { $eq: ItemToTest.courseId },
+        studentId: { $eq: ItemToTest.studentId }
       });
 
       expect(affectedRowsFirstUpdate).toBe(1);
@@ -472,10 +472,10 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
         gradeStatus: 'loaded',
         resultStatus: getResultStatus(CorrectObtainedGrade)
       }, {
-        year: { eq: ItemToTest.year },
-        semester: { eq: ItemToTest.semester },
-        courseId: { eq: ItemToTest.courseId },
-        studentId: { eq: ItemToTest.studentId }
+        year: { $eq: ItemToTest.year },
+        semester: { $eq: ItemToTest.semester },
+        courseId: { $eq: ItemToTest.courseId },
+        studentId: { $eq: ItemToTest.studentId }
       });
 
       expect(affectedRowsFirstUpdate).toBe(1);
@@ -512,16 +512,16 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
       ));
 
       const countApproved = await enrollmentTable.update({ resultStatus: 'approved' }, {
-        year: { eq: YearToTest },
-        grade: { gte: MinimunGradeToPass },
-        gradeStatus: { eq: 'loaded' },
-        resultStatus: { eq: 'pending' }
+        year: { $eq: YearToTest },
+        grade: { $gte: MinimunGradeToPass },
+        gradeStatus: { $eq: 'loaded' },
+        resultStatus: { $eq: 'pending' }
       });
       const countReproved = await enrollmentTable.update({ resultStatus: 'reproved' }, {
-        year: { eq: YearToTest },
-        grade: { lt: MinimunGradeToPass },
-        gradeStatus: { eq: 'loaded' },
-        resultStatus: { eq: 'pending' }
+        year: { $eq: YearToTest },
+        grade: { $lt: MinimunGradeToPass },
+        gradeStatus: { $eq: 'loaded' },
+        resultStatus: { $eq: 'pending' }
       });
 
       expect(countApproved).toBe(ListApproved.length);
@@ -552,9 +552,9 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
       const ItemToTest = enrollmentData[1];
       const UpdateCourseId: Partial<Enrollment> = { courseId: 115 };
       const affectedRows = await enrollmentTable.update(UpdateCourseId, {
-        year: { eq: ItemToTest.year },
-        courseId: { eq: ItemToTest.courseId },
-        studentId: { eq: ItemToTest.studentId }
+        year: { $eq: ItemToTest.year },
+        courseId: { $eq: ItemToTest.courseId },
+        studentId: { $eq: ItemToTest.studentId }
       });
 
       expect(affectedRows).toBe(1);
@@ -589,16 +589,16 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
 
       const UpdateSemester: Partial<Enrollment> = { semester: SemesterToUpdate };
       const affectedRows = await enrollmentTable.update(UpdateSemester, {
-        year: { eq: YearToTest },
-        semester: { eq: SemesterToTest }
+        year: { $eq: YearToTest },
+        semester: { $eq: SemesterToTest }
       });
 
       expect(affectedRows).toBe(4);
 
       // Check if the records with the new semester exist
       const updatedRecord = await enrollmentTable.select([], {
-        year: { eq: YearToTest },
-        semester: { eq: SemesterToUpdate }
+        year: { $eq: YearToTest },
+        semester: { $eq: SemesterToUpdate }
       });
       expect(updatedRecord).toHaveLength(6);
       updatedRecord.forEach(item => {
@@ -628,8 +628,8 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
       const affectedRowsFirstUpdate = await enrollmentTable.update(
         { semester: SemesterToUpdate }, 
         {
-          year: { eq: YearToTest },
-          semester: { eq: OriginalSemester }
+          year: { $eq: YearToTest },
+          semester: { $eq: OriginalSemester }
         }
       );
 
@@ -637,8 +637,8 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
 
       // Get the updated records, these records shouldn't exist after the second update
       const shouldNotExistAtEnd = await enrollmentTable.select([], {
-        year: { eq: YearToTest },
-        semester: { eq: SemesterToUpdate }
+        year: { $eq: YearToTest },
+        semester: { $eq: SemesterToUpdate }
       });
 
       expect(shouldNotExistAtEnd).toHaveLength(6);
@@ -647,8 +647,8 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
       const affectedRowsSecondUpdate = await enrollmentTable.update(
         { semester: OriginalSemester }, 
         {
-          year: { eq: YearToTest },
-          semester: { eq: SemesterToUpdate }
+          year: { $eq: YearToTest },
+          semester: { $eq: SemesterToUpdate }
         }
       );
 
@@ -656,8 +656,8 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
 
       // Check if the records with the original semester
       const secondUpdatedRecords = await enrollmentTable.select([], {
-        year: { eq: YearToTest },
-        semester: { eq: OriginalSemester }
+        year: { $eq: YearToTest },
+        semester: { $eq: OriginalSemester }
       });
       expect(secondUpdatedRecords).toHaveLength(6);
       secondUpdatedRecords.forEach(item => {
@@ -683,10 +683,10 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
       const UpdatedPK: Partial<Enrollment> = { year: 2026, semester: 'Summer', courseId: 103, studentId: 8 };
 
       const affectedRows = await enrollmentTable.update(UpdatedPK, {
-        year: { eq: ItemToTest.year },
-        semester: { eq: ItemToTest.semester },
-        courseId: { eq: ItemToTest.courseId },
-        studentId: { eq: ItemToTest.studentId }
+        year: { $eq: ItemToTest.year },
+        semester: { $eq: ItemToTest.semester },
+        courseId: { $eq: ItemToTest.courseId },
+        studentId: { $eq: ItemToTest.studentId }
       });
 
       expect(affectedRows).toBe(1);
@@ -729,10 +729,10 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
 
       const errorUpdate = async () => {
         await enrollmentTable.update(pkAlreadyRegistered, {
-          year: { eq: ItemPkToTest.year },
-          semester: { eq: ItemPkToTest.semester },
-          courseId: { eq: ItemPkToTest.courseId },
-          studentId: { eq: ItemPkToTest.studentId }
+          year: { $eq: ItemPkToTest.year },
+          semester: { $eq: ItemPkToTest.semester },
+          courseId: { $eq: ItemPkToTest.courseId },
+          studentId: { $eq: ItemPkToTest.studentId }
         });
       }
 
@@ -754,10 +754,10 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
 
       const errorUpdate = async () => {
         await enrollmentTable.update({ courseId: ItemToTestB.courseId }, {
-          year: { eq: ItemToTestA.year },
-          semester: { eq: ItemToTestA.semester },
-          courseId: { eq: ItemToTestA.courseId },
-          studentId: { eq: ItemToTestA.studentId }
+          year: { $eq: ItemToTestA.year },
+          semester: { $eq: ItemToTestA.semester },
+          courseId: { $eq: ItemToTestA.courseId },
+          studentId: { $eq: ItemToTestA.studentId }
         });
       }
 
@@ -779,10 +779,10 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
         .toThrow(DuplicatePrimaryKeyValueError);
 
       const record = await enrollmentTable.select([], {
-        year: { eq: newPk.year },
-        semester: { eq: newPk.semester },
-        courseId: { eq: newPk.courseId },
-        studentId: { eq: newPk.studentId }
+        year: { $eq: newPk.year },
+        semester: { $eq: newPk.semester },
+        courseId: { $eq: newPk.courseId },
+        studentId: { $eq: newPk.studentId }
       });
       expect(record).toHaveLength(1);
 
@@ -793,7 +793,7 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
       const partialPK: Partial<Enrollment> = { courseId: 500 };
 
       const errorUpdate = async () => {
-        await enrollmentTable.update({ courseId: 500 }, { studentId: { eq: ItemTest.studentId } });
+        await enrollmentTable.update({ courseId: 500 }, { studentId: { $eq: ItemTest.studentId } });
       }
 
       await expect(errorUpdate)
@@ -802,10 +802,10 @@ export function updateTestWithCompositePK(createInstance: (testData: Enrollment[
 
       const expectedItem = { ...ItemTest, ...partialPK };
       const record = await enrollmentTable.select([], {
-        year: { eq: expectedItem.year },
-        semester: { eq: expectedItem.semester },
-        courseId: { eq: expectedItem.courseId },
-        studentId: { eq: expectedItem.studentId }
+        year: { $eq: expectedItem.year },
+        semester: { $eq: expectedItem.semester },
+        courseId: { $eq: expectedItem.courseId },
+        studentId: { $eq: expectedItem.studentId }
       });
       expect(record).toHaveLength(1);
       expect(expectedItem).toEqual(record[0]);
