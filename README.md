@@ -10,7 +10,9 @@
 - [Quick Start](#quick-start)
   - [Installation](#installation)
   - [Example](#example)
-- [Supported Opeartions](#supported-operations)
+- [Primary key Handling](#primary-key-handling)
+- [Database Operations](#database-operations)
+- [Operators](#operators)
 - [Transactions](#transactions)
   - [Isolation Levels](#isolation-levels)
   - [Locks](#locks)
@@ -81,8 +83,106 @@ users.insert({ id: 1 , name: "Jhon Smith", email: "some@domain.com" });
 posts.insert({ id: 1, title: "First Post", content: "This is the first post", ownerId: 1 });
 ```
 
-# Supported Operations
-descriptions
+# Primary Key Handling
+
+LynxDB uses primary keys to uniquely identify records in a table. There are two types of primary keys that you can define:
+
+## Simple Primary Key
+
+A simple primary key consists of a single field. For example, in the `users` table, you can define a simple primary key like this:
+
+```typescript
+const tableConfigs: TablesDefinition<{
+  users: User
+}> = {
+  users: {
+    primaryKey: ["id"]
+  }
+};
+```
+
+## Composite Primary Key
+A composite primary key is made up of multiple fields that together uniquely identify a record. For example, in the enrrollments table, you can define a composite primary key like this:
+```typescript 
+type OrderDetail = {
+  orderId: number,
+  productId: number,
+  quantity: number,
+  price: number
+}
+
+const tableConfigs: TablesDefinition<{
+  orderDetails: OrderDetail
+}> = {
+  orderDetails: {
+    primaryKey: ["orderId", "productId"]
+  }
+};
+```
+
+## Default Primary Key
+If you do not define a primary key in the table configuration, LynxDB automatically assigns one by using the `_id` field. This ensures that every record has a unique identifier even when a primary key is not explicitly specified.
+
+You can define a default primary key like this:
+```typescript 
+type Person = {
+  name: string;
+  age: string;
+}
+
+const tableConfigs: TablesDefinition<{
+  persons: Person
+}> = {
+  persons: {
+    primaryKey: [] // Without a PK defined
+  }
+};
+```
+
+# Database Operations
+Once the database instance is created, you can retrieve tables and perform various operations. See [examples](examples.md#database-operations)
+
+
+| Operation    | Description                                                                                           |
+|--------------|-------------------------------------------------------------------------------------------------------|
+| `insert`     | Inserts a single record into a table and returns the newly inserted record.                           |
+| `bulkInsert` | Inserts multiple records into a table at once.                                                      |
+| `findByPk`   | Finds and returns a record using its primary key. Returns `null` if not found.                         |
+| `select`     | Selects records from a table. Supports filtering via a where clause and field selection.              |
+| `update`     | Updates fields in records that match the specified conditions. Returns the number of affected rows.    |
+| `deleteByPk` | Deletes a record using its primary key and returns the deleted record (or `null` if not found).         |
+
+
+# Operators
+When performing select or update operations, you can use a where clause to filter records. The where clause supports several comparison operators. Although logical operators like $or and $not are not directly supported, you can simulate an AND condition by specifying multiple criteria.
+
+## Comparison Opeartors
+| Operator        | Description                                      | Example                            |
+|-----------------|--------------------------------------------------|------------------------------------|
+| **`$eq`**      | Equal to                                          | `{ id: { $eq: 1 } }`               |
+| **`$ne`**      | Not equal to                                      | `{ id: { $ne: 1 } }`               |
+| **`$gt`**      | Greater than                                      | `{ id: { $gt: 1 } }`               |
+| **`$gte`**     | Greater than or equal to                          | `{ id: { $gte: 1 } }`              |
+| **`$lt`**      | Less than                                         | `{ id: { $lt: 1 } }`               |
+| **`$lte`**     | Less than or equal to                             | `{ id: { $lte: 1 } }`              |
+| **`$includes`**| Checks if the field value is included in an array | `{ id: { $includes: [1, 2, 3] } }` |
+| **`$like`**    | String pattern matching (e.g., wildcard search)   | `{ name: { $like: "Jhon%" } }`     |
+
+## Logical Operators
+| Logical Operator | Note                                                    |
+|------------------|---------------------------------------------------------|
+| `$and`           | Simulated with multiple conditions (not officially supported) |
+| `$or`            | Not supported yet                                       |
+| `$not`           | Not supported yet                                       |
+
+Opeartor `and` example:
+```typescript
+await users.select([], {
+  id: { $eq: 1 },
+  name: { $like: "Jhon%" },
+  // another conditions...
+});
+```
 
 # Transactions
 LynxDB implements transactions using locks—both shared and exclusive—without support for MVCC. Each transaction acquires the necessary locks that are held for the entire duration of the transaction, until a commit or rollback occurs. This mechanism ensures data consistency, but it also means that transactions may become blocked if locks are not managed properly.

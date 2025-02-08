@@ -17,7 +17,6 @@ const defaultData: UserTags[] = [
 /**
  * Common tests for the select() method with include condition
  * 
- * @param description The description of the test
  * @param createInstance Function that creates a new instance of the Table class
  * 
  * Param Example:
@@ -29,8 +28,8 @@ const defaultData: UserTags[] = [
  * }
  * ```
  */
-export function selectIncludesTests(description: string, createInstance: (dataTest: UserTags[]) => Promise<ITable<any>>) {
-  describe(description, () => {
+export function selectIncludesTests(createInstance: (dataTest: UserTags[]) => Promise<ITable<any>>) {
+  describe("With include condition - should...", () => {
     let genericTable: ITable<UserTags>;
   
     beforeEach(async () => {

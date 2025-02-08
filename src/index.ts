@@ -36,7 +36,7 @@ const db = new LynxDB(tableConfigs);
 const users = db.get("users");
 const enrrollments = db.get("enrrollments");
 
-async function main(){
+async function operations(){
   // Operation Insert 
   const userInserted: User = await users.insert({ id: 1 , name: "Jhon Smith", email: "some@domain.com" });
   const enrrollmentInserted: Enrollment = await enrrollments.insert({ 
@@ -131,6 +131,79 @@ async function main(){
 
   console.table([userDelete]); // If null, the record was not found
   console.table([enrrollmentDelete]); // If null, the record was not found
+}
+
+// Where clause are in select and update operations
+async function comparisonOperatorInWhereClause(){
+  // Equal to
+  const resultWithEq = await users.select(
+    [], 
+    { id: { $eq: 1 } } // Where clause
+  );
+  const affectedRowsWithEq = await users.update(
+    { /* updated fields */ }, 
+    { id: { $eq: 1 } } // Where clause
+  );
+  console.table(resultWithEq);
+  console.log("Affected rows with $eq:", affectedRowsWithEq);
+
+  // Not equal to
+  await users.select([], 
+    { id: { $ne: 1 } } // Where clause
+  );
+
+  // Greater than
+  await users.select([], 
+    { id: { $gt: 1 } } // Where clause
+  );
+
+  // Greater than or equal to
+  await users.select([], 
+    { id: { $gte: 1 } } // Where clause
+  );
+
+  // Less than
+  await users.select([], 
+    { id: { $lt: 1 } } // Where clause
+  );
+
+  // Less than or equal to
+  await users.select([], 
+    { id: { $lte: 1 } } // Where clause
+  );
+
+  // Array inclusion check
+  await users.select([], 
+    { id: { $includes: [1, 2, 3] } } // Where clause
+  );
+
+  // String pattern match
+  await users.select([], 
+    { name: { $like: "Jhon%" } } // Where clause
+  );
+}
+
+async function logicalOperatorsInWhereClause(){
+  /* - Operator $or not supported yet
+   * - Operator $not not supported yet
+   * - Operator $and not supported yet
+   */
+
+  // Operator and can be simulated by adding multiple conditions
+  await users.select([], 
+    { // Where clause 
+      id: { $eq: 1 }, 
+      name: { $like: "Jhon%" } 
+    }
+  );
+  await users.select([], 
+    { // Where clause
+      name: { $like: "Jhon%" },
+      email: { $like: "some%" },
+      // otras condiciones
+      // another conditions
+    }
+  );
 }
 
 

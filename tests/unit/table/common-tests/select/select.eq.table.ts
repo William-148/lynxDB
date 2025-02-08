@@ -1,14 +1,7 @@
 import { ITable } from "../../../../../src/types/table.type";
+import { PersonInfo } from "../../../../types/user-test.type";
 
-type GenericData = {
-  id: number;
-  name: string;
-  age: number;
-  active: boolean;
-  tags: string[];
-}
-
-const genericDataList: GenericData[] = [
+const genericDataList: PersonInfo[] = [
   { id: 1, name: "Alice", age: 25, active: true, tags: ["developer", "mentor"] },
   { id: 2, name: "Bob", age: 30, active: false, tags: ["designer"] },
   { id: 3, name: "Charlie", age: 35, active: true, tags: ["manager"] },
@@ -18,7 +11,6 @@ const genericDataList: GenericData[] = [
 /**
  * Common tests for the select() method with eq conditions
  * 
- * @param description The description of the test
  * @param createInstance Function that creates a new instance of the Table class
  * 
  * Param Example:
@@ -31,9 +23,9 @@ const genericDataList: GenericData[] = [
  * ```
  * 
  */
-export function selectEqTests(description: string, createInstance: (dataTest: GenericData[]) => Promise<ITable<any>>) {
-  describe(description, () => {
-    let genericTable: ITable<GenericData>;
+export function selectEqTests(createInstance: (dataTest: PersonInfo[]) => Promise<ITable<any>>) {
+  describe("With equal condition - should...", () => {
+    let genericTable: ITable<PersonInfo>;
   
     beforeEach(async () => {
       genericTable = await createInstance(genericDataList);
@@ -106,7 +98,6 @@ export function selectEqTests(description: string, createInstance: (dataTest: Ge
 /**
  * Common tests for the select() method with eq conditions and objects
  * 
- * @param description The description of the test
  * @param createInstance Function that creates a new instance of the Table class
  * 
  * Param Example:
@@ -117,8 +108,8 @@ export function selectEqTests(description: string, createInstance: (dataTest: Ge
  * }
  * ```
  */
-export function selectEqTestsWithObjects(description: string, createInstance: () => Promise<ITable<any>>) {
-  describe(description, () => {
+export function selectEqTestsWithObjects(createInstance: () => Promise<ITable<any>>) {
+  describe("With equal condition and object as values - should...", () => {
     let genericTable: ITable<any>;
   
     beforeEach(async () => {
@@ -126,7 +117,7 @@ export function selectEqTestsWithObjects(description: string, createInstance: ()
     });
   
     it("filter records with array fields", async () => {
-      genericTable as ITable<GenericData>;
+      genericTable as ITable<PersonInfo>;
       genericTable.bulkInsert(genericDataList);
       const expectedItemA = genericDataList[1];
       const expectedItemB = genericDataList[3];

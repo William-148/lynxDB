@@ -10,7 +10,6 @@ const defaultData = [
 /**
  * Common tests for select() with lt and lte conditions
  * 
- * @param description The description of the test
  * @param createInstance Function that receives an array of data and returns a new instance of the Table
  * 
  * Param Example:
@@ -22,8 +21,8 @@ const defaultData = [
  * }
  * ```
  */
-export function selectLtLteTests(description: string, createInstance: (data: any[]) => Promise<ITable<any>>) {
-  describe(description, () => {
+export function selectLtLteTests(createInstance: (data: any[]) => Promise<ITable<any>>) {
+  describe("With lt and lte conditions - should...", () => {
     let genericTable: ITable<any>;
   
     beforeEach(async () => {

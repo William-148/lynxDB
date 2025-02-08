@@ -16,7 +16,6 @@ const defaultData: Element[] = [
 /**
  * Common tests for the select() method with like condition
  * 
- * @param description The description of the test
  * @param createInstance Function that creates a new instance of the table
  * 
  * Param Example:
@@ -28,8 +27,8 @@ const defaultData: Element[] = [
  * }
  * ```
  */
-export function selectLikeTests(description: string, createInstance: (data: Element[]) => Promise<ITable<any>>) {
-  describe(description, () => {
+export function selectLikeTests(createInstance: (data: Element[]) => Promise<ITable<any>>) {
+  describe("with like condition - should...", () => {
     let genericTable: ITable<Element>;
   
     beforeEach(async () => {

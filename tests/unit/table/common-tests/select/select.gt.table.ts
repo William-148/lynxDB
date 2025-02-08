@@ -19,7 +19,6 @@ const scoreDataList: ScoreRecord[] = [
 /**
  * Common tests for the select() method with gt and gte conditions
  * 
- * @param description The description of the test
  * @param createInstance Function that creates a new instance of the Table class
  * 
  * Param Example:
@@ -31,8 +30,8 @@ const scoreDataList: ScoreRecord[] = [
  * }
  * ```
  */
-export function selectGtGteTests(description: string, createInstance: (dataTest: ScoreRecord[]) => Promise<ITable<ScoreRecord>>) {
-  describe (description, () => {
+export function selectGtGteTests(createInstance: (dataTest: ScoreRecord[]) => Promise<ITable<ScoreRecord>>) {
+  describe ("With gt and gte condition - should...", () => {
     
     let genericTable: ITable<any>;
   

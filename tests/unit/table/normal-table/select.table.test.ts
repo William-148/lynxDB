@@ -1,59 +1,73 @@
 import { Table } from "../../../../src/core/table";
-import { selectTestsWithFields, selectWithOperatorTest } from "../common-tests/select/select.table";
+import { selectTestsWithFields, selectWithWrongQueryOperatorTest } from "../common-tests/select/select.table";
 import { selectEqTests, selectEqTestsWithObjects } from "../common-tests/select/select.eq.table";
 import { selectGtGteTests } from "../common-tests/select/select.gt.table";
 import { selectIncludesTests } from "../common-tests/select/select.includes.table";
 import { selectLikeTests } from "../common-tests/select/select.like.table";
 import { selectLtLteTests } from "../common-tests/select/select.lt.table";
+import { selectNeTests, selectNeTestsWithObjects } from "../common-tests/select/select.ne.table";
 
-//#region GENERAL SELECT TESTS
-selectTestsWithFields("Table - select() with fields - should...", async (dataTest) => {
-  const table = new Table<any>({ primaryKey: ['id'] });
-  await table.bulkInsert(dataTest);
-  return table;
-});
+describe("Table - select() method", () => {
+  //#region GENERAL SELECT TESTS
+  selectTestsWithFields(async (dataTest) => {
+    const table = new Table<any>({ primaryKey: ['id'] });
+    await table.bulkInsert(dataTest);
+    return table;
+  });
+  
+  selectWithWrongQueryOperatorTest(async () => {
+    const table = new Table<any>({ primaryKey: ['id'] });
+    return table;
+  });
+  //#endregion
 
-selectWithOperatorTest("Table - select() with operator - should...", async () => {
-  const table = new Table<any>({ primaryKey: ['id'] });
-  return table;
-});
-//#endregion
+  //#region TESTS WITH EQ CONDITION
+  selectEqTests(async (dataTest) => {
+    const table = new Table<any>({ primaryKey: ['id'] });
+    await table.bulkInsert(dataTest);
+    return table;
+  });
+  
+  selectEqTestsWithObjects(async () => {
+    const table = new Table<any>({ primaryKey: ['id'] });
+    return table;
+  });
+  //#endregion
 
+  //#region TESTS WITH NE CONDITION
+  selectNeTests(async (dataTest) => {
+    const table = new Table<any>({ primaryKey: ['id'] });
+    await table.bulkInsert(dataTest);
+    return table;
+  });
+  
+  selectNeTestsWithObjects(async () => {
+    const table = new Table<any>({ primaryKey: ['id'] });
+    return table;
+  });
+  //#endregion
+  
+  selectGtGteTests(async (dataTest) => {
+    const table = new Table<any>({ primaryKey: [] });
+    await table.bulkInsert(dataTest);
+    return table;
+  });
 
-//#region TESTS WITH EQ CONDITION
-selectEqTests("Table - select() with eq condition - should...", async (dataTest) => {
-  const table = new Table<any>({ primaryKey: ['id'] });
-  await table.bulkInsert(dataTest);
-  return table;
-});
-
-selectEqTestsWithObjects("Table - select() with eq condition and objects - should...", async () => {
-  const table = new Table<any>({ primaryKey: ['id'] });
-  return table;
-});
-//#endregion
-
-
-selectGtGteTests("Table - select() with gt and gte condition - should...", async (dataTest) => {
-  const table = new Table<any>({ primaryKey: [] });
-  await table.bulkInsert(dataTest);
-  return table;
-});
-
-selectIncludesTests("Table - select() with include condition - should...", async (dataTest) => {
-  const table = new Table<any>({ primaryKey: [] });
-  await table.bulkInsert(dataTest);
-  return table;
-});
-
-selectLikeTests("Table - select() with like condition - should...", async (dataTest) => {
-  const table = new Table<any>({ primaryKey: [] });
-  await table.bulkInsert(dataTest);
-  return table;
-});
-
-selectLtLteTests("Table - select() with lt and lte conditions - should...", async (dataTest) => {
-  const table = new Table<any>({ primaryKey: ['id'] });
-  await table.bulkInsert(dataTest);
-  return table;
+  selectIncludesTests(async (dataTest) => {
+    const table = new Table<any>({ primaryKey: [] });
+    await table.bulkInsert(dataTest);
+    return table;
+  });
+  
+  selectLikeTests(async (dataTest) => {
+    const table = new Table<any>({ primaryKey: [] });
+    await table.bulkInsert(dataTest);
+    return table;
+  });
+  
+  selectLtLteTests(async (dataTest) => {
+    const table = new Table<any>({ primaryKey: ['id'] });
+    await table.bulkInsert(dataTest);
+    return table;
+  });
 });

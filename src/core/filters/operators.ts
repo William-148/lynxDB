@@ -1,4 +1,8 @@
-import { ComparisonOperatorType, OperatorHandlerMap, OperatorHandler } from "../../types/filter.type";
+import { 
+  ComparisonOperatorType,
+  OperatorHandlerMap, 
+  OperatorHandler 
+} from "../../types/filter.type";
 
 let operators: OperatorHandlerMap<any> | undefined;
 
@@ -14,9 +18,10 @@ export function getOperatorHandler<T>(operatorType: ComparisonOperatorType): Ope
   if (!operators) {
     operators = Object.freeze({
       [ComparisonOperatorType.$eq]: deepEqual,
+      [ComparisonOperatorType.$ne]: deepNotEqual,
       [ComparisonOperatorType.$gt]: (recordValue: T, conditionValue: T) => recordValue > conditionValue,
-      [ComparisonOperatorType.$lt]: (recordValue: T, conditionValue: T) => recordValue < conditionValue,
       [ComparisonOperatorType.$gte]: (recordValue: T, conditionValue: T) => recordValue >= conditionValue,
+      [ComparisonOperatorType.$lt]: (recordValue: T, conditionValue: T) => recordValue < conditionValue,
       [ComparisonOperatorType.$lte]: (recordValue: T, conditionValue: T) => recordValue <= conditionValue,
       [ComparisonOperatorType.$includes]: (recordValue: T, conditionValue: T[]) => Array.isArray(conditionValue) && conditionValue.includes(recordValue),
       [ComparisonOperatorType.$like]: likeComparison<T>
@@ -86,3 +91,8 @@ function deepEqual<T>(recordValue: T, conditionValue: T): boolean {
 
   return true;
 }
+
+function deepNotEqual<T>(recordValue: T, conditionValue: T): boolean {
+  return !deepEqual(recordValue, conditionValue);
+}
+

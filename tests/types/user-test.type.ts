@@ -8,6 +8,14 @@ export type User = {
   password: string;
 }
 
+export type PersonInfo = {
+  id: number;
+  name: string;
+  age: number;
+  active: boolean;
+  tags: string[];
+};
+
 /**
  * Here we have a list of properties that are present in the User type.
  */

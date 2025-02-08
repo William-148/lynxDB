@@ -5,9 +5,10 @@
  * The available operators are:
  * 
  * - `$eq`: Equal to
+ * - `$ne`: Not equal to
  * - `$gt`: Greater than
- * - `$lt`: Less than
  * - `$gte`: Greater than or equal to
+ * - `$lt`: Less than
  * - `$lte`: Less than or equal to
  * - `$includes`: Array inclusion check
  * - `$like`: String pattern match
@@ -15,6 +16,8 @@
 export enum ComparisonOperatorType {
   /** Equal to */
   $eq = '$eq',
+  /** Not equal to */
+  $ne = '$ne',
   /** Greater than */
   $gt = '$gt',
   /** Greater than or equal to */
@@ -36,9 +39,10 @@ export enum ComparisonOperatorType {
  * to filter data. The available operators are:
  * 
  * - `$eq`: Equal to
+ * - `$ne`: Not equal to
  * - `$gt`: Greater than
- * - `$lt`: Less than
  * - `$gte`: Greater than or equal to
+ * - `$lt`: Less than
  * - `$lte`: Less than or equal to
  * - `$includes`: Array inclusion check
  * - `$like`: String pattern match
@@ -49,12 +53,21 @@ export enum ComparisonOperatorType {
  * @template T - The type of the value to be compared.
  */
 export type FilterOperator<T> = {
+  /** Equal to */
   [ComparisonOperatorType.$eq]?: T;
+  /** Not equal to */
+  [ComparisonOperatorType.$ne]?: T;
+  /** Greater than */
   [ComparisonOperatorType.$gt]?: T;
-  [ComparisonOperatorType.$lt]?: T;
+  /** Greater than or equal to */
   [ComparisonOperatorType.$gte]?: T;
+  /** Less than */
+  [ComparisonOperatorType.$lt]?: T;
+  /** Less than or equal to */
   [ComparisonOperatorType.$lte]?: T;
+  /** Array inclusion check */
   [ComparisonOperatorType.$includes]?: T[];
+  /** String pattern match */
   [ComparisonOperatorType.$like]?: string;
 };
 

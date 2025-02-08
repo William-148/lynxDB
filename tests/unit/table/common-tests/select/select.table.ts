@@ -4,7 +4,6 @@ import { User, userPropertyList } from "../../../../types/user-test.type";
 
 /**
  * Common test for the select() method with fields
- * @param description The description of the test
  * @param createInstance Function that receives the data to be inserted and returns a new instance of the Table
  * 
  * Param Example:
@@ -16,8 +15,8 @@ import { User, userPropertyList } from "../../../../types/user-test.type";
  * }
  * ```
  */
-export function selectTestsWithFields(description: string, createInstance: (testData: User[]) => Promise<ITable<User>>) {
-  describe(description, () => {
+export function selectTestsWithFields(createInstance: (testData: User[]) => Promise<ITable<User>>) {
+  describe("With select specific fields - should...", () => {
     let userTable: ITable<User>;
     
     beforeEach(async () => {
@@ -74,9 +73,8 @@ export function selectTestsWithFields(description: string, createInstance: (test
 }
 
 /**
- * Common test for the select() method with operators
+ * Common test for the select() method with wrong query operator
  * 
- * @param description The description of the test
  * @param createInstance Function that returns a new instance of the Table
  * 
  * Param Example:
@@ -84,8 +82,8 @@ export function selectTestsWithFields(description: string, createInstance: (test
  * const createInstance = async () => new Table<any>({ primaryKey: ['id'] });
  * ```
  */
-export function selectWithOperatorTest(description: string, createInstance: () => Promise<ITable<any>>) {
-  describe(description, () => {
+export function selectWithWrongQueryOperatorTest(createInstance: () => Promise<ITable<any>>) {
+  describe("With wrong query operator", () => {
     let defaultTable: ITable<any>;
 
     beforeEach(async () => {
