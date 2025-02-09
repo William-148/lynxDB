@@ -2,7 +2,7 @@ import { Filter } from "../types/filter.type";
 import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { RecordLockManager } from "./record-lock-manager";
 import { Config } from "./config";
-import { ITable, TableConfig } from "../types/table.type";
+import { TableSchema, TableConfig } from "../types/table.type";
 import { RecordWithId, Versioned } from "../types/record.type";
 import { PrimaryKeyManager } from "./primary-key-manager";
 import { processPromiseBatch } from "../utils/batch-processor";
@@ -12,7 +12,7 @@ import {
   updateVersionedRecord 
 } from "./record";
 
-export class Table<T> implements ITable<T> {
+export class Table<T> implements TableSchema<T> {
   /** Map that stores the records of the table. */
   protected _recordsMap: Map<string, Versioned<T>>;
   /** Definition of the primary key. */

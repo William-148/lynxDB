@@ -10,7 +10,7 @@ export type TablesDefinition<T extends Record<string, any>> = {
   [K in keyof T]: TableConfig<T[K]>;
 };
 
-export interface ITable<T> {
+export interface TableSchema<T> {
   /**
    * Return the number of records in the table
    */

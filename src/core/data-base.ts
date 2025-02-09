@@ -1,12 +1,14 @@
 import { TableNotFoundError } from "./errors/data-base.error";
 import { Transaction } from "./transaction";
 import { Table } from "./table";
-import { ITable, TablesDefinition } from "../types/table.type";
+import { TableSchema, TablesDefinition } from "../types/table.type";
 import { TableManager } from "./table-manager";
 import { ConfigOptions } from "../types/config.type";
 import { Config } from "./config";
-import { LockTimeoutError } from "./errors/record-lock-manager.error";
+import { TransactionHandler } from "../types/transaction.type";
+import { TransactionManager } from "./transaction-manager";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
+import { LockTimeoutError } from "./errors/record-lock-manager.error";
 
 export class LynxDB<Tables extends Record<string, any>> {
   /** Map of tables in the database */
@@ -46,11 +48,11 @@ export class LynxDB<Tables extends Record<string, any>> {
    * Retrieves a table for the specified table name.
    * 
    * @param name - Name of the table to retrieve (type-safe key from Tables)
-   * @returns {ITable<Tables[K]>} Transaction table manager instance for the specified table
+   * @returns {TableSchema<Tables[K]>} Transaction table manager instance for the specified table
    * @throws {TransactionCompletedError} If the transaction has already been committed or rolled back
    * @throws {TableNotFoundError} If the table doesn't exist in the main tables collection (via createTransactionTable)
    */
-  public get<K extends keyof Tables>(name: K): ITable<Tables[K]> {
+  public get<K extends keyof Tables>(name: K): TableSchema<Tables[K]> {
     const tableManager = this.tableManagersMap.get(String(name));
     if (!tableManager) throw new TableNotFoundError(String(name));
     return tableManager;
@@ -60,13 +62,14 @@ export class LynxDB<Tables extends Record<string, any>> {
    * Creates a new transaction in the database.
    * 
    * @param {ConfigOptions} [options] - Optional configuration options for the transaction.
-   * @returns {Transaction<Tables>} The newly created transaction.
+   * @returns {TransactionHandler<Tables>} The newly created transaction.
    */
-  public createTransaction(options?: ConfigOptions): Transaction<Tables> {
-    return new Transaction<Tables>(
+  public createTransaction(options?: ConfigOptions): TransactionHandler<Tables> {
+    const transaction = new Transaction<Tables>(
       this.tablesMap,
       options ? Config.fromOptions(this.dbConfig, options) : this.dbConfig
     );
+    return new TransactionManager(transaction);
   }
 
   /**
@@ -86,7 +89,7 @@ export class LynxDB<Tables extends Record<string, any>> {
    * @throws {Error} If an error occurs during the execution of the callback, 
    * the transaction is rolled back and the error is rethrown.
    */
-  public async transaction<T>(callback: (transaction: Transaction<Tables>) => Promise<T>, options?: ConfigOptions): Promise<T> {
+  public async transaction<T>(callback: (transaction: TransactionHandler<Tables>) => Promise<T>, options?: ConfigOptions): Promise<T> {
     const transaction = this.createTransaction(options);
     try {
       const result = await callback(transaction);

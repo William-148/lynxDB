@@ -1,6 +1,6 @@
 import { RecordWithId } from "../types/record.type";
 import { 
-  DuplicatePrimaryKeyDefinitionError, 
+  DuplicatePkDefinitionError, 
   DuplicatePrimaryKeyValueError, 
   PrimaryKeyValueNullError 
 } from "./errors/table.error";
@@ -9,7 +9,7 @@ const DEFAULT_PK_NAME = '_id';
 
 export class PrimaryKeyManager<T> {
   private _compositePrimaryKey: (keyof T)[];
-  private _singlePrimaryKey: keyof T | undefined; 
+  private _simplePrimaryKey: keyof T | undefined; 
 
   constructor(primaryKeyDef: (keyof T)[]) {
     const primaryKey = this.validatePKDefinition(primaryKeyDef);
@@ -17,7 +17,7 @@ export class PrimaryKeyManager<T> {
       this._compositePrimaryKey = primaryKey;
     }
     else {
-      this._singlePrimaryKey = primaryKey;
+      this._simplePrimaryKey = primaryKey;
       this._compositePrimaryKey = [];
     }
   }
@@ -25,7 +25,7 @@ export class PrimaryKeyManager<T> {
   private validatePKDefinition(primaryKeyDef: (keyof T)[]): (keyof T)[] | keyof T{
     const uniqueKeys = new Set(primaryKeyDef);
     if (uniqueKeys.size !== primaryKeyDef.length) {
-      throw new DuplicatePrimaryKeyDefinitionError(String(primaryKeyDef));
+      throw new DuplicatePkDefinitionError(String(primaryKeyDef));
     }
 
     return (uniqueKeys.size <= 1) 
@@ -33,15 +33,15 @@ export class PrimaryKeyManager<T> {
       : primaryKeyDef;  // Composite primary key
   }
 
-  get isSinglePrimaryKey(): boolean {
-    return this._singlePrimaryKey !== undefined;
+  get isSimplePrimaryKey(): boolean {
+    return this._simplePrimaryKey !== undefined;
   }
 
   /**
    * Indicates whether the table has a default primary key.
    */
   get hasDefaultPk(): boolean {
-    return this._singlePrimaryKey === DEFAULT_PK_NAME;
+    return this._simplePrimaryKey === DEFAULT_PK_NAME;
   }
 
   /**
@@ -52,7 +52,7 @@ export class PrimaryKeyManager<T> {
    */
   public createDuplicatePkValueError(primaryKey: string): DuplicatePrimaryKeyValueError {
     return new DuplicatePrimaryKeyValueError(
-      this._singlePrimaryKey !== undefined ? String(this._singlePrimaryKey) : this._compositePrimaryKey.join(', '),
+      this._simplePrimaryKey !== undefined ? String(this._simplePrimaryKey) : this._compositePrimaryKey.join(', '),
       primaryKey
     );
   }
@@ -64,8 +64,8 @@ export class PrimaryKeyManager<T> {
    * @returns {boolean} - Returns true if the record contains any primary key fields, otherwise false.
    */
   public isPartialRecordPartOfPk(record: Partial<T>): boolean {
-    return this.isSinglePrimaryKey
-      ? record[this._singlePrimaryKey!] !== undefined
+    return this.isSimplePrimaryKey
+      ? record[this._simplePrimaryKey!] !== undefined
       : this._compositePrimaryKey.some(field => record[field] !== undefined);
   }
 
@@ -77,9 +77,9 @@ export class PrimaryKeyManager<T> {
    * @throws {PrimaryKeyValueNullError} - If any primary key values are null or undefined.
    */
   public buildPkFromRecord(record: Partial<RecordWithId<T>>): string {
-    if (this.isSinglePrimaryKey) {
-      const pkValue = record[this._singlePrimaryKey!];
-      if (!pkValue) throw new PrimaryKeyValueNullError(String(this._singlePrimaryKey));
+    if (this.isSimplePrimaryKey) {
+      const pkValue = record[this._simplePrimaryKey!];
+      if (!pkValue) throw new PrimaryKeyValueNullError(String(this._simplePrimaryKey));
       return String(pkValue);
     }
 
@@ -91,8 +91,8 @@ export class PrimaryKeyManager<T> {
   }
 
   public buildUpdatedPk(committedRecord: RecordWithId<T>, updatedFields: Partial<T>): string {
-    return this.isSinglePrimaryKey 
-      ? String(updatedFields[this._singlePrimaryKey!] ?? committedRecord[this._singlePrimaryKey!])
+    return this.isSimplePrimaryKey 
+      ? String(updatedFields[this._simplePrimaryKey!] ?? committedRecord[this._simplePrimaryKey!])
       : this._compositePrimaryKey.map(pkName => updatedFields[pkName] ?? committedRecord[pkName]).join('-');
   }
 
@@ -104,10 +104,10 @@ export class PrimaryKeyManager<T> {
    * @returns {{newPk: string, oldPk: string}} - An object containing the new and old primary keys.
    */
   public generateNewAndOldPk(committedRecord: RecordWithId<T>, updatedFields: Partial<T>): { newPk: string; oldPk: string } {
-    return this.isSinglePrimaryKey
+    return this.isSimplePrimaryKey
       ? {
-        newPk: String(updatedFields[this._singlePrimaryKey!] ?? committedRecord[this._singlePrimaryKey!]),
-        oldPk: String(committedRecord[this._singlePrimaryKey!])
+        newPk: String(updatedFields[this._simplePrimaryKey!] ?? committedRecord[this._simplePrimaryKey!]),
+        oldPk: String(committedRecord[this._simplePrimaryKey!])
       }
       : {
         newPk: this._compositePrimaryKey.map(pkName => updatedFields[pkName] ?? committedRecord[pkName]).join('-'),

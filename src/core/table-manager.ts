@@ -1,10 +1,10 @@
-import { ITable } from "../types/table.type";
+import { TableSchema } from "../types/table.type";
 import { Filter } from "../types/filter.type";
 import { RecordWithId } from "../types/record.type";
 
-export class TableManager <T> implements ITable <T> {
+export class TableManager <T> implements TableSchema <T> {
 
-  constructor(private table: ITable<T>) {}
+  constructor(private table: TableSchema<T>) {}
 
   size(): number {
     return this.table.size();

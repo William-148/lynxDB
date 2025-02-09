@@ -1,4 +1,4 @@
-import { ITable } from "../types/table.type";
+import { TableSchema } from "../types/table.type";
 import { Table } from "./table";
 import { Filter } from "../types/filter.type";
 import { LockType } from "../types/lock.type";
@@ -16,7 +16,7 @@ import { ExternalModificationError } from "./errors/transaction-table.error";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 
-export class TransactionTable<T> implements ITable<T>, TwoPhaseCommitParticipant {
+export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitParticipant {
   private _transactionId: string;
   private _isActive: boolean;
   private _transactionConfig: Config;

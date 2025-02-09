@@ -5,7 +5,7 @@
  * @extends {Error}
  * @param {string} providedKeys - The keys that were provided.
  */
-export class DuplicatePrimaryKeyDefinitionError extends Error {
+export class DuplicatePkDefinitionError extends Error {
   constructor(providedKeys: string) {
     super(`The primary key definition must not be repeated. Provided: ${providedKeys}`);
   }
