@@ -1,10 +1,8 @@
 import { Table } from "../../../../src/core/table";
 import { User } from "../../../types/user-test.type";
-import { 
-  DuplicatePrimaryKeyDefinitionError,
-} from "../../../../src/core/errors/table.error";
 import { Config } from "../../../../src/core/config";
 import { IsolationLevel } from "../../../../src/types/transaction.type";
+import { DuplicatePkDefinitionError } from "../../../../src/core/errors/table.error";
 
 describe("Table should", () => {
 
@@ -43,7 +41,7 @@ describe("Table should", () => {
     }
     await expect(createTableWrong)
       .rejects
-      .toThrow(DuplicatePrimaryKeyDefinitionError);
+      .toThrow(DuplicatePkDefinitionError);
   });
 
 });

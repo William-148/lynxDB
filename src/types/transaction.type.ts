@@ -37,7 +37,6 @@ export interface TransactionHandler<T> {
   /**
    * Rolls back the transaction, discarding all changes.
    * 
-   * @throws {TransactionCompletedError} - If the transaction is already completed
    * @throws {Error} - Potential errors from individual table commits
    */
   rollback(): Promise<void>;

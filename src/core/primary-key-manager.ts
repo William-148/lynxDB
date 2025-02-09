@@ -79,13 +79,15 @@ export class PrimaryKeyManager<T> {
   public buildPkFromRecord(record: Partial<RecordWithId<T>>): string {
     if (this.isSimplePrimaryKey) {
       const pkValue = record[this._simplePrimaryKey!];
-      if (!pkValue) throw new PrimaryKeyValueNullError(String(this._simplePrimaryKey));
+      // Checks both `null` and `undefined` with flexible double equals checking.
+      if (pkValue == undefined) throw new PrimaryKeyValueNullError(String(this._simplePrimaryKey));
       return String(pkValue);
     }
 
     return this._compositePrimaryKey.map((pkName: keyof T) => {
       const pkValue = record[pkName];
-      if (!pkValue) throw new PrimaryKeyValueNullError(String(pkName));
+      // Checks both `null` and `undefined` with flexible double equals checking.
+      if (pkValue == undefined) throw new PrimaryKeyValueNullError(String(pkName));
       return pkValue;
     }).join('-');
   }

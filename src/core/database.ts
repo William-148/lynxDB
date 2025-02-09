@@ -10,7 +10,7 @@ import { TransactionManager } from "./transaction-manager";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 
-export class LynxDB<Tables extends Record<string, any>> {
+export class LynxDB<Tables extends Record<string, Tables[any]>> {
   /** Map of tables in the database */
   private tablesMap: Map<string, Table<Tables[any]>>;
   /** Map of table managers in the database */

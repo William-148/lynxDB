@@ -1,12 +1,12 @@
 import { Config } from "../../../../../src/core/config";
 import { LockTimeoutError } from "../../../../../src/core/errors/record-lock-manager.error";
 import { DuplicatePrimaryKeyValueError } from "../../../../../src/core/errors/table.error";
-import { TransactionCompletedError, TransactionConflictError } from "../../../../../src/core/errors/transaction.error";
 import { Table } from "../../../../../src/core/table";
 import { TransactionTable } from "../../../../../src/core/transaction-table";
 import { IsolationLevel } from "../../../../../src/types/transaction.type";
 import { generateId } from "../../../../../src/utils/generate-id";
 import { Product } from "../../../../types/product-test.type";
+import { TransactionCompletedError, TransactionConflictError } from "../../../../../src/core/errors/transaction.error";
 
 describe(`Transaction Table Commit ${IsolationLevel.RepeatableRead}`, () => {
   const TestData: Product[] = [

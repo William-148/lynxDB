@@ -1,4 +1,4 @@
-import { ITable } from "../../../../../src/types/table.type";
+import { TableSchema } from "../../../../../src/types/table.type";
 
 type Element = {
   id: number;
@@ -27,9 +27,9 @@ const defaultData: Element[] = [
  * }
  * ```
  */
-export function selectLikeTests(createInstance: (data: Element[]) => Promise<ITable<any>>) {
+export function selectLikeTests(createInstance: (data: Element[]) => Promise<TableSchema<any>>) {
   describe("with like condition - should...", () => {
-    let genericTable: ITable<Element>;
+    let genericTable: TableSchema<Element>;
   
     beforeEach(async () => {
       genericTable = await createInstance(defaultData);

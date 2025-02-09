@@ -1,4 +1,4 @@
-import { ITable } from "../../../../../src/types/table.type";
+import { TableSchema } from "../../../../../src/types/table.type";
 import { PersonInfo } from "../../../../types/user-test.type";
 
 const genericDataList: PersonInfo[] = [
@@ -23,9 +23,9 @@ const genericDataList: PersonInfo[] = [
  * ```
  * 
  */
-export function selectEqTests(createInstance: (dataTest: PersonInfo[]) => Promise<ITable<any>>) {
+export function selectEqTests(createInstance: (dataTest: PersonInfo[]) => Promise<TableSchema<any>>) {
   describe("With equal condition - should...", () => {
-    let genericTable: ITable<PersonInfo>;
+    let genericTable: TableSchema<PersonInfo>;
   
     beforeEach(async () => {
       genericTable = await createInstance(genericDataList);
@@ -108,16 +108,16 @@ export function selectEqTests(createInstance: (dataTest: PersonInfo[]) => Promis
  * }
  * ```
  */
-export function selectEqTestsWithObjects(createInstance: () => Promise<ITable<any>>) {
+export function selectEqTestsWithObjects(createInstance: () => Promise<TableSchema<any>>) {
   describe("With equal condition and object as values - should...", () => {
-    let genericTable: ITable<any>;
+    let genericTable: TableSchema<any>;
   
     beforeEach(async () => {
       genericTable = await createInstance();
     });
   
     it("filter records with array fields", async () => {
-      genericTable as ITable<PersonInfo>;
+      genericTable as TableSchema<PersonInfo>;
       genericTable.bulkInsert(genericDataList);
       const expectedItemA = genericDataList[1];
       const expectedItemB = genericDataList[3];

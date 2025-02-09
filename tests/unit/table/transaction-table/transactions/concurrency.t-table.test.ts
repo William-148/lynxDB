@@ -1,6 +1,5 @@
 import { Config } from "../../../../../src/core/config";
 import { LockTimeoutError } from "../../../../../src/core/errors/record-lock-manager.error";
-import { ExternalModificationError } from "../../../../../src/core/errors/transaction-table.error";
 import { TransactionConflictError } from "../../../../../src/core/errors/transaction.error";
 import { Table } from "../../../../../src/core/table";
 import { TransactionTable } from "../../../../../src/core/transaction-table";
@@ -15,7 +14,7 @@ function generateTransactionTables(
   table: Table<Product>,
   configOptions?: ConfigOptions
 ): TransactionTable<Product>[] {
-  const transactionTables = [];
+  const transactionTables: TransactionTable<Product>[] = [];
   for (let i = 0; i < transactionCount; i++) {
     transactionTables.push(new TransactionTable<Product>(
       generateId(),

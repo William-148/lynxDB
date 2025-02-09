@@ -1,4 +1,4 @@
-import { ITable } from "../../../../src/types/table.type";
+import { TableSchema } from "../../../../src/types/table.type";
 import { thirtyItemsUserList } from "../../../data/data-test";
 import { User } from "../../../types/user-test.type";
 import { OrderDetail } from "../../../types/order-test.type";
@@ -18,9 +18,9 @@ import {
  * const createInstance = () => new Table<User>({ primaryKey: ['id'] });
  * ```
  */
-export function bulkInsertTestsWithSinglePK(description: string, createInstance: () => ITable<User>): void {
+export function bulkInsertTestsWithSinglePK(description: string, createInstance: () => TableSchema<User>): void {
   describe(description, () => {
-    let userTable: ITable<User>;
+    let userTable: TableSchema<User>;
   
     beforeEach(() => {
       userTable = createInstance();
@@ -75,9 +75,9 @@ const orderDetails: OrderDetail[] = [
  * const createInstance = () => new Table<OrderDetail>({ primaryKey: ["orderId", "productId"] });
  * ```
  */
-export function bulkInsertTestsWithCompositePK(description: string, createInstance: () => ITable<OrderDetail>): void {
+export function bulkInsertTestsWithCompositePK(description: string, createInstance: () => TableSchema<OrderDetail>): void {
   describe(description, () => {
-    let orderDetailTable: ITable<OrderDetail>;
+    let orderDetailTable: TableSchema<OrderDetail>;
   
     beforeEach(() => {
       orderDetailTable = createInstance();
@@ -143,9 +143,9 @@ export function bulkInsertTestsWithCompositePK(description: string, createInstan
  * ```
  * 
  */
-export function bulkInsertTestWithoutPK(description: string, createInstance: () => ITable<User>): void {
+export function bulkInsertTestWithoutPK(description: string, createInstance: () => TableSchema<User>): void {
   describe(description, () => {
-    let userTable: ITable<User>;
+    let userTable: TableSchema<User>;
   
     beforeEach(() => {
       userTable = createInstance();

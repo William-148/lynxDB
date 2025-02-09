@@ -1,4 +1,4 @@
-import { ITable } from "../../../../../src/types/table.type";
+import { TableSchema } from "../../../../../src/types/table.type";
 
 export type ScoreRecord = {
   id: number;
@@ -30,10 +30,10 @@ const scoreDataList: ScoreRecord[] = [
  * }
  * ```
  */
-export function selectGtGteTests(createInstance: (dataTest: ScoreRecord[]) => Promise<ITable<ScoreRecord>>) {
+export function selectGtGteTests(createInstance: (dataTest: ScoreRecord[]) => Promise<TableSchema<ScoreRecord>>) {
   describe ("With gt and gte condition - should...", () => {
     
-    let genericTable: ITable<any>;
+    let genericTable: TableSchema<any>;
   
     beforeEach(async () => {
       genericTable = await createInstance(scoreDataList);

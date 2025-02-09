@@ -1,5 +1,5 @@
 import { PrimaryKeyValueNullError } from "../../../../src/core/errors/table.error";
-import { ITable } from "../../../../src/types/table.type";
+import { TableSchema } from "../../../../src/types/table.type";
 import { Enrollment } from "../../../types/enrollment-test.type";
 import { Product } from "../../../types/product-test.type";
 
@@ -28,9 +28,9 @@ const products: Product[] = [
  * 
  * ```
  */
-export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[]) => Promise<ITable<Product>>) {
+export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[]) => Promise<TableSchema<Product>>) {
   describe('Simple Primary Key', () => {
-    let table: ITable<Product>;
+    let table: TableSchema<Product>;
   
     beforeEach(async () => {
       table = await createInstance(products);
@@ -242,9 +242,9 @@ export function deleteByPkTestWithSimplePK(createInstance: (testData: Product[])
  * 
  * ```
  */
-export function deleteByPkTestWithDefaultPK(createInstance: (testData: Product[]) => Promise<ITable<Product & { _id?: string }>>) {
+export function deleteByPkTestWithDefaultPK(createInstance: (testData: Product[]) => Promise<TableSchema<Product & { _id?: string }>>) {
   describe('Default Primary Key', () => {
-    let table: ITable<Product & { _id?: string }>;
+    let table: TableSchema<Product & { _id?: string }>;
 
     beforeEach(async () => {
       table = await createInstance(products);
@@ -321,10 +321,10 @@ const enrollmentsTestData: Enrollment[] = [
  * }
  * ```
  */
-export function deleteByPkTestWithCompositePK(createInstance: (testData: Enrollment[]) => Promise<ITable<Enrollment>>) {
+export function deleteByPkTestWithCompositePK(createInstance: (testData: Enrollment[]) => Promise<TableSchema<Enrollment>>) {
   describe('Composite Primary Key', () => {
   
-    let table: ITable<Enrollment>;
+    let table: TableSchema<Enrollment>;
   
     beforeEach(async () => {
       table = await createInstance(enrollmentsTestData);

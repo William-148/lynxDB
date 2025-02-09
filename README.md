@@ -247,8 +247,8 @@ async function transactionExample(){
     console.log("Updated count", updatedCount);
 
   }catch(error){
-    transaction.rollback();
     console.error(error);
+    await transaction.rollback();
   }
 }
 ```
@@ -351,7 +351,8 @@ try {
 
   await transaction.commit();
 } catch (error) {
-  transaction.rollback();
+  console.error(error);
+  await transaction.rollback();
 }
 ```
 

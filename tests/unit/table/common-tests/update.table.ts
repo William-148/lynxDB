@@ -1,5 +1,5 @@
 import { DuplicatePrimaryKeyValueError } from "../../../../src/core/errors/table.error";
-import { ITable } from "../../../../src/types/table.type";
+import { TableSchema } from "../../../../src/types/table.type";
 import { Enrollment, getResultStatus } from "../../../types/enrollment-test.type";
 
 type Entity = {
@@ -31,9 +31,9 @@ const EntityData: Entity[] = [
  * }
  * ```
  */
-export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => Promise<ITable<any>>) {
+export function updateTestWithSinglePK(createInstance: (testData: Entity[]) => Promise<TableSchema<any>>) {
   describe("Simple Primary Key", () => {
-    let entityTable: ITable<Entity>;
+    let entityTable: TableSchema<Entity>;
 
     beforeEach(async () => {
       entityTable = await createInstance(EntityData);
@@ -261,10 +261,10 @@ const defaultEntityData: EntityWithDefaultId[] = [
  * ```
  */
 export function updateTestWithoutPK(
-  createInstance: (testData: Array<any & { _id?: string }>) => Promise<ITable<any & { _id?: string }>>
+  createInstance: (testData: Array<any & { _id?: string }>) => Promise<TableSchema<any & { _id?: string }>>
 ) {
   describe("Default Primary Key", () => {
-    let entityTable: ITable<EntityWithDefaultId>;
+    let entityTable: TableSchema<EntityWithDefaultId>;
 
     beforeEach(async () => {
       entityTable = await createInstance(defaultEntityData);
@@ -399,9 +399,9 @@ const enrollmentData: Enrollment[] = [
  *  return table;
  * }
  */
-export function updateTestWithCompositePK(createInstance: (testData: Enrollment[]) => Promise<ITable<Enrollment>>) {
+export function updateTestWithCompositePK(createInstance: (testData: Enrollment[]) => Promise<TableSchema<Enrollment>>) {
   describe("Composite Primary Key", () => {
-    let enrollmentTable: ITable<Enrollment>;
+    let enrollmentTable: TableSchema<Enrollment>;
 
     beforeEach(async () => {
       enrollmentTable = await createInstance(enrollmentData);

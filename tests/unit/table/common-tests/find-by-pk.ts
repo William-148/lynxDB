@@ -1,4 +1,4 @@
-import { ITable } from "../../../../src/types/table.type";
+import { TableSchema } from "../../../../src/types/table.type";
 import { defaultUser, thirtyItemsUserList, twentyOrderDetails } from "../../../data/data-test";
 import { OrderDetail } from "../../../types/order-test.type";
 import { User } from "../../../types/user-test.type";
@@ -21,9 +21,9 @@ import { PrimaryKeyValueNullError } from "../../../../src/core/errors/table.erro
  * 
  * ```
  */
-export function findByPkTestWithSinglePK(description: string, createInstance: (testData: User[]) => Promise<ITable<User>>) {
+export function findByPkTestWithSinglePK(description: string, createInstance: (testData: User[]) => Promise<TableSchema<User>>) {
   describe(description, () => {
-    let userTable: ITable<User>; // primaryKey: ['id']
+    let userTable: TableSchema<User>; // primaryKey: ['id']
 
     beforeEach(async () => {
       userTable = await createInstance(thirtyItemsUserList);
@@ -70,9 +70,9 @@ export function findByPkTestWithSinglePK(description: string, createInstance: (t
  * 
  * ```
  */
-export function findByPkTestWithCompositePK(description: string, createInstance: (testData: OrderDetail[]) => Promise<ITable<OrderDetail>>) {
+export function findByPkTestWithCompositePK(description: string, createInstance: (testData: OrderDetail[]) => Promise<TableSchema<OrderDetail>>) {
   describe(description, () => {
-    let orderDetailTable: ITable<OrderDetail>; // primaryKey: ['orderId', 'productId']
+    let orderDetailTable: TableSchema<OrderDetail>; // primaryKey: ['orderId', 'productId']
 
     beforeEach(async () => {
       orderDetailTable = await createInstance(twentyOrderDetails);
@@ -139,12 +139,12 @@ export function findByPkTestWithCompositePK(description: string, createInstance:
  */
 export function findByPkTestWithoutPK(
   description: string, 
-  createInstance: (testData: Array<User & { _id?: string }>) => Promise<ITable<User & { _id?: string }>>
+  createInstance: (testData: Array<User & { _id?: string }>) => Promise<TableSchema<User & { _id?: string }>>
 ) {
   describe(description, () => {
     type UserWithDefaultId = User & { _id?: string };
 
-    let userTable: ITable<UserWithDefaultId>;
+    let userTable: TableSchema<UserWithDefaultId>;
 
     beforeEach(async () => {
       userTable = await createInstance(thirtyItemsUserList);

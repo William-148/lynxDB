@@ -5,12 +5,12 @@ import { TableManager } from "./table-manager";
 import { TableSchema } from "../types/table.type";
 import { generateId } from "../utils/generate-id";
 import { Config } from "./config";
-import { TwoPhaseCommitParticipant } from "../types/transaction.type";
+import { TransactionHandler, TwoPhaseCommitParticipant } from "../types/transaction.type";
 import { TransactionCompletedError, TransactionConflictError } from "./errors/transaction.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 
-export class Transaction <Tables extends Record<string, any>>  {
+export class Transaction <Tables extends Record<string, Tables[any]>> implements TransactionHandler<Tables> {
   private transactionId: string;
   private transactionTables: Map<string, TransactionTable<Tables[any]>>;
   private tableManagers: Map<string, TableManager<Tables[any]>>;
@@ -91,7 +91,7 @@ export class Transaction <Tables extends Record<string, any>>  {
   }
 
   public async rollback(): Promise<void> {
-    if (!this.isActive) throw new TransactionCompletedError();
+    if (!this.isActive) return;
     try {
       await Promise.all(Array.from(this.transactionTables.values()).map(
         (tTable) => tTable.rollback()

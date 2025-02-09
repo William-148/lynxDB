@@ -1,4 +1,4 @@
-import { ITable } from "../../../../../src/types/table.type";
+import { TableSchema } from "../../../../../src/types/table.type";
 import { thirtyItemsUserList } from "../../../../data/data-test";
 import { User, userPropertyList } from "../../../../types/user-test.type";
 
@@ -15,9 +15,9 @@ import { User, userPropertyList } from "../../../../types/user-test.type";
  * }
  * ```
  */
-export function selectTestsWithFields(createInstance: (testData: User[]) => Promise<ITable<User>>) {
+export function selectTestsWithFields(createInstance: (testData: User[]) => Promise<TableSchema<User>>) {
   describe("With select specific fields - should...", () => {
-    let userTable: ITable<User>;
+    let userTable: TableSchema<User>;
     
     beforeEach(async () => {
       userTable = await createInstance(thirtyItemsUserList);
@@ -82,9 +82,9 @@ export function selectTestsWithFields(createInstance: (testData: User[]) => Prom
  * const createInstance = async () => new Table<any>({ primaryKey: ['id'] });
  * ```
  */
-export function selectWithWrongQueryOperatorTest(createInstance: () => Promise<ITable<any>>) {
+export function selectWithWrongQueryOperatorTest(createInstance: () => Promise<TableSchema<any>>) {
   describe("With wrong query operator", () => {
-    let defaultTable: ITable<any>;
+    let defaultTable: TableSchema<any>;
 
     beforeEach(async () => {
       defaultTable = await createInstance();

@@ -1,4 +1,4 @@
-import { ITable } from "../../../../../src/types/table.type";
+import { TableSchema } from "../../../../../src/types/table.type";
 
 type UserTags = {
   id: number;
@@ -28,9 +28,9 @@ const defaultData: UserTags[] = [
  * }
  * ```
  */
-export function selectIncludesTests(createInstance: (dataTest: UserTags[]) => Promise<ITable<any>>) {
+export function selectIncludesTests(createInstance: (dataTest: UserTags[]) => Promise<TableSchema<any>>) {
   describe("With include condition - should...", () => {
-    let genericTable: ITable<UserTags>;
+    let genericTable: TableSchema<UserTags>;
   
     beforeEach(async () => {
       genericTable = await createInstance(defaultData);

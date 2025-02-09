@@ -4,4 +4,9 @@ export default {
   testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'js'],
   testMatch: ['**/tests/**/*.test.ts'],
+  coveragePathIgnorePatterns: [
+    "/node_modules/",
+    "/test/",
+    "/tests/"
+  ]
 };

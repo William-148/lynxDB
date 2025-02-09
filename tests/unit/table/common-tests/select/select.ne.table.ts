@@ -1,4 +1,4 @@
-import { ITable } from "../../../../../src/types/table.type";
+import { TableSchema } from "../../../../../src/types/table.type";
 import { PersonInfo } from "../../../../types/user-test.type";
 
 const personInfoList: PersonInfo[] = [
@@ -23,9 +23,9 @@ const personInfoList: PersonInfo[] = [
  * ```
  * 
  */
-export function selectNeTests(createInstance: (dataTest: PersonInfo[]) => Promise<ITable<any>>) {
+export function selectNeTests(createInstance: (dataTest: PersonInfo[]) => Promise<TableSchema<any>>) {
   describe("With not equal condition - should...", () => {
-    let personInfoTable: ITable<PersonInfo>;
+    let personInfoTable: TableSchema<PersonInfo>;
   
     beforeEach(async () => {
       personInfoTable = await createInstance(personInfoList);
@@ -119,16 +119,16 @@ export function selectNeTests(createInstance: (dataTest: PersonInfo[]) => Promis
  * }
  * ```
  */
-export function selectNeTestsWithObjects(createInstance: () => Promise<ITable<any>>) {
+export function selectNeTestsWithObjects(createInstance: () => Promise<TableSchema<any>>) {
   describe("With not equal condition and object as values - should...", () => {
-    let genericTable: ITable<any>;
+    let genericTable: TableSchema<any>;
   
     beforeEach(async () => {
       genericTable = await createInstance();
     });
   
     it("filter records with array fields", async () => {
-      genericTable as ITable<PersonInfo>;
+      genericTable as TableSchema<PersonInfo>;
       genericTable.bulkInsert(personInfoList);
       const itemToTestA = personInfoList[1];
       const itemToTestB = personInfoList[3];

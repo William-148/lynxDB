@@ -1,4 +1,4 @@
-export { LynxDB } from "./core/data-base";
+export { LynxDB } from "./core/database";
 export { generateId } from "./utils/generate-id";
 
 // Errors
