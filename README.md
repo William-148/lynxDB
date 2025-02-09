@@ -14,30 +14,32 @@
 - [Database Operations](#database-operations)
 - [Operators](#operators)
 - [Transactions](#transactions)
+  - [Creating and Using Transactions](#creating-and-using-transactions)
+  - [Configuration](#configuration)
   - [Isolation Levels](#isolation-levels)
   - [Locks](#locks)
   - [Phenomena occurrence](#phenomena-occurrence)
 
 ## **LynxDB - In-Memory Database for Fast Testing**
 
-LynxDB is a lightweight, in-memory database designed specifically for fast testing in applications built with JavaScript or TypeScript. It is ideal for developers who need a quick and efficient database solution for testing complex data models without the overhead of configuring and maintaining full-fledged relational databases.
+`LynxDB` is a lightweight, in-memory database designed specifically for fast testing in applications built with JavaScript or TypeScript. It is ideal for developers who need a quick and efficient database solution for testing complex data models without the overhead of configuring and maintaining full-fledged relational databases.
 
 ### Key Features:
 - **In-Memory Storage**: All data is stored in memory, offering extremely fast read and write operations, perfect for testing scenarios.
 - **Quick Setup**: Easily configure databases without the complexity of traditional database setup and management.
-- **Support for Simple and Composite Primary Keys**: LynxDB allows you to define both simple and composite primary keys, enabling flexibility for complex data structures.
+- **Support for Simple and Composite Primary Keys**: `LynxDB` allows you to define both simple and composite primary keys, enabling flexibility for complex data structures.
 - **Transaction Support**: Fully supports transactions with two configurable isolation levels.
-- **Fast and Lightweight**: Built for speed and efficiency, LynxDB is perfect for testing environments where rapid data manipulation and retrieval are essential.
+- **Fast and Lightweight**: Built for speed and efficiency, `LynxDB` is perfect for testing environments where rapid data manipulation and retrieval are essential.
 
-LynxDB is the perfect choice for developers who need a fast, easy-to-use, and flexible in-memory database to simulate more complex database interactions during testing without the overhead of setting up a full database system.
+`LynxDB` is the perfect choice for developers who need a fast, easy-to-use, and flexible in-memory database to simulate more complex database interactions during testing without the overhead of setting up a full database system.
 
 # Quick Start
 
-Welcome to LynxDB, the in-memory database built for fast testing in JavaScript and TypeScript environments. This quick start guide will help you install the package and perform basic operations to get you up and running in no time.
+Welcome to `LynxDB`, the in-memory database built for fast testing in JavaScript and TypeScript environments. This quick start guide will help you install the package and perform basic operations to get you up and running in no time.
 
 ## Installation
 
-Install the LynxDB package using npm (or pnpm):
+Install the `LynxDB` package using npm (or pnpm):
 
 ```bash
   npm install lynxdb
@@ -52,11 +54,11 @@ Or, if you prefer pnpm:
 ## Example
 For more, see the following [examples](examples.md).
 
-Below is a minimal example demonstrating how to define tables, create a LynxDB instance, and perform basic operations:
+Below is a minimal example demonstrating how to define tables, create a `LynxDB` instance, and perform basic operations:
 ```typescript
-import { LynxDB } from "./core/data-base";
-import { TablesDefinition } from "./types/table.type";
+import { LynxDB, TablesDefinition } from "lynxdb";
 
+// Types of data that the tables will store
 type User = { id: number; name: string; email: string; }
 type Post = { id: number; title: string; content: string; ownerId: number; }
 
@@ -64,6 +66,7 @@ type Post = { id: number; title: string; content: string; ownerId: number; }
 const tableConfigs: TablesDefinition<{
   users: User,
   post: Post
+  // More tables...
 }> = {
   users: {
     primaryKey: ["id"]
@@ -71,30 +74,41 @@ const tableConfigs: TablesDefinition<{
   post: {
     primaryKey: ["id"]
   }
+  // More tables configuration...
 };
 
 // Create LynxDb instance
 const db = new LynxDB(tableConfigs);
 
+// Getting tables
 const users = db.get("users");
 const posts = db.get("post");
 
-users.insert({ id: 1 , name: "Jhon Smith", email: "some@domain.com" });
-posts.insert({ id: 1, title: "First Post", content: "This is the first post", ownerId: 1 });
+// Perform operations
+users.insert({ 
+  id: 1 , 
+  name: "Jhon Smith", 
+  email: "some@domain.com" 
+});
+
+posts.insert({ 
+  id: 1, 
+  title: "First Post", 
+  content: "This is the first post", 
+  ownerId: 1 
+});
 ```
 
 # Primary Key Handling
 
-LynxDB uses primary keys to uniquely identify records in a table. There are two types of primary keys that you can define:
+`LynxDB` uses primary keys to uniquely identify records in a table. There are two types of primary keys that you can define:
 
 ## Simple Primary Key
 
 A simple primary key consists of a single field. For example, in the `users` table, you can define a simple primary key like this:
 
 ```typescript
-const tableConfigs: TablesDefinition<{
-  users: User
-}> = {
+const tableConfigs: TablesDefinition<{ users: User }> = {
   users: {
     primaryKey: ["id"]
   }
@@ -102,7 +116,7 @@ const tableConfigs: TablesDefinition<{
 ```
 
 ## Composite Primary Key
-A composite primary key is made up of multiple fields that together uniquely identify a record. For example, in the enrrollments table, you can define a composite primary key like this:
+A composite primary key is made up of multiple fields that together uniquely identify a record. For example, in the "order details" table, you can define a composite primary key like this:
 ```typescript 
 type OrderDetail = {
   orderId: number,
@@ -111,9 +125,7 @@ type OrderDetail = {
   price: number
 }
 
-const tableConfigs: TablesDefinition<{
-  orderDetails: OrderDetail
-}> = {
+const tableConfigs: TablesDefinition<{ orderDetails: OrderDetail }> = {
   orderDetails: {
     primaryKey: ["orderId", "productId"]
   }
@@ -121,7 +133,7 @@ const tableConfigs: TablesDefinition<{
 ```
 
 ## Default Primary Key
-If you do not define a primary key in the table configuration, LynxDB automatically assigns one by using the `_id` field. This ensures that every record has a unique identifier even when a primary key is not explicitly specified.
+If you do not define a primary key in the table configuration, `LynxDB` automatically assigns one by using the `_id` field. This ensures that every record has a unique identifier even when a primary key is not explicitly specified.
 
 You can define a default primary key like this:
 ```typescript 
@@ -130,9 +142,7 @@ type Person = {
   age: string;
 }
 
-const tableConfigs: TablesDefinition<{
-  persons: Person
-}> = {
+const tableConfigs: TablesDefinition<{ persons: Person }> = {
   persons: {
     primaryKey: [] // Without a PK defined
   }
@@ -176,6 +186,7 @@ When performing select or update operations, you can use a where clause to filte
 | `$not`           | Not supported yet                                       |
 
 Opeartor `and` example:
+
 ```typescript
 await users.select([], {
   id: { $eq: 1 },
@@ -185,23 +196,212 @@ await users.select([], {
 ```
 
 # Transactions
-LynxDB implements transactions using locks—both shared and exclusive—without support for MVCC. Each transaction acquires the necessary locks that are held for the entire duration of the transaction, until a commit or rollback occurs. This mechanism ensures data consistency, but it also means that transactions may become blocked if locks are not managed properly.
+`LynxDB` implements transactions using locks—both shared and exclusive—without support for MVCC. Each transaction acquires the necessary locks that are held for the entire duration of the transaction, until a commit or rollback occurs. This mechanism ensures data consistency, but it also means that transactions may become blocked if locks are not managed properly.
 >**Note**:
 >
 > Locks have a default timeout of 5000 milliseconds. This value is configurable to suit different scenarios and workloads.
 
+## Creating and Using Transactions
+LynxDB offers two primary ways to create and use transactions: explicit transaction creation and transactional callbacks. Below are examples and explanations of both methods.
+
+### Method 1: Explicit Transaction Creation
+You can explicitly create a transaction using the `createTransaction` method and perform operations within the transaction context.
+
+1. **Begin a Transaction**: Start by calling the `createTransaction` method on the LynxDB instance.
+```typescript
+import { LynxDB, TablesDefinition } from "lynxdb";
+
+type User = { id: number; name: string; email: string; }
+
+const tableConfigs: TablesDefinition<{ users: User }> = { 
+  users: { primaryKey: ["id"] } 
+};
+
+// LynxDB instance
+const db = new LynxDB(tableConfigs);
+// Begin a transaction
+const transaction = db.createTransaction();
+
+```
+
+2. **Perform Database Operations**: Inside the transaction, you can perform various database operations, see [database operations](#database-operations).
+```typescript
+async function transactionExample(){
+  try {
+    // Perform operations
+    const userInserted = await transaction.get("users").insert({ 
+      id: 1, 
+      name: 'John Doe', 
+      email: 'john.doe@example.com' 
+    });
+    const updatedCount = await transaction.get("users").update(
+      { email: "doe.john@domain.com" }, 
+      { id: { $eq: 1 } }
+    );
+    // More operations...
+
+    // Commit changes
+    await transaction.commit();
+
+    console.log("User Inserted", userInserted);
+    console.log("Updated count", updatedCount);
+
+  }catch(error){
+    transaction.rollback();
+    console.error(error);
+  }
+}
+```
+
+### Method 2: Transactional Callbacks
+LynxDB also supports transactional callbacks, where you pass a callback function to the `transaction` method. The transaction is automatically committed or rolled back based on the success or failure of the callback.
+
+```typescript
+import { LynxDB, TablesDefinition } from "lynxdb";
+
+type User = { id: number; name: string; email: string; }
+
+const tableConfigs: TablesDefinition<{ users: User }> = { 
+  users: { primaryKey: ["id"] } 
+};
+
+// LynxDB instance
+const db = new LynxDB(tableConfigs);
+
+// Use a transactional callback
+async function transactionCallbackExample(){
+  try {
+    const result = await db.transaction(async (t) => {
+
+      const userInserted = await t.get("users").insert({ 
+        id: 1, 
+        name: 'John Doe', 
+        email: 'john.doe@example.com' 
+      });
+
+      const updatedCount = await t.get("users").update(
+        { email: "doe.john@domain.com" }, 
+        { id: { $eq: 1 } }
+      );
+
+      // More operations...
+
+      // You can return any value or void
+      return { userInserted, updatedCount }
+    });
+    
+    // After the transaction is completed, you can get the returned values
+    console.log("User Inserted", result.userInserted);
+    console.log("Updated count", result.updatedCount);
+  }
+  catch(error){
+    console.error(error);
+  }
+}
+```
+
+## Configuration
+When creating a `LynxDB` instance, you can configure various options to tailor how transactions are handled. Below is a table detailing the available configuration options, these options are optional:
+
+| Option          | Description                                                                                                      | Default Value        |
+|-----------------|------------------------------------------------------------------------------------------------------------------|----------------------|
+| `isolationLevel` | The isolation level for transactions. Determines how concurrent transactions are managed to ensure data consistency. See supported values ​​in [Isolation Levels](#isolation-levels) | `RepeatableRead`     |
+| `lockTimeout`   | The timeout for locks in milliseconds. Specifies how long a transaction should wait before a lock is released.  | `5000` (milliseconds) |
+
+By configuring these options, you can customize `LynxDB` to fit your specific transaction handling needs.
+
+### Global Configuration
+You can configure the transaction settings globally when creating the `LynxDB` instance. This configuration will apply to all transactions created by the instance unless overridden.
+
+```typescript
+import { LynxDB, IsolationLevel, TablesDefinition } from "lynxdb";
+
+type User = { id: number; name: string; email: string; }
+
+const tableConfigs: TablesDefinition<{ users: User }> = {
+  users: { primaryKey: ["id"] }
+};
+
+// Create an instance and configure globally
+const db = new LynxDB(tableConfigs, {
+  isolationLevel: IsolationLevel.Serializable,
+  lockTimeout: 1000
+});
+```
+
+### Per-Transaction Configuration
+You can also configure transactions individually when creating a transaction or using a transactional callback. This allows you to override the global configuration for specific transactions.
+
+#### Method 1: Using `createTransaction`
+```typescript
+import { LynxDB, IsolationLevel } from "lynxdb";
+
+// LynxDB instance
+const db = new LynxDB(...); 
+
+// Configure when creating a transaction
+const transaction = db.createTransaction({
+  isolationLevel: IsolationLevel.Serializable,
+  lockTimeout: 4000
+});
+
+try {
+  const users = transaction.get("users");
+  // Perform operations...
+
+  await transaction.commit();
+} catch (error) {
+  transaction.rollback();
+}
+```
+
+#### Method 2: Using `transaction` with Callback
+```typescript
+import { LynxDB, IsolationLevel } from "lynxdb";
+
+// LynxDB instance
+const db = new LynxDB(...);
+
+// Configure within a transactional callback
+db.transaction(async (transaction) => {
+    const users = transaction.get("users");
+    // Perform operations...
+  }, 
+  {
+    isolationLevel: IsolationLevel.Serializable,
+    lockTimeout: 2000
+  }
+).then(() => {
+  console.log('Transaction committed successfully.');
+}).catch((error) => {
+  console.error('Transaction error:', error);
+});
+
+```
+
 ## Isolation Levels
 
-LynxDB offers two isolation levels for its transactions:
+`LynxDB` offers two isolation levels for its transactions:
 
 1. Repeatable Read
 2. Serializable
 
 These levels determine how locks behave during read and write operations, affecting the types of concurrency anomalies (phenomena) that may occur.
 
+Below is the enum for the available isolation levels, you can use it to set up transactions:
+```Typescript
+import { IsolationLevel } from "lynxdb";
+
+// Example usage Reapetable Read
+IsolationLevel.RepeatableRead
+
+// Example usage Serializable
+IsolationLevel.Serializable
+```
+
 
 ## Locks
-LynxDB utilizes two types of locks:
+`LynxDB` utilizes two types of locks:
 
 * **Shared Lock**:
 Allows multiple transactions to read a record simultaneously. It is used for read operations under the *Repeatable Read* level.
@@ -243,7 +443,7 @@ Not possible, as reads acquire locks that ensure only committed data is visible.
 Since locks persist for the duration of the transaction, once a row is read its value cannot change during that transaction.
 
 * **Phantom Read**:
-May occur at both isolation levels. Because LynxDB does not implement MVCC or range locking, new rows that match the search criteria can appear during the transaction.
+May occur at both isolation levels. Because `LynxDB` does not implement MVCC or range locking, new rows that match the search criteria can appear during the transaction.
 
 * **Read Skew**:
 Does not occur, as reads are protected by locks.

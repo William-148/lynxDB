@@ -9,7 +9,7 @@
   - [Delete](#delete-by-primary-key)
 
 ## Database Operations
-For the examples below, the following LynxDB configuration is used:
+Create the types for the tables:
 
 ```typescript
 type User = { 
@@ -26,28 +26,41 @@ type Enrollment = {
   resultStatus: 'pending' | 'approved' | 'reproved';
   gradeStatus: 'pending' | 'loaded';
 }
+```
+
+Create the table definition:
+```typescript
+type TableList = {
+  users: User,
+  enrollments: Enrollment
+}
 
 
 // Define the configurations for the tables
 const tableConfigs: TablesDefinition<{
   users: User,
-  enrrollments: Enrollment
+  enrollments: Enrollment
 }> = {
   users: {
     // Simple primary key
     primaryKey: ["id"] 
   },
-  enrrollments: {
+  enrollments: {
     // Composite primary key
     primaryKey: ["year", "semester", "courseId", "studentId"]
   }
 };
-// Create a new instance of LynxDB
-const db = new LynxDB(tableConfigs);
+```
 
-// Getting tables
+Create a new instance of LynxDB:
+```typescript
+const db = new LynxDB(tableConfigs);
+```
+
+Getting the tables for operations:
+```typescript
 const users = db.get("users");
-const enrrollments = db.get("enrrollments");
+const enrollments = db.get("enrollments");
 ```
 
 
@@ -76,7 +89,7 @@ async function bulkInsertExample() {
   ]);
 
   // Insert multiple enrollments
-  await enrrollments.bulkInsert([
+  await enrollments.bulkInsert([
     {
       year: 2025,
       semester: "Spring",
@@ -109,7 +122,7 @@ async function findByPkExample() {
   console.table([userFound]);
 
   // Find an enrollment by composite primary key
-  const enrollmentFound: Enrollment | null = await enrrollments.findByPk({
+  const enrollmentFound: Enrollment | null = await enrollments.findByPk({
     year: 2025,
     semester: "Spring",
     courseId: 1,
@@ -131,9 +144,12 @@ async function selectExample() {
   console.table(selectedUsers);
 
   // Select all fields (using an empty array) with a filtering condition
-  const allEnrollments: Partial<Enrollment>[] = await enrrollments.select(
+  const allEnrollments: Partial<Enrollment>[] = await enrollments.select(
     [],
-    { semester: { $eq: "Spring" } }
+    { 
+      year: { $gte: 2023 },
+      semester: { $eq: "Spring" } 
+    }
   );
   console.table(allEnrollments);
 }
@@ -153,7 +169,7 @@ async function updateExample() {
   console.log("Affected rows (user):", affectedRowsUser);
 
   // Update an enrollment record's grade and status
-  const affectedRowsEnrollment = await enrrollments.update(
+  const affectedRowsEnrollment = await enrollments.update(
     { grade: 72, resultStatus: "approved", gradeStatus: "loaded" },
     {
       year: { $eq: 2025 },
@@ -177,7 +193,7 @@ async function deleteExample() {
   console.table([userDeleted]);
 
   // Delete an enrollment by composite primary key
-  const enrollmentDeleted: Enrollment | null = await enrrollments.deleteByPk({
+  const enrollmentDeleted: Enrollment | null = await enrollments.deleteByPk({
     year: 2025,
     semester: "Spring",
     courseId: 1,
