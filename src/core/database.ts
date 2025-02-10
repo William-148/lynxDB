@@ -10,7 +10,20 @@ import { TransactionManager } from "./transaction-manager";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 
-export class LynxDB<Tables extends Record<string, Tables[any]>> {
+/**
+ * Represents a database with tables defined as key-value pairs.
+ * @template Tables An object where keys are table names and values are the types 
+ * of objects stored in the tables.
+ * 
+ * Example:
+ * ```typescript
+ * type Person { id: number; name: string; }
+ * type MyTables = { persons: Person; ... }
+ * const db = new LynxDB<MyTables>(...);
+ * 
+ * ```
+ */
+export class LynxDB<Tables extends Record<string, any>> {
   /** Map of tables in the database */
   private tablesMap: Map<string, Table<Tables[any]>>;
   /** Map of table managers in the database */
@@ -47,14 +60,14 @@ export class LynxDB<Tables extends Record<string, Tables[any]>> {
   /**
    * Retrieves a table for the specified table name.
    * 
-   * @param name - Name of the table to retrieve (type-safe key from Tables)
+   * @param tableName - Name of the table to retrieve (type-safe key from Tables)
    * @returns {TableSchema<Tables[K]>} Transaction table manager instance for the specified table
    * @throws {TransactionCompletedError} If the transaction has already been committed or rolled back
    * @throws {TableNotFoundError} If the table doesn't exist in the main tables collection (via createTransactionTable)
    */
-  public get<K extends keyof Tables>(name: K): TableSchema<Tables[K]> {
-    const tableManager = this.tableManagersMap.get(String(name));
-    if (!tableManager) throw new TableNotFoundError(String(name));
+  public get<K extends keyof Tables>(tableName: K): TableSchema<Tables[K]> {
+    const tableManager = this.tableManagersMap.get(String(tableName));
+    if (!tableManager) throw new TableNotFoundError(String(tableName));
     return tableManager;
   }
 

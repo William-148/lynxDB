@@ -1,21 +1,38 @@
 import { TableSchema } from "./table.type";
-import { TransactionCompletedError, TransactionConflictError } from "../core/errors/transaction.error";
+import { 
+  TransactionCompletedError, 
+  TransactionConflictError 
+} from "../core/errors/transaction.error";
 
 export enum IsolationLevel {
   RepeatableRead = 'REPEATABLE_READ',
   Serializable = 'SERIALIZABLE',
 }
 
-export interface TransactionHandler<T> {
+/**
+ * Represents a handler for database transactions.
+ * 
+ * @template Tables An object where keys are table names and values are the types 
+ * of objects stored in the tables.
+ * 
+ * Example:
+ * ```typescript
+ * type Person { id: number; name: string; }
+ * type MyTables = { persons: Person; ... }
+ * const tx:TransactionHandler<MyTables>;
+ * 
+ * ```
+ */
+export interface TransactionHandler<Tables extends Record<string, any>> {
   /**
    * Retrieves a table for the specified table name.
    * 
    * @param name - Name of the table to retrieve (type-safe key from Tables)
-   * @returns {TableSchema<T[K]>} Transaction table manager instance for the specified table
+   * @returns {TableSchema<Tables[K]>} Transaction table manager instance for the specified table
    * @throws {TransactionCompletedError} If the transaction has already been committed or rolled back
    * @throws {TableNotFoundError} If the table doesn't exist in the main tables collection (via createTransactionTable)
    */
-  get<K extends keyof T>(name: K): TableSchema<T[K]>;
+  get<K extends keyof Tables>(name: K): TableSchema<Tables[K]>;
 
   /**
    * Commits the transaction, saving all changes to the database.

@@ -28,6 +28,10 @@
   ],
   "author": "William Cán <wilenrike@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/William-148/lynxDB.git"
+  },
   "devDependencies": {
     "@faker-js/faker": "^9.4.0",
     "@types/jest": "^29.5.14",

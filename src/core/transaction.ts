@@ -10,7 +10,20 @@ import { TransactionCompletedError, TransactionConflictError } from "./errors/tr
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 
-export class Transaction <Tables extends Record<string, Tables[any]>> implements TransactionHandler<Tables> {
+/**
+ * Represents a transaction in the database.
+ * 
+ * @template Tables An object where keys are table names and values are the types 
+ * of objects stored in the tables.
+ * 
+ * Example:
+ * ```typescript
+ * type Person { id: number; name: string; }
+ * type MyTables = { persons: Person; ... }
+ * const tx = new Transaction<MyTables>(...);
+ * ```
+ */
+export class Transaction <Tables extends Record<string, any>> implements TransactionHandler<Tables> {
   private transactionId: string;
   private transactionTables: Map<string, TransactionTable<Tables[any]>>;
   private tableManagers: Map<string, TableManager<Tables[any]>>;
@@ -21,7 +34,7 @@ export class Transaction <Tables extends Record<string, Tables[any]>> implements
    * @param tables - Map of tables in the database
    * @param transactionConfig - Configuration for the transaction
    */
-  constructor(private tables: Map<string, Table<Tables[any]>>, transactionConfig?: Config) {
+  constructor(private tables: Map<string, Table<Tables[keyof Tables]>>, transactionConfig?: Config) {
     this.transactionId = generateId();
     this.transactionTables = new Map();
     this.tableManagers = new Map();
@@ -44,33 +57,33 @@ export class Transaction <Tables extends Record<string, Tables[any]>> implements
    * This method creates a TransactionTable instance linked to the current transaction,
    * associates it with a TableManager, and registers both in transaction-scoped collections.
    * 
-   * @param name - Name of the table to create transaction wrapper for
+   * @param tableName - Name of the table to create transaction wrapper for
    * @returns {TableSchema<T>} - Transaction-enabled table manager instance
    * @throws {TableNotFoundError} - When the requested table doesn't exist in the tables collection
    */
-  private createTransactionTable(name: string): TableSchema<Tables[any]> {
-    const table = this.tables.get(name);
-    if (!table) throw new TableNotFoundError(name);
+  private createTransactionTable(tableName: string): TableSchema<Tables[any]> {
+    const table = this.tables.get(tableName);
+    if (!table) throw new TableNotFoundError(tableName);
     
     const transactionTable = new TransactionTable(
       this.transactionId, 
       table,
       this.transactionConfig
     );
-    this.transactionTables.set(name, transactionTable);
+    this.transactionTables.set(tableName, transactionTable);
     
     const tableManager = new TableManager(transactionTable);
-    this.tableManagers.set(name, tableManager);
+    this.tableManagers.set(tableName, tableManager);
     return tableManager;
   }
 
-  public get<K extends keyof Tables>(name: K): TableSchema<Tables[K]> {
+  public get<K extends keyof Tables>(tableName: K): TableSchema<Tables[K]> {
     if (!this.isActive) throw new TransactionCompletedError();
 
-    const found = this.tableManagers.get(String(name));
+    const found = this.tableManagers.get(String(tableName));
     return found 
       ? found
-      : this.createTransactionTable(String(name)); 
+      : this.createTransactionTable(String(tableName));
   }
 
   public async commit(): Promise<void> {

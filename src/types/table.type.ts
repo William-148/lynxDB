@@ -6,8 +6,25 @@ export type TableConfig<T> = {
   primaryKey?: (keyof T)[];
 }
 
-export type TablesDefinition<T extends Record<string, any>> = {
-  [K in keyof T]: TableConfig<T[K]>;
+/**
+ * Defines the configuration of tables in a database.
+ * 
+ * @template Tables An object where keys are table names and values are the types 
+ * of objects stored in the tables.
+ * 
+ * Example:
+ * ```typescript
+ * type Person { id: number; name: string; }
+ * type MyTables = { persons: Person; ... }
+ * 
+ * const tableDefinition: TablesDefinition<MyTables> = {
+ * persons: { primaryKey: ["id"] }
+ * };
+ * 
+ * ```
+ */
+export type TablesDefinition<Tables extends Record<string, any>> = {
+  [K in keyof Tables]: TableConfig<Tables[K]>;
 };
 
 export interface TableSchema<T> {
