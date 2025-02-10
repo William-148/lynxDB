@@ -36,13 +36,13 @@ type Enrollment = {
 Create the table definition:
 ```typescript
 // Define a type that lists all the tables in the database
-type DatabaseTables = {
+type MyTables = {
   users: User,
   enrollments: Enrollment
 }
 
 // Define the configurations for the tables
-const tableConfigs: TablesDefinition<DatabaseTables> = {
+const tableConfigs: TablesDefinition<MyTables> = {
   users: {
     // Simple primary key
     primaryKey: ["id"] 

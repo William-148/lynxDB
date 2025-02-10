@@ -63,14 +63,14 @@ type User = { id: number; name: string; email: string; }
 type Post = { id: number; title: string; content: string; ownerId: number; }
 
 // Type that lists all tables in the database
-type DatabaseTables = {
+type MyTables = {
   users: User,
   post: Post
   // More tables...
 }
 
 // Define the configurations for the tables
-const tableConfigs: TablesDefinition<DatabaseTables> = {
+const tableConfigs: TablesDefinition<MyTables> = {
   users: {
     primaryKey: ["id"]
   },
