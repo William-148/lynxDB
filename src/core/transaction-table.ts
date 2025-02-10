@@ -252,7 +252,6 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
       if (!matchRecord(recordToEvaluate.data, compiledFilter)) return;
 
       await this.acquireExclusiveLock(committedRecordPk);
-      // TODO: Hacer un test para ver que pasa cuando bloquea un registro que su pk fue modificado
 
       if ((versionSnapshot !== record.committed.version) && !matchRecord(recordToEvaluate.data, compiledFilter)) {
         this.releaseLock(committedRecordPk);

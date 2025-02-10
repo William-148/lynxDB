@@ -6,7 +6,7 @@ export default {
   testMatch: ['**/tests/**/*.test.ts'],
   coveragePathIgnorePatterns: [
     "/node_modules/",
-    "/test/",
+    "/examples/",
     "/tests/"
   ]
 };
