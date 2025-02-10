@@ -9,10 +9,15 @@
   - [Delete](#delete-by-primary-key)
 
 ## Database Operations
+First, you need to import the necessary modules into your application. 
+```typescript
+import { LynxDB, TablesDefinition } from "lynxdb";
+```
+
 Create the types for the tables:
 
 ```typescript
-type User = { 
+type User = {
   id: number; 
   name: string;
   email: string; 
@@ -30,17 +35,14 @@ type Enrollment = {
 
 Create the table definition:
 ```typescript
-type TableList = {
+// Define a type that lists all the tables in the database
+type DatabaseTables = {
   users: User,
   enrollments: Enrollment
 }
 
-
 // Define the configurations for the tables
-const tableConfigs: TablesDefinition<{
-  users: User,
-  enrollments: Enrollment
-}> = {
+const tableConfigs: TablesDefinition<DatabaseTables> = {
   users: {
     // Simple primary key
     primaryKey: ["id"] 

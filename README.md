@@ -22,7 +22,7 @@
 
 ## **LynxDB - In-Memory Database for Fast Testing**
 
-`LynxDB` is a lightweight, in-memory database designed specifically for fast testing in applications built with JavaScript or TypeScript. It is ideal for developers who need a quick and efficient database solution for testing complex data models without the overhead of configuring and maintaining full-fledged relational databases.
+`LynxDB` is a lightweight, in-memory database designed specifically for fast testing in applications. Although it can be used with both JavaScript and TypeScript, it is recommended to use it with TypeScript to fully leverage its typing features. Its primary focus is to support tool testing and experimentation with various technologies, providing an easy-to-configure and quick-to-prepare database solution for in-memory data testing without the complexity of managing full-fledged relational databases.
 
 ### Key Features:
 - **In-Memory Storage**: All data is stored in memory, offering extremely fast read and write operations, perfect for testing scenarios.
@@ -62,12 +62,15 @@ import { LynxDB, TablesDefinition } from "lynxdb";
 type User = { id: number; name: string; email: string; }
 type Post = { id: number; title: string; content: string; ownerId: number; }
 
-// Define the configurations for the tables
-const tableConfigs: TablesDefinition<{
+// Type that lists all tables in the database
+type DatabaseTables = {
   users: User,
   post: Post
   // More tables...
-}> = {
+}
+
+// Define the configurations for the tables
+const tableConfigs: TablesDefinition<DatabaseTables> = {
   users: {
     primaryKey: ["id"]
   },
@@ -191,6 +194,12 @@ Opeartor `and` example:
 await users.select([], {
   id: { $eq: 1 },
   name: { $like: "Jhon%" },
+  // another conditions...
+});
+
+await users.select([], {
+  id: { $gte: 20, $lte: 50 },
+  email: { $like: "%@some.com" }
   // another conditions...
 });
 ```
