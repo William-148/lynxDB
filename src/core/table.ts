@@ -91,6 +91,19 @@ export class Table<T> implements TableSchema<T> {
     return recordFound ? { ...recordFound.data } : null;
   }
 
+  public async findOne(where: Query<RecordWithId<T>>): Promise<T | null> {
+    const compiledQuery = compileQuery(where);
+
+    for (const [primaryKey, versioned] of this._recordsMap) {
+      await this._lockManager.waitUnlockToRead(primaryKey);
+      if (match(versioned.data, compiledQuery)) {
+        return { ...versioned.data };
+      }
+    }
+
+    return null;
+  }
+
   select(where?: Query<RecordWithId<T>>): Promise<T[]>;
   select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
   async select(arg1?: (keyof T)[] | Query<RecordWithId<T>>, arg2?: Query<RecordWithId<T>>): Promise<Partial<T>[] | T[]> {

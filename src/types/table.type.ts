@@ -60,6 +60,13 @@ export interface TableSchema<T> {
    * @throws {PrimaryKeyValueNullError} If the primary key is null
    */
   findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null>;
+
+  /**
+   * Find the first record in the table that matches the query conditions
+   * 
+   * @param where The query conditions
+   */
+  findOne(where: Query<RecordWithId<T>>): Promise<T | null>;
   
   /**
    * Find records in the table

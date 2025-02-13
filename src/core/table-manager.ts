@@ -22,6 +22,10 @@ export class TableManager <T> implements TableSchema <T> {
     return this.table.findByPk(primaryKey);
   }
 
+  findOne(where: Query<RecordWithId<T>>): Promise<T | null> {
+    return this.table.findOne(where);
+  }
+
   select(where?: Query<RecordWithId<T>>): Promise<T[]>;
   select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
   select(arg1?: (keyof T)[] | Query<RecordWithId<T>>, arg2?: Query<RecordWithId<T>>): Promise<Partial<T>[] | T[]> {

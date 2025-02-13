@@ -181,6 +181,31 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     return null;
   }
 
+  async findOne(where: Query<RecordWithId<T>>): Promise<T | null> {
+    const compiledQuery = compileQuery(where);
+
+    for (const newestRecord of this._tempStore.tempInserts.values()) {
+      if (match(newestRecord.data, compiledQuery)) return { ...newestRecord.data };
+    }
+
+    const keys = Array.from(this._recordsMap.keys());
+
+    for (const key of keys) {
+      await this.waitUlockToRead(key);
+      const record = this._tempStore.getRecordState(key);
+      if (!record) continue;
+      if (isCommittedRecordDeleted(record)) continue;
+
+      const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
+      if (match(recordToEvaluate.data, compiledQuery)) {
+        await this.acquireReadLock(key);
+        return { ...recordToEvaluate.data };
+      }
+    }
+
+    return null;
+  }
+
   select(where?: Query<RecordWithId<T>>): Promise<T[]>;
   select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
   async select(arg1?: (keyof T)[] | Query<RecordWithId<T>>, arg2?: Query<RecordWithId<T>>): Promise<Partial<T>[] | T[]> {
