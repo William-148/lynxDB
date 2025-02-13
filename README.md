@@ -156,14 +156,15 @@ const tableConfigs: TablesDefinition<{ persons: Person }> = {
 Once the database instance is created, you can retrieve tables and perform various operations. See [examples](examples.md#database-operations).
 
 
-| Operation    | Description                                                                                           |
-|--------------|-------------------------------------------------------------------------------------------------------|
-| `insert`     | Inserts a single record into a table and returns the newly inserted record.                           |
+| Operation    | Description                                                                                         |
+|--------------|-----------------------------------------------------------------------------------------------------|
+| `insert`     | Inserts a single record into a table and returns the newly inserted record.                         |
 | `bulkInsert` | Inserts multiple records into a table at once.                                                      |
-| `findByPk`   | Finds and returns a record using its primary key. Returns `null` if not found.                         |
-| `select`     | Selects records from a table. Supports filtering via a where clause and field selection.              |
-| `update`     | Updates fields in records that match the specified conditions. Returns the number of affected rows.    |
-| `deleteByPk` | Deletes a record using its primary key and returns the deleted record (or `null` if not found).         |
+| `findByPk`   | Returns a record using its primary key. Returns `null` if not found.                                |
+| `findOne`    | Returns the first record that satisfies the query criteria. Returns `null` if not found.            |
+| `select`     | Selects records from a table. Supports filtering via a where clause and field selection.            |
+| `update`     | Updates fields in records that match the specified conditions. Returns the number of affected rows. |
+| `deleteByPk` | Deletes a record using its primary key and returns the deleted record (or `null` if not found).     |
 
 
 # Operators

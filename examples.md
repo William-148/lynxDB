@@ -4,6 +4,7 @@
   - [Insert](#insert)
   - [Bulk Insert](#bulk-insert)
   - [Find By Primary Key](#find-by-primary-key)
+  - [Find One](#find-one)
   - [Select](#select)
   - [Update](#update)
   - [Delete](#delete-by-primary-key)
@@ -135,6 +136,16 @@ async function findByPkExample() {
     studentId: 1
   });
   console.table([enrollmentFound]);
+}
+```
+
+### Find one
+Retrieves the first record that satisfies the specific query.
+```typescript
+async function findOneExample() {
+  // Find a user
+  const userFound: User | null = await users.findOne({ email: "gethynf@dot.gt" });
+  console.table([userFound]);
 }
 ```
 
