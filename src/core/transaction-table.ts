@@ -181,15 +181,21 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     return null;
   }
 
-  async select(fields: (keyof T)[], where: Query<RecordWithId<T>>): Promise<Partial<T>[]> {
-    const compiledQuery = compileQuery(where);
+  select(where?: Query<RecordWithId<T>>): Promise<T[]>;
+  select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
+  async select(arg1?: (keyof T)[] | Query<RecordWithId<T>>, arg2?: Query<RecordWithId<T>>): Promise<Partial<T>[] | T[]> {
+    const [fields, query] = Array.isArray(arg1)
+      ? [arg1, arg2]
+      : [undefined, arg1];
+
+    const compiledQuery = query ? compileQuery(query) : [];
     const committedResults: Partial<T>[] = [];
     const newestResults: Partial<T>[] = [];
 
-    const areFieldsEmpty = (fields.length === 0);
+    const areFieldsEmpty = !fields || fields.length === 0;
 
     const processFields = (data: RecordWithId<T>): Partial<T> => 
-      areFieldsEmpty ? {...data} : extractFieldsFromRecord(fields, data);
+      areFieldsEmpty ? {...data} : extractFieldsFromRecord(fields!, data);
 
     const committedSelectProcess = async (committedRecordPk: string) => {
       await this.waitUlockToRead(committedRecordPk);

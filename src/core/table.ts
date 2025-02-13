@@ -91,15 +91,20 @@ export class Table<T> implements TableSchema<T> {
     return recordFound ? { ...recordFound.data } : null;
   }
 
-  public async select(fields: (keyof T)[], where: Query<RecordWithId<T>>): Promise<Partial<T>[]> {
-    const compiledQuery = compileQuery(where);
+  select(where?: Query<RecordWithId<T>>): Promise<T[]>;
+  select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
+  async select(arg1?: (keyof T)[] | Query<RecordWithId<T>>, arg2?: Query<RecordWithId<T>>): Promise<Partial<T>[] | T[]> {
+    const [fields, query] = Array.isArray(arg1)
+      ? [arg1, arg2]
+      : [undefined, arg1];
+
+    const compiledQuery = query ? compileQuery(query) : [];
     const result: Partial<RecordWithId<T>>[] = [];
-    const areFieldsToSelectEmpty = (fields.length === 0);
+    const areFieldsToSelectEmpty = !fields || (fields.length === 0);
 
     const processSelect = async ([primaryKey, versioned]: [string, Versioned<T>]): Promise<void> => {
-      const currentRecord = versioned.data;
       await this._lockManager.waitUnlockToRead(primaryKey);
-
+      const currentRecord = versioned.data;
       if (!match(currentRecord, compiledQuery)) return;
 
       result.push(areFieldsToSelectEmpty 

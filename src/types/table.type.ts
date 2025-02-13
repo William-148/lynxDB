@@ -32,6 +32,7 @@ export interface TableSchema<T> {
    * Return the number of records in the table
    */
   size(): number;
+
   /**
    * Insert a record in the table
    * 
@@ -41,6 +42,7 @@ export interface TableSchema<T> {
    * @throws {PrimaryKeyValueNullError} If the primary key is null
    */
   insert(record: T): Promise<T>;
+
   /**
    * Insert a list of records in the table
    * 
@@ -49,6 +51,7 @@ export interface TableSchema<T> {
    * @throws {PrimaryKeyValueNullError} If the primary key is null
    */
   bulkInsert(records: T[]): Promise<void>;
+
   /**
    * Find a record by its primary key
    * 
@@ -57,14 +60,22 @@ export interface TableSchema<T> {
    * @throws {PrimaryKeyValueNullError} If the primary key is null
    */
   findByPk(primaryKey: Partial<RecordWithId<T>>): Promise<T | null>;
+  
+  /**
+   * Find records in the table
+   * 
+   * @param where The query conditions
+   * @returns A promise that resolves to an array of objects
+   */
+  select(where: Query<RecordWithId<T>>): Promise<T[]>;
   /**
    * Find records in the table
    * 
    * @param fields The fields to select
-   * @param where A function that matches the records to be selected
-   * @returns The records found
+   * @param where The query conditions
+   * @returns A promise that resolves to an array of partial objects
    */
-  select(fields: (keyof T)[], where: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
+  select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
   
   /**
    * Update a record in the table
