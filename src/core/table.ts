@@ -1,10 +1,11 @@
-import { Filter } from "../types/filter.type";
-import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { RecordLockManager } from "./record-lock-manager";
 import { Config } from "./config";
 import { TableSchema, TableConfig } from "../types/table.type";
 import { RecordWithId, Versioned } from "../types/record.type";
 import { PrimaryKeyManager } from "./primary-key-manager";
+import { Query } from "../types/query.type";
+import { match } from "./query/matcher";
+import { compileQuery } from "./query/compiler";
 import { processPromiseBatch } from "../utils/batch-processor";
 import { 
   createNewVersionedRecord, 
@@ -90,8 +91,8 @@ export class Table<T> implements TableSchema<T> {
     return recordFound ? { ...recordFound.data } : null;
   }
 
-  public async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
-    const compiledFilter = compileFilter(where);
+  public async select(fields: (keyof T)[], where: Query<RecordWithId<T>>): Promise<Partial<T>[]> {
+    const compiledQuery = compileQuery(where);
     const result: Partial<RecordWithId<T>>[] = [];
     const areFieldsToSelectEmpty = (fields.length === 0);
 
@@ -99,7 +100,7 @@ export class Table<T> implements TableSchema<T> {
       const currentRecord = versioned.data;
       await this._lockManager.waitUnlockToRead(primaryKey);
 
-      if (!matchRecord(currentRecord, compiledFilter)) return;
+      if (!match(currentRecord, compiledQuery)) return;
 
       result.push(areFieldsToSelectEmpty 
         ? { ...currentRecord }
@@ -117,11 +118,11 @@ export class Table<T> implements TableSchema<T> {
     return result;
   }
 
-  public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
+  public async update(updatedFields: Partial<T>, where: Query<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
     const willPkBeModified = this._primaryKeyManager.isPartialRecordPartOfPk(updatedFields);
-    const compiledFilter = compileFilter(where);
+    const compiledQuery = compileQuery(where);
     const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
 
@@ -132,10 +133,10 @@ export class Table<T> implements TableSchema<T> {
       if (!currentVersioned) return;
       const versionSnapshot = currentVersioned.version;
 
-      if (!matchRecord(currentVersioned.data, compiledFilter)) return;
+      if (!match(currentVersioned.data, compiledQuery)) return;
       
       await this._lockManager.waitUnlockToWrite(currentPrimaryKey);
-      if ((versionSnapshot !== currentVersioned.version) && !matchRecord(currentVersioned.data, compiledFilter)) {
+      if ((versionSnapshot !== currentVersioned.version) && !match(currentVersioned.data, compiledQuery)) {
         return;
       }
 

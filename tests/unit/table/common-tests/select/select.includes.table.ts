@@ -37,47 +37,47 @@ export function selectIncludesTests(createInstance: (dataTest: UserTags[]) => Pr
     });
   
     it('filter records when a string property is included in the array', async () => {
-      const result = await genericTable.select([], { tag: { $includes: ['red', 'blue'] } });
+      const result = await genericTable.select([], { tag: { $in: ['red', 'blue'] } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.name)).toEqual(['Alpha', 'Beta']);
     });
   
     it('filter records when a numeric property is included in the array', async () => {
-      const result = await genericTable.select([], { number: { $includes: [2, 3] } });
+      const result = await genericTable.select([], { number: { $in: [2, 3] } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.name)).toEqual(['Beta', 'Gamma']);
     });
   
     it('return all records when all values are included', async () => {
-      const result = await genericTable.select([], { tag: { $includes: ['red', 'blue', 'yellow', 'green'] } });
+      const result = await genericTable.select([], { tag: { $in: ['red', 'blue', 'yellow', 'green'] } });
       expect(result).toHaveLength(4);
       expect(result.map(record => record.name)).toEqual(['Alpha', 'Beta', 'Gamma', 'Delta']);
     });
   
     it('return an empty array when no values match', async () => {
-      const result = await genericTable.select([], { tag: { $includes: ['purple', 'orange'] } });
+      const result = await genericTable.select([], { tag: { $in: ['purple', 'orange'] } });
       expect(result).toHaveLength(0);
     });
   
     it('handle cases with a single value matching', async () => {
-      const result = await genericTable.select([], { tag: { $includes: ['yellow'] } });
+      const result = await genericTable.select([], { tag: { $in: ['yellow'] } });
       expect(result).toHaveLength(1);
       expect(result[0].name).toEqual('Gamma');
     });
   
     it('handle cases with empty include values', async () => {
-      const result = await genericTable.select([], { tag: { $includes: [] } });
+      const result = await genericTable.select([], { tag: { $in: [] } });
       expect(result).toHaveLength(0);
     });
   
     it('handle cases with duplicates in the include array', async () => {
-      const result = await genericTable.select([], { number: { $includes: [3, 3, 4] } });
+      const result = await genericTable.select([], { number: { $in: [3, 3, 4] } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.name)).toEqual(['Gamma', 'Delta']);
     });
   
     it('return an empty array if the property does not exist in any record', async () => {
-      const result = await genericTable.select([], { nonexistent: { $includes: ['value'] } } as any);
+      const result = await genericTable.select([], { nonexistent: { $in: ['value'] } } as any);
       expect(result).toHaveLength(0);
     });
   

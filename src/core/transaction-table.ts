@@ -1,14 +1,15 @@
 import { TableSchema } from "../types/table.type";
 import { Table } from "./table";
-import { Filter } from "../types/filter.type";
 import { LockType } from "../types/lock.type";
-import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { RecordWithId, UpdatedFieldsDetails, Versioned } from "../types/record.type";
 import { IsolationLevel, TwoPhaseCommitParticipant } from "../types/transaction.type";
 import { Config } from "./config";
 import { TransactionTempStore } from "./transaction-temp-store";
 import { RecordLockManager } from "./record-lock-manager";
 import { PrimaryKeyManager } from "./primary-key-manager";
+import { Query } from "../types/query.type";
+import { compileQuery } from "./query/compiler";
+import { match } from "./query/matcher";
 import { extractFieldsFromRecord, isCommittedRecordDeleted } from "./record";
 import { processPromiseBatch } from "../utils/batch-processor";
 import { TransactionCompletedError, TransactionConflictError } from "./errors/transaction.error";
@@ -180,8 +181,8 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     return null;
   }
 
-  async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
-    const compiledFilter = compileFilter(where);
+  async select(fields: (keyof T)[], where: Query<RecordWithId<T>>): Promise<Partial<T>[]> {
+    const compiledQuery = compileQuery(where);
     const committedResults: Partial<T>[] = [];
     const newestResults: Partial<T>[] = [];
 
@@ -197,7 +198,7 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
       if (isCommittedRecordDeleted(record)) return;
 
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
-      if (!matchRecord(recordToEvaluate.data, compiledFilter)) return;
+      if (!match(recordToEvaluate.data, compiledQuery)) return;
 
       await this.acquireReadLock(committedRecordPk);
       committedResults.push(processFields(recordToEvaluate.data));
@@ -205,7 +206,7 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
 
     const newestSelectProcess = async (versioned: Versioned<T>) => {
       const newestRecord = versioned.data;
-      if (!matchRecord(newestRecord, compiledFilter)) return;
+      if (!match(newestRecord, compiledQuery)) return;
       newestResults.push(processFields(newestRecord));
     }
 
@@ -228,14 +229,14 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     return committedResults.concat(newestResults);
   }
 
-  public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
+  public async update(updatedFields: Partial<T>, where: Query<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
     const updatedDetails: UpdatedFieldsDetails<T> = { 
       updatedFields, 
       isPartOfPrimaryKey: this._primaryKeyManager.isPartialRecordPartOfPk(updatedFields) 
     };
-    const compiledFilter = compileFilter(where);
+    const compiledQuery = compileQuery(where);
     const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
 
@@ -249,11 +250,11 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
 
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
 
-      if (!matchRecord(recordToEvaluate.data, compiledFilter)) return;
+      if (!match(recordToEvaluate.data, compiledQuery)) return;
 
       await this.acquireExclusiveLock(committedRecordPk);
 
-      if ((versionSnapshot !== record.committed.version) && !matchRecord(recordToEvaluate.data, compiledFilter)) {
+      if ((versionSnapshot !== record.committed.version) && !match(recordToEvaluate.data, compiledQuery)) {
         this.releaseLock(committedRecordPk);
         return;
       }
@@ -264,7 +265,7 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     }
 
     for (const newestRecord of Array.from(this._tempStore.tempInserts.entries())) {
-      if (!matchRecord(newestRecord[1].data, compiledFilter)) continue;
+      if (!match(newestRecord[1].data, compiledQuery)) continue;
       this._tempStore.updateInsertedRecord(newestRecord, updatedDetails);
       affectedRecords++;
     }

@@ -1,5 +1,5 @@
 import { TableSchema } from "../types/table.type";
-import { Filter } from "../types/filter.type";
+import { Query } from "../types/query.type";
 import { RecordWithId } from "../types/record.type";
 
 export class TableManager <T> implements TableSchema <T> {
@@ -22,11 +22,11 @@ export class TableManager <T> implements TableSchema <T> {
     return this.table.findByPk(primaryKey);
   }
 
-  select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
+  select(fields: (keyof T)[], where: Query<RecordWithId<T>>): Promise<Partial<T>[]> {
     return this.table.select(fields, where);
   }
 
-  update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
+  update(updatedFields: Partial<T>, where: Query<RecordWithId<T>>): Promise<number> {
     return this.table.update(updatedFields, where);
   }
 

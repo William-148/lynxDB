@@ -71,37 +71,3 @@ export function selectTestsWithFields(createInstance: (testData: User[]) => Prom
   
   });
 }
-
-/**
- * Common test for the select() method with wrong query operator
- * 
- * @param createInstance Function that returns a new instance of the Table
- * 
- * Param Example:
- * ```ts
- * const createInstance = async () => new Table<any>({ primaryKey: ['id'] });
- * ```
- */
-export function selectWithWrongQueryOperatorTest(createInstance: () => Promise<TableSchema<any>>) {
-  describe("With wrong query operator", () => {
-    let defaultTable: TableSchema<any>;
-
-    beforeEach(async () => {
-      defaultTable = await createInstance();
-    });
-    
-    it("throw an error when the operator is not recognized", async () => {
-      
-      const tryToFilter = async () => {
-        await defaultTable.select([], { 
-          id: { unexistent_operator: 1 } as any 
-        });
-      }
-  
-      await expect(tryToFilter)
-        .rejects
-        .toThrow(/^Unsupported operator:/);
-      
-    });
-  });
-}

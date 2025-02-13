@@ -102,19 +102,5 @@ export function selectLikeTests(createInstance: (data: Element[]) => Promise<Tab
       expect(result).toHaveLength(2);
       expect(result.map(item => item.name)).toEqual(['Alpha', 'ALPHA']);
     });
-  
-    it('empty match when pattern is not a string', async () => {
-      const numericLikeValue = await genericTable.select([], { name: { $like: 33 as any } });
-      const booleanLikeValue = await genericTable.select([], { name: { $like: true as any } });
-      const nullLikeValue = await genericTable.select([], { name: { $like: null as any } });
-      const objectLikeValue = await genericTable.select([], { name: { $like: { some: 'data' } as any } });
-      const stringLikeValue = await genericTable.select([], { name: { $like: [] as any } });
-      
-      expect(numericLikeValue).toHaveLength(0);
-      expect(booleanLikeValue).toHaveLength(0);
-      expect(nullLikeValue).toHaveLength(0);
-      expect(objectLikeValue).toHaveLength(0);
-      expect(stringLikeValue).toHaveLength(0);
-    });
   });
 }

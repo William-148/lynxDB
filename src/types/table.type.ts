@@ -1,4 +1,4 @@
-import { Filter } from "./filter.type";
+import { Query } from "./query.type";
 import { RecordWithId } from "./record.type";
 
 export type TableConfig<T> = {
@@ -64,7 +64,7 @@ export interface TableSchema<T> {
    * @param where A function that matches the records to be selected
    * @returns The records found
    */
-  select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]>;
+  select(fields: (keyof T)[], where: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
   
   /**
    * Update a record in the table
@@ -74,7 +74,7 @@ export interface TableSchema<T> {
    * @returns The number of records updated
    * @throws {DuplicatePrimaryKeyValueError} If the primary key is duplicated
    */
-  update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number>;
+  update(updatedFields: Partial<T>, where: Query<RecordWithId<T>>): Promise<number>;
   
   /**
    * Delete a record in the table by its primary key
