@@ -140,26 +140,35 @@ async function findByPkExample() {
 
 ### Select
 Selects records using a where clause and allows choosing specific fields.
+
+You can select specific fields:
 ```typescript
 async function selectExample() {
-  // Select specific fields with a condition
   const selectedUsers: Partial<User>[] = await users.select(
-    ["id", "name"],
-    { id: { $gt: 1 } }
+    ["id", "name"], // Fields to select
+    { id: { $gt: 1 } } // Where clause
   );
   console.table(selectedUsers);
+}
+```
 
-  // Select all fields (using an empty array) with a filtering condition
-  const allEnrollments: Partial<Enrollment>[] = await enrollments.select(
-    [],
-    { 
-      year: { $gte: 2023 },
-      semester: { $eq: "Spring" } 
-    }
-  );
+You can also select all fields:
+```typescript
+async function selectExample() {
+  const allEnrollments: Enrollment[] = await enrollments.select({ 
+    year: { $gte: 2023 },
+    semester: { $eq: "Spring" } 
+  });
   console.table(allEnrollments);
 }
+```
 
+Getting all records and all fields:
+```typescript
+async function selectExample() {
+  const allEnrollments: Enrollment[] = await enrollments.select();
+  console.table(allEnrollments);
+}
 ```
 
 ### Update
