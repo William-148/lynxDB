@@ -188,13 +188,10 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
       if (match(newestRecord.data, compiledQuery)) return { ...newestRecord.data };
     }
 
-    const keys = Array.from(this._recordsMap.keys());
-
-    for (const key of keys) {
+    for (const key of Array.from(this._recordsMap.keys())) {
       await this.waitUlockToRead(key);
       const record = this._tempStore.getRecordState(key);
-      if (!record) continue;
-      if (isCommittedRecordDeleted(record)) continue;
+      if (!record || isCommittedRecordDeleted(record)) continue;
 
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
       if (match(recordToEvaluate.data, compiledQuery)) {
@@ -225,8 +222,7 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     const committedSelectProcess = async (committedRecordPk: string) => {
       await this.waitUlockToRead(committedRecordPk);
       const record = this._tempStore.getRecordState(committedRecordPk);
-      if (!record) return;
-      if (isCommittedRecordDeleted(record)) return;
+      if (!record || isCommittedRecordDeleted(record)) return;
 
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
       if (!match(recordToEvaluate.data, compiledQuery)) return;

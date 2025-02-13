@@ -7,22 +7,25 @@ import {
   findByPkTestWithSinglePK
 } from "../common-tests/find-by-pk";
 
-findByPkTestWithSinglePK("Table with single PK - findByPk() - should...", async (testData) => {
-  const table = new Table<User>({ primaryKey: ['id'] });
-  await table.bulkInsert(testData);
-  return table;
+describe("Table - findByPk()", () => {
+  findByPkTestWithSinglePK(async (testData) => {
+    const table = new Table<User>({ primaryKey: ['id'] });
+    await table.bulkInsert(testData);
+    return table;
+  });
+  
+  
+  findByPkTestWithCompositePK(async (testData) => {
+    const table = new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
+    await table.bulkInsert(testData);
+    return table;
+  });
+  
+  
+  findByPkTestWithoutPK(async (testData) => {
+    const table = new Table<User & { _id?: string }>({ primaryKey: [] });
+    await table.bulkInsert(testData);
+    return table;
+  });
 });
 
-
-findByPkTestWithCompositePK("Table with composite PK - findByPk() - should...", async (testData) => {
-  const table = new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
-  await table.bulkInsert(testData);
-  return table;
-});
-
-
-findByPkTestWithoutPK("Table without PK - findByPk() - should...", async (testData) => {
-  const table = new Table<User & { _id?: string }>({ primaryKey: [] });
-  await table.bulkInsert(testData);
-  return table;
-});
