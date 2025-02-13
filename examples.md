@@ -7,6 +7,10 @@
   - [Select](#select)
   - [Update](#update)
   - [Delete](#delete-by-primary-key)
+- [Logical Operators](#logical-operators)
+  - [Operator And](#operator-and)
+  - [Operator Or](#operator-or)
+  - [Operator Not](#operator-not)
 
 ## Database Operations
 First, you need to import the necessary modules into your application. 
@@ -203,4 +207,82 @@ async function deleteExample() {
   });
   console.table([enrollmentDeleted]);
 }
+```
+
+## Logical Operators
+Logical operators allow you to combine multiple conditions to build complex queries for your database.
+
+### Operator `$and`
+The `$and` operator is used to ensure that all specified conditions are met. It can be used implicitly by combining conditions within the same object or explicitly by using the $and keyword.
+
+#### Implicit
+When you provide multiple conditions within a single object, they are automatically combined using an implicit `$and`. For example:
+```typescript
+await db.get("example").select([], {
+  id: { $gte: 3, $lte: 50 }, 
+  name: { $like: "jennie%" } 
+});
+
+await db.get("example").select([], {
+  name: { $like: "karen%" },
+  email: { $like: "%@some%" }
+});
+```
+
+#### Explicit
+Using the `$and` operator explicitly can improve clarity, especially when combining more complex conditions:
+```typescript
+await db.get("example").select([], {
+  $and: [ 
+    { id: { $gte: 3 } },
+    { id: { $lte: 50 } },
+    { name: { $like: "carla%" } }
+  ]
+});
+```
+
+### Operator `$or`
+The `$or` operator returns records that satisfy at least one of the specified conditions. Use it when you want to match any one of multiple possible criteria:
+
+```typescript
+await db.get("example").select([], {
+  $or: [ 
+    { id: { $gte: 3 } },
+    { name: { $like: "erwin%" } },
+    { email: { $like: "%@some.com" } }
+  ]
+});
+```
+
+### Operator `$not`
+The `$not` operator negates a condition, returning records that do not match the specified criteria:
+
+```typescript
+await db.get("example").select([], {
+    $not: { id: { $eq: 1 } }
+});
+```
+### Combined
+You can combine multiple logical operators to create even more powerful and flexible queries. For example, you might want to retrieve records that satisfy one set of conditions or another, while also applying negations within those conditions.
+
+Consider the following example:
+```typescript
+await db.get("example").select([], {
+  $or: [
+    {
+      $and: [
+        { id: { $gte: 3 } },
+        { id: { $lte: 50 } },
+        { name: { $like: "josseline%" } }
+      ]
+    },
+    {
+      $and: [
+        { email: { $like: "%some_email@%" } },
+        { $not: { status: { $eq: "inactive" } } }
+      ]
+    }
+  ]
+});
+
 ```

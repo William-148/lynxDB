@@ -173,7 +173,12 @@ async function comparisonOperatorInWhereClause(){
 
   // Array inclusion check
   await users.select([], 
-    { id: { $includes: [1, 2, 3] } } // Where clause
+    { id: { $in: [1, 2, 3] } } // Where clause
+  );
+
+  // Array exclusion check
+  await users.select([], 
+    { id: { $nin: [1, 2, 3] } } // Where clause
   );
 
   // String pattern match
@@ -183,24 +188,43 @@ async function comparisonOperatorInWhereClause(){
 }
 
 async function logicalOperatorsInWhereClause(){
-  /* - Operator $or not supported yet
-   * - Operator $not not supported yet
-   * - Operator $and not supported yet
-   */
-
-  // Operator and can be simulated by adding multiple conditions
+  // Operator "and" implicit
   await users.select([], 
     { // Where clause 
-      id: { $eq: 1 }, 
-      name: { $like: "Jhon%" } 
+      id: { $gte: 3, $lte: 50 }, 
+      name: { $like: "jhon%" } 
     }
   );
   await users.select([], 
     { // Where clause
-      name: { $like: "Jhon%" },
+      name: { $like: "jhon%" },
       email: { $like: "some%" },
-      // otras condiciones
       // another conditions
     }
   );
+
+  // Operator "and" explicit
+  await users.select([], 
+    { // Where clause
+      $and: [ 
+        { id: { $gte: 3 } },
+        { id: { $lte: 50 } },
+        { name: { $like: "jhon%" } }
+      ]
+    }
+  );
+
+  // Operator "or"
+  await users.select([], {
+    $or: [ 
+      { id: { $gte: 3 } },
+      { name: { $like: "jhon%" } },
+      { email: { $like: "%@some.com" } }
+    ]
+  });
+
+  // Operator "not"
+  await users.select([], {
+      $not: { id: { $eq: 1 } }
+  });
 }
