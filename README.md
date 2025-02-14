@@ -2,6 +2,12 @@
   <picture>
       <img src="./assets/images/lynxDB-logo-text.svg" alt="Logo LynxDB" width="auto" height="200px">
   </picture>
+  <p align="center">
+  <a href="https://codecov.io/gh/William-148/lynxDB">
+    <img src="https://codecov.io/gh/William-148/lynxDB/graph/badge.svg?token=YD82TVS9R2" alt="Codecov Badge" />
+  </a>
+</p>
+
 </div>
 
 ## Content
