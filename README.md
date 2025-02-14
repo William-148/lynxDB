@@ -155,8 +155,14 @@ const tableConfigs: TablesDefinition<{ persons: Person }> = {
 # Database Operations
 Once the database instance is created, you can retrieve tables and perform various operations. See [examples](examples.md#database-operations).
 
+### Database operations:
+| Operation |              Description             |
+| ------------------ | ------------------------------------ |
+| `reset`            | Deletes all records from all tables. |
 
-| Operation    | Description                                                                                         |
+
+### Table operations:
+| Operation| Description                                                                                         |
 |--------------|-----------------------------------------------------------------------------------------------------|
 | `insert`     | Inserts a single record into a table and returns the newly inserted record.                         |
 | `bulkInsert` | Inserts multiple records into a table at once.                                                      |

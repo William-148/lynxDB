@@ -3,6 +3,7 @@ import { User } from "../../../types/user-test.type";
 import { Config } from "../../../../src/core/config";
 import { IsolationLevel } from "../../../../src/types/transaction.type";
 import { DuplicatePkDefinitionError } from "../../../../src/core/errors/table.error";
+import { thirtyItemsUserList } from "../../../data/data-test";
 
 describe("Table should", () => {
 
@@ -42,6 +43,25 @@ describe("Table should", () => {
     await expect(createTableWrong)
       .rejects
       .toThrow(DuplicatePkDefinitionError);
+  });
+
+  describe("Reset the table", () => {
+    it("reset the table with no data", async () => {
+      const userTb = new Table<User>({ primaryKey: ['id'] });
+      userTb.reset();
+      expect(userTb.size()).toBe(0);
+      expect(await userTb.select()).toEqual([]);
+    });
+
+    it("reset the table with data", async () => {
+      const userTb = new Table<User>({ primaryKey: ['id'] });
+      await userTb.bulkInsert(thirtyItemsUserList);
+
+      expect(userTb.size()).toBe(thirtyItemsUserList.length);
+      userTb.reset();
+      expect(userTb.size()).toBe(0);
+      expect(await userTb.select()).toEqual([]);
+    });
   });
 
 });

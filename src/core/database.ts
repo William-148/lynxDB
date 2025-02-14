@@ -58,6 +58,14 @@ export class LynxDB<Tables extends Record<string, any>> {
   }
 
   /**
+   * Resets the database by clearing all tables.
+   * If a transaction is in progress, it will rollback the transaction.
+   */
+  public reset(): void {
+    this.tablesMap.forEach((table) => table.reset());
+  }
+
+  /**
    * Retrieves a table for the specified table name.
    * 
    * @param tableName - Name of the table to retrieve (type-safe key from Tables)

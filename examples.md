@@ -1,6 +1,7 @@
 # LynxDB Examples
 ## Content
 - [Database Operations](#database-operations)
+  - [Reset Database](#reset-database)
   - [Insert](#insert)
   - [Bulk Insert](#bulk-insert)
   - [Find By Primary Key](#find-by-primary-key)
@@ -70,6 +71,12 @@ const users = db.get("users");
 const enrollments = db.get("enrollments");
 ```
 
+### Reset Database
+To delete all records from all tables you can do the following:
+
+```typescript
+  db.reset()
+```
 
 ### Insert
 Inserts a single record and returns the newly inserted record.

@@ -38,6 +38,16 @@ export class Table<T> implements TableSchema<T> {
   get config(): Config { return this._config; }
 
   /**
+   * Resets the table by clearing all records. 
+   * If a transaction is active, it will be rolled back.
+   */
+  public reset(): void {
+    this._recordsMap.clear();
+    this._recordsMap = new Map();
+    this._lockManager = new RecordLockManager(this._config);
+  }
+
+  /**
    * Checks if the primary key is already in use and throws an error if it is.
    *
    * @param primaryKey - The primary key to check.
