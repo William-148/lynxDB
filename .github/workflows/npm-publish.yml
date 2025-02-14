@@ -14,13 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org/'
-      - name: Install pnpm
-        run: npm install -g pnpm
+          cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run tests
@@ -39,12 +38,12 @@ jobs:
     if: github.event_name == 'release' 
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org/
-      - name: Install pnpm
-        run: npm install -g pnpm
+          cache: 'pnpm'
       - name: Publish
         run: npm publish --access public
         env:
