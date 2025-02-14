@@ -1,10 +1,11 @@
-import { Filter } from "../types/filter.type";
-import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { RecordLockManager } from "./record-lock-manager";
 import { Config } from "./config";
 import { TableSchema, TableConfig } from "../types/table.type";
 import { RecordWithId, Versioned } from "../types/record.type";
 import { PrimaryKeyManager } from "./primary-key-manager";
+import { Query } from "../types/query.type";
+import { match } from "./query/matcher";
+import { compileQuery } from "./query/compiler";
 import { processPromiseBatch } from "../utils/batch-processor";
 import { 
   createNewVersionedRecord, 
@@ -35,6 +36,16 @@ export class Table<T> implements TableSchema<T> {
   get primaryKeyManager(): PrimaryKeyManager<T> { return this._primaryKeyManager; }
   get lockManager(): RecordLockManager { return this._lockManager; }
   get config(): Config { return this._config; }
+
+  /**
+   * Resets the table by clearing all records. 
+   * If a transaction is active, it will be rolled back.
+   */
+  public reset(): void {
+    this._recordsMap.clear();
+    this._recordsMap = new Map();
+    this._lockManager = new RecordLockManager(this._config);
+  }
 
   /**
    * Checks if the primary key is already in use and throws an error if it is.
@@ -90,16 +101,34 @@ export class Table<T> implements TableSchema<T> {
     return recordFound ? { ...recordFound.data } : null;
   }
 
-  public async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
-    const compiledFilter = compileFilter(where);
+  public async findOne(where: Query<RecordWithId<T>>): Promise<T | null> {
+    const compiledQuery = compileQuery(where);
+
+    for (const [primaryKey, versioned] of this._recordsMap) {
+      await this._lockManager.waitUnlockToRead(primaryKey);
+      if (match(versioned.data, compiledQuery)) {
+        return { ...versioned.data };
+      }
+    }
+
+    return null;
+  }
+
+  select(where?: Query<RecordWithId<T>>): Promise<T[]>;
+  select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
+  async select(arg1?: (keyof T)[] | Query<RecordWithId<T>>, arg2?: Query<RecordWithId<T>>): Promise<Partial<T>[] | T[]> {
+    const [fields, query] = Array.isArray(arg1)
+      ? [arg1, arg2]
+      : [undefined, arg1];
+
+    const compiledQuery = query ? compileQuery(query) : [];
     const result: Partial<RecordWithId<T>>[] = [];
-    const areFieldsToSelectEmpty = (fields.length === 0);
+    const areFieldsToSelectEmpty = !fields || (fields.length === 0);
 
     const processSelect = async ([primaryKey, versioned]: [string, Versioned<T>]): Promise<void> => {
-      const currentRecord = versioned.data;
       await this._lockManager.waitUnlockToRead(primaryKey);
-
-      if (!matchRecord(currentRecord, compiledFilter)) return;
+      const currentRecord = versioned.data;
+      if (!match(currentRecord, compiledQuery)) return;
 
       result.push(areFieldsToSelectEmpty 
         ? { ...currentRecord }
@@ -117,11 +146,11 @@ export class Table<T> implements TableSchema<T> {
     return result;
   }
 
-  public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
+  public async update(updatedFields: Partial<T>, where: Query<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
     const willPkBeModified = this._primaryKeyManager.isPartialRecordPartOfPk(updatedFields);
-    const compiledFilter = compileFilter(where);
+    const compiledQuery = compileQuery(where);
     const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
 
@@ -132,10 +161,10 @@ export class Table<T> implements TableSchema<T> {
       if (!currentVersioned) return;
       const versionSnapshot = currentVersioned.version;
 
-      if (!matchRecord(currentVersioned.data, compiledFilter)) return;
+      if (!match(currentVersioned.data, compiledQuery)) return;
       
       await this._lockManager.waitUnlockToWrite(currentPrimaryKey);
-      if ((versionSnapshot !== currentVersioned.version) && !matchRecord(currentVersioned.data, compiledFilter)) {
+      if ((versionSnapshot !== currentVersioned.version) && !match(currentVersioned.data, compiledQuery)) {
         return;
       }
 

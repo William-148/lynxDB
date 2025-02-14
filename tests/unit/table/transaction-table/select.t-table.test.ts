@@ -1,7 +1,7 @@
 import { Table } from "../../../../src/core/table";
 import { TransactionTable } from "../../../../src/core/transaction-table";
 import { generateId } from "../../../../src/utils/generate-id";
-import { selectTestsWithFields, selectWithWrongQueryOperatorTest } from "../common-tests/select/select.table";
+import { selectTestsWithFields } from "../common-tests/select/select.table";
 import { selectEqTests, selectEqTestsWithObjects } from "../common-tests/select/select.eq.table";
 import { ScoreRecord, selectGtGteTests } from "../common-tests/select/select.gt.table";
 import { selectIncludesTests } from "../common-tests/select/select.includes.table";
@@ -19,11 +19,6 @@ describe("Transaction Table - select() method", () => {
     const transactionTable = new TransactionTable<User>(generateId(), table);
     await transactionTable.bulkInsert(dataTest.slice(middle));
     return transactionTable;
-  });
-  
-  selectWithWrongQueryOperatorTest(async () => {
-    const table = new Table<any>({ primaryKey: ['id'] });
-    return new TransactionTable<any>(generateId(), table);
   });
   //#endregion
 

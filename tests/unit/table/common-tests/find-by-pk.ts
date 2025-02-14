@@ -7,7 +7,6 @@ import { PrimaryKeyValueNullError } from "../../../../src/core/errors/table.erro
 /**
  * Common tests for findByPk() method using a single PK
  * 
- * @description Describe the test
  * @param createInstance Function that return a new instance of Table< User > with "id" as PK.
  * It is used to create a new instance of Table<User> for each test.
  * 
@@ -21,8 +20,8 @@ import { PrimaryKeyValueNullError } from "../../../../src/core/errors/table.erro
  * 
  * ```
  */
-export function findByPkTestWithSinglePK(description: string, createInstance: (testData: User[]) => Promise<TableSchema<User>>) {
-  describe(description, () => {
+export function findByPkTestWithSinglePK(createInstance: (testData: User[]) => Promise<TableSchema<User>>) {
+  describe("With single primary key - Should...", () => {
     let userTable: TableSchema<User>; // primaryKey: ['id']
 
     beforeEach(async () => {
@@ -56,7 +55,6 @@ export function findByPkTestWithSinglePK(description: string, createInstance: (t
 /**
  * Common tests for findByPk() method using a composite PK
  * 
- * @description Describe the test
  * @param createInstance Function that return a new instance of Table< OrderDetail > with "orderId" and "productId" as composite PK.
  * It is used to create a new instance of Table< OrderDetail > for each test.
  * 
@@ -70,8 +68,8 @@ export function findByPkTestWithSinglePK(description: string, createInstance: (t
  * 
  * ```
  */
-export function findByPkTestWithCompositePK(description: string, createInstance: (testData: OrderDetail[]) => Promise<TableSchema<OrderDetail>>) {
-  describe(description, () => {
+export function findByPkTestWithCompositePK(createInstance: (testData: OrderDetail[]) => Promise<TableSchema<OrderDetail>>) {
+  describe("With composite primary key - Should...", () => {
     let orderDetailTable: TableSchema<OrderDetail>; // primaryKey: ['orderId', 'productId']
 
     beforeEach(async () => {
@@ -137,11 +135,10 @@ export function findByPkTestWithCompositePK(description: string, createInstance:
  * 
  * ```
  */
-export function findByPkTestWithoutPK(
-  description: string, 
+export function findByPkTestWithoutPK( 
   createInstance: (testData: Array<User & { _id?: string }>) => Promise<TableSchema<User & { _id?: string }>>
 ) {
-  describe(description, () => {
+  describe("With default primary key - Should...", () => {
     type UserWithDefaultId = User & { _id?: string };
 
     let userTable: TableSchema<UserWithDefaultId>;

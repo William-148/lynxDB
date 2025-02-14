@@ -35,7 +35,7 @@ export function selectNeTests(createInstance: (dataTest: PersonInfo[]) => Promis
       const testItem = personInfoList[2];
       const listExpected = personInfoList.filter(item => item.id !== testItem.id);
 
-      const resultList = await personInfoTable.select([], { id: { $ne: testItem.id } });
+      const resultList = await personInfoTable.select({ id: { $ne: testItem.id } });
 
       expect(resultList).toHaveLength(listExpected.length);
       expect(resultList).toEqual(expect.arrayContaining(listExpected));
@@ -45,8 +45,8 @@ export function selectNeTests(createInstance: (dataTest: PersonInfo[]) => Promis
       const testItem = personInfoList[0];
       const listExpected = personInfoList.filter(item => item.name !== testItem.name);
 
-      const result = await personInfoTable.select([], { name: { $ne: testItem.name } });
-      const loweCaseResult = await personInfoTable.select([], { name: { $ne: testItem.name.toLowerCase() } });
+      const result = await personInfoTable.select({ name: { $ne: testItem.name } });
+      const loweCaseResult = await personInfoTable.select({ name: { $ne: testItem.name.toLowerCase() } });
   
       expect(result).toHaveLength(listExpected.length);
       expect(loweCaseResult).toHaveLength(personInfoList.length);
@@ -56,7 +56,7 @@ export function selectNeTests(createInstance: (dataTest: PersonInfo[]) => Promis
     it("filter records with a boolean value", async () => {
       const expectedList = personInfoList.filter(item => item.active !== true);
 
-      const result = await personInfoTable.select([], { active: { $ne: true } });
+      const result = await personInfoTable.select({ active: { $ne: true } });
 
       expect(result).toHaveLength(expectedList.length);
       expect(result.map(record => record.active).every((item)=> item === false)).toEqual(true);
@@ -66,20 +66,20 @@ export function selectNeTests(createInstance: (dataTest: PersonInfo[]) => Promis
       const itemToTest = personInfoList[1];
       const expectedList = personInfoList.filter(item => item.tags !== itemToTest.tags);
 
-      const result = await personInfoTable.select([], { tags: { $ne: itemToTest.tags } });
+      const result = await personInfoTable.select({ tags: { $ne: itemToTest.tags } });
 
       expect(result).toHaveLength(personInfoList.length - 1);
       expect(result).toEqual(expect.arrayContaining(expectedList));
     });
   
     it("return all records for non-matching numeric value", async () => {
-      const result = await personInfoTable.select([], { id: { $ne: -10 } });
+      const result = await personInfoTable.select({ id: { $ne: -10 } });
       expect(result).toHaveLength(personInfoList.length);
     });
   
     it("handle edge case with empty table", async () => {
       const emptyTable = await createInstance([]);
-      const result = await emptyTable.select([], { id: { $ne: 1 } });
+      const result = await emptyTable.select({ id: { $ne: 1 } });
       expect(result).toHaveLength(0);
     });
   
@@ -93,12 +93,12 @@ export function selectNeTests(createInstance: (dataTest: PersonInfo[]) => Promis
       tableWithNulls.bulkInsert(dataToInsert);
 
       const expectedNullList = dataToInsert.filter(item => item.name !== null);
-      const resultWithoutNull = await tableWithNulls.select([], { name: { $ne: null } });
+      const resultWithoutNull = await tableWithNulls.select({ name: { $ne: null } });
       expect(resultWithoutNull).toHaveLength(dataToInsert.length - 1);
       expect(resultWithoutNull).toEqual(expect.arrayContaining(expectedNullList));
       
       const expectedUndefinedList = dataToInsert.filter(item => item.name !== undefined);
-      const resultWithoutUndefined = await tableWithNulls.select([], { name: { $ne: undefined } });
+      const resultWithoutUndefined = await tableWithNulls.select({ name: { $ne: undefined } });
       expect(resultWithoutUndefined).toHaveLength(dataToInsert.length - 1);
       expect(resultWithoutUndefined).toEqual(expect.arrayContaining(expectedUndefinedList));
     });
@@ -135,8 +135,8 @@ export function selectNeTestsWithObjects(createInstance: () => Promise<TableSche
       const expectedA = personInfoList.filter(item => item.tags !== itemToTestA.tags);
       const expectedB = personInfoList.filter(item => item.tags !== itemToTestB.tags);
   
-      const resultA = await genericTable.select([], { tags: { $ne: ["designer"] } });
-      const resultB = await genericTable.select([], { tags: { $ne: ["developer", "manager"]} });
+      const resultA = await genericTable.select({ tags: { $ne: ["designer"] } });
+      const resultB = await genericTable.select({ tags: { $ne: ["developer", "manager"]} });
   
       expect(resultA).toHaveLength(personInfoList.length - 1);
       expect(resultA).toEqual(expect.arrayContaining(expectedA));
@@ -154,7 +154,7 @@ export function selectNeTestsWithObjects(createInstance: () => Promise<TableSche
       genericTable.bulkInsert(dataToInsert);
       const expectedList = dataToInsert.filter(item => !(item.profile.name === "Alice" && item.profile.age === 25));
 
-      const result = await genericTable.select([], { profile: { $ne: { name: "Alice", age: 25 } } });
+      const result = await genericTable.select({ profile: { $ne: { name: "Alice", age: 25 } } });
       expect(result).toHaveLength(dataToInsert.length - 1);
       expect(result).toEqual(expect.arrayContaining(expectedList));
     });
@@ -174,7 +174,7 @@ export function selectNeTestsWithObjects(createInstance: () => Promise<TableSche
       const expectedList = [listdata[0], listdata[2]];
       const teamToSearch =[{ name: "Rob", age: 30 }, { name: "Tom", age: 41 }];
   
-      const result = await genericTable.select([], { team: { $ne: teamToSearch } });
+      const result = await genericTable.select({ team: { $ne: teamToSearch } });
       expect(result).toHaveLength(listdata.length - 1);
       expect(result.sort((a, b) => a.id - b.id)).toEqual(expectedList);
     });

@@ -114,6 +114,27 @@ describe("Transaction Table", () => {
       expect(table.size()).toBe(clothesProducts.length - 1);
     });
 
+    it("should handle record locking and not finding it after deleting it with concurrent transactions", async () => {
+      const [tx1, tx2] = generateTransactionTables(2, table);
+      const itemTest = clothesProducts[2];
+
+      // The record should be locked by tx1
+      const tx1DeletePromise = tx1.deleteByPk({ id: itemTest.id });
+      // Tx2 should wait for the lock to be released by tx1
+      const tx2FindPromise = tx2.findOne({ id: itemTest.id });
+      // Tx1 release the lock by commit
+      await tx1.commit();
+
+      // Tx1 should delete the record and return the deleted record
+      await expect(tx1DeletePromise).resolves.toEqual(itemTest);
+      // Tx2 should be able to read the record but it should be deleted
+      await expect(tx2FindPromise).resolves.toBeNull();
+      await expect(tx2.commit()).resolves.not.toThrow();
+      // Main table should not have the record
+      await expect(table.findOne({ id: itemTest.id })).resolves.toBeNull();
+      expect(table.size()).toBe(clothesProducts.length - 1);
+    });
+
     it("should throw an error when trying to update a record that has been deleted by another transaction", async () => {
       const [tx1, tx2, tx3] = generateTransactionTables(3, table);
       const itemTest = clothesProducts[2];

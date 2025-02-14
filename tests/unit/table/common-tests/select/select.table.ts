@@ -32,7 +32,7 @@ export function selectTestsWithFields(createInstance: (testData: User[]) => Prom
     }
   
     it("return all registers when no conditions are provided", async () => {
-      const resultList = await userTable.select([], {});
+      const resultList = await userTable.select();
       const resultItem = resultList[3];
   
       expect(resultList.length).toBe(thirtyItemsUserList.length);
@@ -46,7 +46,7 @@ export function selectTestsWithFields(createInstance: (testData: User[]) => Prom
       const propertiesToSelect: (keyof User)[] = ["email", "id", "password"];
       const expectedResult = generatePartialUser(itemUsedForTesting, propertiesToSelect);
   
-      const resultList = await userTable.select(propertiesToSelect, {});
+      const resultList = await userTable.select(propertiesToSelect);
       const resultItem = resultList.find(u => u.id === itemUsedForTesting.id);
   
       expect(resultList.length).toBe(thirtyItemsUserList.length);
@@ -60,7 +60,7 @@ export function selectTestsWithFields(createInstance: (testData: User[]) => Prom
       const propertiesToSelect: (keyof User)[] = ["id", "username", "age", "id", "age", "username", "id"];
       const expectedResult = generatePartialUser(itemUsedForTesting, propertiesToSelect);
   
-      const resultList = await userTable.select(propertiesToSelect, {});
+      const resultList = await userTable.select(propertiesToSelect);
       const resultItem = resultList.find(u => u.id === itemUsedForTesting.id);
   
       expect(resultList.length).toBe(thirtyItemsUserList.length);
@@ -69,39 +69,5 @@ export function selectTestsWithFields(createInstance: (testData: User[]) => Prom
       }
     });
   
-  });
-}
-
-/**
- * Common test for the select() method with wrong query operator
- * 
- * @param createInstance Function that returns a new instance of the Table
- * 
- * Param Example:
- * ```ts
- * const createInstance = async () => new Table<any>({ primaryKey: ['id'] });
- * ```
- */
-export function selectWithWrongQueryOperatorTest(createInstance: () => Promise<TableSchema<any>>) {
-  describe("With wrong query operator", () => {
-    let defaultTable: TableSchema<any>;
-
-    beforeEach(async () => {
-      defaultTable = await createInstance();
-    });
-    
-    it("throw an error when the operator is not recognized", async () => {
-      
-      const tryToFilter = async () => {
-        await defaultTable.select([], { 
-          id: { unexistent_operator: 1 } as any 
-        });
-      }
-  
-      await expect(tryToFilter)
-        .rejects
-        .toThrow(/^Unsupported operator:/);
-      
-    });
   });
 }

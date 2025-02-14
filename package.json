@@ -1,6 +1,6 @@
 {
   "name": "lynxdb",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An in-memory database for TypeScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,7 +10,6 @@
     "test": "jest --verbose --silent",
     "test:unit": "jest --verbose --silent tests/unit",
     "test:integration": "jest --verbose --silent tests/integration",
-    "test:coverage": "jest --coverage --silent",
     "dev": "ts-node src/index.ts"
   },
   "keywords": [

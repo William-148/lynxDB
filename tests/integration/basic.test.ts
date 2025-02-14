@@ -41,6 +41,9 @@ describe("LynxDB Basic Tests", () => {
         createRandomUser(1),
       ])
     ).rejects.toThrow(); // An error is expected due to duplication
+    
+    await expect(users.findOne({ id: 2 })).resolves.not.toBeNull();
+
   });
 
   it("Complex conditions in WHERE clause", async () => {
@@ -120,13 +123,13 @@ describe("LynxDB Basic Tests", () => {
     // Update all users with even ids, assigning them a fixed name "Updated"
     const updateCount = await users.update(
       { fullName: "Updated Fullname" },
-      { id: { $includes: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20] } }
+      { id: { $in: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20] } }
     );
     expect(updateCount).toBe(10);
 
     // Verify that the updated users have the name "Updated"
     const updatedUsers = await users.select([], {
-      id: { $includes: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20] },
+      id: { $in: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20] },
     });
     updatedUsers.forEach((user) => {
       expect(user.fullName).toBe("Updated Fullname");

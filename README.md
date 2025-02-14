@@ -2,6 +2,12 @@
   <picture>
       <img src="./assets/images/lynxDB-logo-text.svg" alt="Logo LynxDB" width="auto" height="200px">
   </picture>
+  <p align="center">
+  <a href="https://codecov.io/gh/William-148/lynxDB">
+    <img src="https://codecov.io/gh/William-148/lynxDB/graph/badge.svg?token=YD82TVS9R2" alt="Codecov Badge" />
+  </a>
+</p>
+
 </div>
 
 ## Content
@@ -153,56 +159,49 @@ const tableConfigs: TablesDefinition<{ persons: Person }> = {
 ```
 
 # Database Operations
-Once the database instance is created, you can retrieve tables and perform various operations. See [examples](examples.md#database-operations)
+Once the database instance is created, you can retrieve tables and perform various operations. See [examples](examples.md#database-operations).
+
+### Database operations:
+| Operation |              Description             |
+| ------------------ | ------------------------------------ |
+| `reset`            | Deletes all records from all tables. |
 
 
-| Operation    | Description                                                                                           |
-|--------------|-------------------------------------------------------------------------------------------------------|
-| `insert`     | Inserts a single record into a table and returns the newly inserted record.                           |
+### Table operations:
+| Operation| Description                                                                                         |
+|--------------|-----------------------------------------------------------------------------------------------------|
+| `insert`     | Inserts a single record into a table and returns the newly inserted record.                         |
 | `bulkInsert` | Inserts multiple records into a table at once.                                                      |
-| `findByPk`   | Finds and returns a record using its primary key. Returns `null` if not found.                         |
-| `select`     | Selects records from a table. Supports filtering via a where clause and field selection.              |
-| `update`     | Updates fields in records that match the specified conditions. Returns the number of affected rows.    |
-| `deleteByPk` | Deletes a record using its primary key and returns the deleted record (or `null` if not found).         |
+| `findByPk`   | Returns a record using its primary key. Returns `null` if not found.                                |
+| `findOne`    | Returns the first record that satisfies the query criteria. Returns `null` if not found.            |
+| `select`     | Selects records from a table. Supports filtering via a where clause and field selection.            |
+| `update`     | Updates fields in records that match the specified conditions. Returns the number of affected rows. |
+| `deleteByPk` | Deletes a record using its primary key and returns the deleted record (or `null` if not found).     |
 
 
 # Operators
-When performing select or update operations, you can use a where clause to filter records. The where clause supports several comparison operators. Although logical operators like $or and $not are not directly supported, you can simulate an AND condition by specifying multiple criteria.
+When performing select or update operations, you can use a where clause to filter records. The where clause supports several comparison operators and logical operators.
 
 ## Comparison Opeartors
-| Operator        | Description                                      | Example                            |
-|-----------------|--------------------------------------------------|------------------------------------|
-| **`$eq`**      | Equal to                                          | `{ id: { $eq: 1 } }`               |
-| **`$ne`**      | Not equal to                                      | `{ id: { $ne: 1 } }`               |
-| **`$gt`**      | Greater than                                      | `{ id: { $gt: 1 } }`               |
-| **`$gte`**     | Greater than or equal to                          | `{ id: { $gte: 1 } }`              |
-| **`$lt`**      | Less than                                         | `{ id: { $lt: 1 } }`               |
-| **`$lte`**     | Less than or equal to                             | `{ id: { $lte: 1 } }`              |
-| **`$includes`**| Checks if the field value is included in an array | `{ id: { $includes: [1, 2, 3] } }` |
-| **`$like`**    | String pattern matching (e.g., wildcard search)   | `{ name: { $like: "Jhon%" } }`     |
+| Operator       | Description                                           | Example                        |
+|----------------| ------------------------------------------------------|--------------------------------|
+| **`$eq`**      | Equal to                                              | `{ id: { $eq: 1 } }`           |
+| **`$ne`**      | Not equal to                                          | `{ id: { $ne: 1 } }`           |
+| **`$gt`**      | Greater than                                          | `{ id: { $gt: 8 } }`           |
+| **`$gte`**     | Greater than or equal to                              | `{ id: { $gte: 8 } }`          |
+| **`$lt`**      | Less than                                             | `{ id: { $lt: 100 } }`         |
+| **`$lte`**     | Less than or equal to                                 | `{ id: { $lte: 100 } }`        |
+| **`$in`**      | Checks if the field value is included in an array     | `{ id: { $in: [1, 2, 3] } }`   |
+| **`$nin`**     | Checks if the field value is not included in an array | `{ id: { $nin: [1, 2, 3] } }`  |
+| **`$like`**    | String pattern matching (e.g., wildcard search)       | `{ name: { $like: "Jhon%" } }` |
 
 ## Logical Operators
-| Logical Operator | Note                                                    |
-|------------------|---------------------------------------------------------|
-| `$and`           | Simulated with multiple conditions (not officially supported) |
-| `$or`            | Not supported yet                                       |
-| `$not`           | Not supported yet                                       |
-
-Opeartor `and` example:
-
-```typescript
-await users.select([], {
-  id: { $eq: 1 },
-  name: { $like: "Jhon%" },
-  // another conditions...
-});
-
-await users.select([], {
-  id: { $gte: 20, $lte: 50 },
-  email: { $like: "%@some.com" }
-  // another conditions...
-});
-```
+See [examples](examples.md#logical-operators) for logical operators.
+| Operator   | Note                                       | Example                                 |
+|------------|--------------------------------------------|-----------------------------------------|
+| **`$and`** | Requires all conditions to be true         | See [example](examples.md#operator-and) |
+| **`$or`**  | Requires at least one condition to be true | See [example](examples.md#operator-or)  |
+| **`$not`** | Negates the specified condition            | See [example](examples.md#operator-not) |
 
 # Transactions
 `LynxDB` implements transactions using locks—both shared and exclusive—without support for MVCC. Each transaction acquires the necessary locks that are held for the entire duration of the transaction, until a commit or rollback occurs. This mechanism ensures data consistency, but it also means that transactions may become blocked if locks are not managed properly.

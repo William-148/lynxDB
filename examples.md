@@ -1,12 +1,18 @@
 # LynxDB Examples
 ## Content
 - [Database Operations](#database-operations)
+  - [Reset Database](#reset-database)
   - [Insert](#insert)
   - [Bulk Insert](#bulk-insert)
   - [Find By Primary Key](#find-by-primary-key)
+  - [Find One](#find-one)
   - [Select](#select)
   - [Update](#update)
   - [Delete](#delete-by-primary-key)
+- [Logical Operators](#logical-operators)
+  - [Operator And](#operator-and)
+  - [Operator Or](#operator-or)
+  - [Operator Not](#operator-not)
 
 ## Database Operations
 First, you need to import the necessary modules into your application. 
@@ -65,6 +71,12 @@ const users = db.get("users");
 const enrollments = db.get("enrollments");
 ```
 
+### Reset Database
+To delete all records from all tables you can do the following:
+
+```typescript
+  db.reset()
+```
 
 ### Insert
 Inserts a single record and returns the newly inserted record.
@@ -134,28 +146,47 @@ async function findByPkExample() {
 }
 ```
 
+### Find one
+Retrieves the first record that satisfies the specific query.
+```typescript
+async function findOneExample() {
+  // Find a user
+  const userFound: User | null = await users.findOne({ email: "gethynf@dot.gt" });
+  console.table([userFound]);
+}
+```
+
 ### Select
 Selects records using a where clause and allows choosing specific fields.
+
+You can select specific fields:
 ```typescript
 async function selectExample() {
-  // Select specific fields with a condition
   const selectedUsers: Partial<User>[] = await users.select(
-    ["id", "name"],
-    { id: { $gt: 1 } }
+    ["id", "name"], // Fields to select
+    { id: { $gt: 1 } } // Where clause
   );
   console.table(selectedUsers);
+}
+```
 
-  // Select all fields (using an empty array) with a filtering condition
-  const allEnrollments: Partial<Enrollment>[] = await enrollments.select(
-    [],
-    { 
-      year: { $gte: 2023 },
-      semester: { $eq: "Spring" } 
-    }
-  );
+You can also select all fields:
+```typescript
+async function selectExample() {
+  const allEnrollments: Enrollment[] = await enrollments.select({ 
+    year: { $gte: 2023 },
+    semester: { $eq: "Spring" } 
+  });
   console.table(allEnrollments);
 }
+```
 
+Getting all records and all fields:
+```typescript
+async function selectExample() {
+  const allEnrollments: Enrollment[] = await enrollments.select();
+  console.table(allEnrollments);
+}
 ```
 
 ### Update
@@ -203,4 +234,82 @@ async function deleteExample() {
   });
   console.table([enrollmentDeleted]);
 }
+```
+
+## Logical Operators
+Logical operators allow you to combine multiple conditions to build complex queries for your database.
+
+### Operator `$and`
+The `$and` operator is used to ensure that all specified conditions are met. It can be used implicitly by combining conditions within the same object or explicitly by using the $and keyword.
+
+#### Implicit
+When you provide multiple conditions within a single object, they are automatically combined using an implicit `$and`. For example:
+```typescript
+await db.get("example").select([], {
+  id: { $gte: 3, $lte: 50 }, 
+  name: { $like: "jennie%" } 
+});
+
+await db.get("example").select([], {
+  name: { $like: "karen%" },
+  email: { $like: "%@some%" }
+});
+```
+
+#### Explicit
+Using the `$and` operator explicitly can improve clarity, especially when combining more complex conditions:
+```typescript
+await db.get("example").select([], {
+  $and: [ 
+    { id: { $gte: 3 } },
+    { id: { $lte: 50 } },
+    { name: { $like: "carla%" } }
+  ]
+});
+```
+
+### Operator `$or`
+The `$or` operator returns records that satisfy at least one of the specified conditions. Use it when you want to match any one of multiple possible criteria:
+
+```typescript
+await db.get("example").select([], {
+  $or: [ 
+    { id: { $gte: 3 } },
+    { name: { $like: "erwin%" } },
+    { email: { $like: "%@some.com" } }
+  ]
+});
+```
+
+### Operator `$not`
+The `$not` operator negates a condition, returning records that do not match the specified criteria:
+
+```typescript
+await db.get("example").select([], {
+    $not: { id: { $eq: 1 } }
+});
+```
+### Combined
+You can combine multiple logical operators to create even more powerful and flexible queries. For example, you might want to retrieve records that satisfy one set of conditions or another, while also applying negations within those conditions.
+
+Consider the following example:
+```typescript
+await db.get("example").select([], {
+  $or: [
+    {
+      $and: [
+        { id: { $gte: 3 } },
+        { id: { $lte: 50 } },
+        { name: { $like: "josseline%" } }
+      ]
+    },
+    {
+      $and: [
+        { email: { $like: "%some_email@%" } },
+        { $not: { status: { $eq: "inactive" } } }
+      ]
+    }
+  ]
+});
+
 ```

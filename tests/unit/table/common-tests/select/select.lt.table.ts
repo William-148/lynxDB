@@ -30,31 +30,31 @@ export function selectLtLteTests(createInstance: (data: any[]) => Promise<TableS
     });
   
     it('filter records with lt operator for numeric values', async () => {
-      const result = await genericTable.select([], { value: { $lt: 150 } });
+      const result = await genericTable.select({ value: { $lt: 150 } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.value)).toEqual([100, 50]);
     });
   
     it('filter records with lte operator for numeric values', async () => {
-      const result = await genericTable.select([], { value: { $lte: 150 } });
+      const result = await genericTable.select({ value: { $lte: 150 } });
       expect(result).toHaveLength(3);
       expect(result.map(record => record.value)).toEqual([100, 150, 50]);
     });
   
     it('filter records with lt operator for float values', async () => {
-      const result = await genericTable.select([], { score: { $lt: 50.0 } });
+      const result = await genericTable.select({ score: { $lt: 50.0 } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.score)).toEqual([45.6, 33.3]);
     });
   
     it('filter records with lte operator for float values', async () => {
-      const result = await genericTable.select([], { score: { $lte: 45.6 } });
+      const result = await genericTable.select({ score: { $lte: 45.6 } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.score)).toEqual([45.6, 33.3]);
     });
   
     it('filter records with lt operator for dates', async () => {
-      const result = await genericTable.select([], { date: { $lt: new Date('2023-01-01') } });
+      const result = await genericTable.select({ date: { $lt: new Date('2023-01-01') } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.date.toISOString())).toEqual([
         new Date('2022-01-01').toISOString(),
@@ -63,7 +63,7 @@ export function selectLtLteTests(createInstance: (data: any[]) => Promise<TableS
     });
   
     it('filter records with lte operator for dates', async () => {
-      const result = await genericTable.select([], { date: { $lte: new Date('2023-01-01') } });
+      const result = await genericTable.select({ date: { $lte: new Date('2023-01-01') } });
       expect(result).toHaveLength(3);
       expect(result.map(record => record.date.toISOString())).toEqual([
         new Date('2022-01-01').toISOString(),
@@ -73,23 +73,23 @@ export function selectLtLteTests(createInstance: (data: any[]) => Promise<TableS
     });
   
     it('filter records with lt operator for boolean values (false < true)', async () => {
-      const result = await genericTable.select([], { active: { $lt: true } });
+      const result = await genericTable.select({ active: { $lt: true } });
       expect(result).toHaveLength(2); // All false values
       expect(result.map(record => record.name)).toEqual(['Beta', 'Delta']);
     });
   
     it('filter records with lte operator for boolean values (false <= true)', async () => {
-      const result = await genericTable.select([], { active: { $lte: true } });
+      const result = await genericTable.select({ active: { $lte: true } });
       expect(result).toHaveLength(4); // All records
     });
   
     it('return an empty array when no records match for lt', async () => {
-      const result = await genericTable.select([], { value: { $lt: 0 } });
+      const result = await genericTable.select({ value: { $lt: 0 } });
       expect(result).toHaveLength(0);
     });
   
     it('return an empty array when no records match for lte', async () => {
-      const result = await genericTable.select([], { value: { $lte: -1 } });
+      const result = await genericTable.select({ value: { $lte: -1 } });
       expect(result).toHaveLength(0);
     });
   });

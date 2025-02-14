@@ -1,14 +1,15 @@
 import { TableSchema } from "../types/table.type";
 import { Table } from "./table";
-import { Filter } from "../types/filter.type";
 import { LockType } from "../types/lock.type";
-import { compileFilter, matchRecord } from "./filters/filter-matcher";
 import { RecordWithId, UpdatedFieldsDetails, Versioned } from "../types/record.type";
 import { IsolationLevel, TwoPhaseCommitParticipant } from "../types/transaction.type";
 import { Config } from "./config";
 import { TransactionTempStore } from "./transaction-temp-store";
 import { RecordLockManager } from "./record-lock-manager";
 import { PrimaryKeyManager } from "./primary-key-manager";
+import { Query } from "../types/query.type";
+import { compileQuery } from "./query/compiler";
+import { match } from "./query/matcher";
 import { extractFieldsFromRecord, isCommittedRecordDeleted } from "./record";
 import { processPromiseBatch } from "../utils/batch-processor";
 import { TransactionCompletedError, TransactionConflictError } from "./errors/transaction.error";
@@ -180,24 +181,51 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     return null;
   }
 
-  async select(fields: (keyof T)[], where: Filter<RecordWithId<T>>): Promise<Partial<T>[]> {
-    const compiledFilter = compileFilter(where);
+  async findOne(where: Query<RecordWithId<T>>): Promise<T | null> {
+    const compiledQuery = compileQuery(where);
+
+    for (const newestRecord of this._tempStore.tempInserts.values()) {
+      if (match(newestRecord.data, compiledQuery)) return { ...newestRecord.data };
+    }
+
+    for (const key of Array.from(this._recordsMap.keys())) {
+      await this.waitUlockToRead(key);
+      const record = this._tempStore.getRecordState(key);
+      if (!record || isCommittedRecordDeleted(record)) continue;
+
+      const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
+      if (match(recordToEvaluate.data, compiledQuery)) {
+        await this.acquireReadLock(key);
+        return { ...recordToEvaluate.data };
+      }
+    }
+
+    return null;
+  }
+
+  select(where?: Query<RecordWithId<T>>): Promise<T[]>;
+  select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
+  async select(arg1?: (keyof T)[] | Query<RecordWithId<T>>, arg2?: Query<RecordWithId<T>>): Promise<Partial<T>[] | T[]> {
+    const [fields, query] = Array.isArray(arg1)
+      ? [arg1, arg2]
+      : [undefined, arg1];
+
+    const compiledQuery = query ? compileQuery(query) : [];
     const committedResults: Partial<T>[] = [];
     const newestResults: Partial<T>[] = [];
 
-    const areFieldsEmpty = (fields.length === 0);
+    const areFieldsEmpty = !fields || fields.length === 0;
 
     const processFields = (data: RecordWithId<T>): Partial<T> => 
-      areFieldsEmpty ? {...data} : extractFieldsFromRecord(fields, data);
+      areFieldsEmpty ? {...data} : extractFieldsFromRecord(fields!, data);
 
     const committedSelectProcess = async (committedRecordPk: string) => {
       await this.waitUlockToRead(committedRecordPk);
       const record = this._tempStore.getRecordState(committedRecordPk);
-      if (!record) return;
-      if (isCommittedRecordDeleted(record)) return;
+      if (!record || isCommittedRecordDeleted(record)) return;
 
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
-      if (!matchRecord(recordToEvaluate.data, compiledFilter)) return;
+      if (!match(recordToEvaluate.data, compiledQuery)) return;
 
       await this.acquireReadLock(committedRecordPk);
       committedResults.push(processFields(recordToEvaluate.data));
@@ -205,7 +233,7 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
 
     const newestSelectProcess = async (versioned: Versioned<T>) => {
       const newestRecord = versioned.data;
-      if (!matchRecord(newestRecord, compiledFilter)) return;
+      if (!match(newestRecord, compiledQuery)) return;
       newestResults.push(processFields(newestRecord));
     }
 
@@ -228,14 +256,14 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     return committedResults.concat(newestResults);
   }
 
-  public async update(updatedFields: Partial<T>, where: Filter<RecordWithId<T>>): Promise<number> {
+  public async update(updatedFields: Partial<T>, where: Query<RecordWithId<T>>): Promise<number> {
     if (Object.keys(updatedFields).length === 0) return 0;
 
     const updatedDetails: UpdatedFieldsDetails<T> = { 
       updatedFields, 
       isPartOfPrimaryKey: this._primaryKeyManager.isPartialRecordPartOfPk(updatedFields) 
     };
-    const compiledFilter = compileFilter(where);
+    const compiledQuery = compileQuery(where);
     const keys = Array.from(this._recordsMap.keys());
     let affectedRecords = 0;
 
@@ -249,11 +277,11 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
 
       const recordToEvaluate = record.tempChanges?.changes ?? record.committed;
 
-      if (!matchRecord(recordToEvaluate.data, compiledFilter)) return;
+      if (!match(recordToEvaluate.data, compiledQuery)) return;
 
       await this.acquireExclusiveLock(committedRecordPk);
 
-      if ((versionSnapshot !== record.committed.version) && !matchRecord(recordToEvaluate.data, compiledFilter)) {
+      if ((versionSnapshot !== record.committed.version) && !match(recordToEvaluate.data, compiledQuery)) {
         this.releaseLock(committedRecordPk);
         return;
       }
@@ -264,7 +292,7 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
     }
 
     for (const newestRecord of Array.from(this._tempStore.tempInserts.entries())) {
-      if (!matchRecord(newestRecord[1].data, compiledFilter)) continue;
+      if (!match(newestRecord[1].data, compiledQuery)) continue;
       this._tempStore.updateInsertedRecord(newestRecord, updatedDetails);
       affectedRecords++;
     }

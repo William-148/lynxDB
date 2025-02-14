@@ -33,7 +33,7 @@ export function selectEqTests(createInstance: (dataTest: PersonInfo[]) => Promis
   
     it('filter records with numeric value', async () => {
       const expected = genericDataList[2];
-      const resultList = await genericTable.select([], { id: { $eq: expected.id } });
+      const resultList = await genericTable.select({ id: { $eq: expected.id } });
       const resultItem = resultList[0]; // This have all properties of User
       expect(resultList).toHaveLength(1);
       expect(resultItem).not.toBe(expected);
@@ -42,8 +42,8 @@ export function selectEqTests(createInstance: (dataTest: PersonInfo[]) => Promis
   
     it("filter records with a string value", async () => {
       const expected = genericDataList[0];
-      const result = await genericTable.select([], { name: { $eq: expected.name } });
-      const loweCaseResult = await genericTable.select([], { name: { $eq: expected.name.toLowerCase() } });
+      const result = await genericTable.select({ name: { $eq: expected.name } });
+      const loweCaseResult = await genericTable.select({ name: { $eq: expected.name.toLowerCase() } });
   
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(expected);
@@ -51,26 +51,26 @@ export function selectEqTests(createInstance: (dataTest: PersonInfo[]) => Promis
     });
   
     it("filter records with a boolean value", async () => {
-      const result = await genericTable.select([], { active: { $eq: true } });
+      const result = await genericTable.select({ active: { $eq: true } });
       expect(result).toHaveLength(2);
       expect(result.map(record => record.active).every((item)=> item)).toEqual(true);
     });
   
     it("filter records with an array value (tags)", async () => {
       const expected = genericDataList[1];
-      const result = await genericTable.select([], { tags: { $eq: expected.tags } });
+      const result = await genericTable.select({ tags: { $eq: expected.tags } });
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(expected);
     });
   
     it("return no records for non-matching numeric value", async () => {
-      const result = await genericTable.select([], { id: { $eq: -10 } });
+      const result = await genericTable.select({ id: { $eq: -10 } });
       expect(result).toHaveLength(0);
     });
   
     it("handle edge case with empty table", async () => {
       const emptyTable = await createInstance([]);
-      const result = await emptyTable.select([], { id: { $eq: 1 } });
+      const result = await emptyTable.select({ id: { $eq: 1 } });
       expect(result).toHaveLength(0);
     });
   
@@ -81,11 +81,11 @@ export function selectEqTests(createInstance: (dataTest: PersonInfo[]) => Promis
         { id: 2, name: undefined },
         { id: 3, name: "Charlie" }
       ] as any[]);
-      const resultWithNull = await tableWithNulls.select([], { name: { $eq: null } });
+      const resultWithNull = await tableWithNulls.select({ name: { $eq: null } });
       expect(resultWithNull).toHaveLength(1);
       expect(resultWithNull[0]).toEqual({ id: 1, name: null });
   
-      const resultWithUndefined = await tableWithNulls.select([], { name: { $eq: undefined } });
+      const resultWithUndefined = await tableWithNulls.select({ name: { $eq: undefined } });
       expect(resultWithUndefined).toHaveLength(1);
       expect(resultWithUndefined[0]).toEqual({ id: 2, name: undefined });
     });
@@ -122,8 +122,8 @@ export function selectEqTestsWithObjects(createInstance: () => Promise<TableSche
       const expectedItemA = genericDataList[1];
       const expectedItemB = genericDataList[3];
   
-      const resultA = await genericTable.select([], { tags: { $eq: ["designer"] } });
-      const resultB = await genericTable.select([], { tags: { $eq: ["developer", "manager"]} });
+      const resultA = await genericTable.select({ tags: { $eq: ["designer"] } });
+      const resultB = await genericTable.select({ tags: { $eq: ["developer", "manager"]} });
   
       expect(resultA).toHaveLength(1);
       expect(resultA[0]).toEqual(expectedItemA);
@@ -138,7 +138,7 @@ export function selectEqTestsWithObjects(createInstance: () => Promise<TableSche
         { id: 2, profile: { name: "Bob", age: 30 } },
         { id: 3, profile: { name: "Bob", age: 30, address: 'street' } }
       ]);
-      const result = await genericTable.select([], { profile: { $eq: { name: "Alice", age: 25 } } });
+      const result = await genericTable.select({ profile: { $eq: { name: "Alice", age: 25 } } });
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({ id: 1, profile: { name: "Alice", age: 25 } });
     });
@@ -158,7 +158,7 @@ export function selectEqTestsWithObjects(createInstance: () => Promise<TableSche
       const expectedItem = { id: 2, project: "hospital", team: [{ name: "Rob", age: 30 }, { name: "Tom", age: 41 }] }
       const teamToSearch =[{ name: "Rob", age: 30 }, { name: "Tom", age: 41 }];
   
-      const result = await genericTable.select([], { team: { $eq: teamToSearch } });
+      const result = await genericTable.select({ team: { $eq: teamToSearch } });
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(expectedItem);
     });

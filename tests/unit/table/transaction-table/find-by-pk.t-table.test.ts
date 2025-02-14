@@ -9,22 +9,24 @@ import {
   findByPkTestWithSinglePK
 } from "../common-tests/find-by-pk";
 
-findByPkTestWithSinglePK("Transaction table with single PK - findByPk() - should...", async (testData) => {
-  const table = new Table<User>({ primaryKey: ['id'] });
-  await table.bulkInsert(testData);
-  return new TransactionTable<User>(generateId(), table);
-});
-
-
-findByPkTestWithCompositePK("Transaction table with composite PK - findByPk() - should...", async (testData) => {
-  const table =  new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
-  await table.bulkInsert(testData);
-  return new TransactionTable<OrderDetail>(generateId(), table);
-});
-
-
-findByPkTestWithoutPK("Transaction table without PK - findByPk() - should...", async (testData) => {
-  const table =  new Table<User & { _id?: string }>({ primaryKey: [] });
-  await table.bulkInsert(testData);
-  return new TransactionTable<User & { _id?: string }>(generateId(), table);
+describe('Transaction Table - findByPk()', () => {
+  findByPkTestWithSinglePK(async (testData) => {
+    const table = new Table<User>({ primaryKey: ['id'] });
+    await table.bulkInsert(testData);
+    return new TransactionTable<User>(generateId(), table);
+  });
+  
+  
+  findByPkTestWithCompositePK(async (testData) => {
+    const table =  new Table<OrderDetail>({ primaryKey: ['orderId', 'productId'] });
+    await table.bulkInsert(testData);
+    return new TransactionTable<OrderDetail>(generateId(), table);
+  });
+  
+  
+  findByPkTestWithoutPK(async (testData) => {
+    const table =  new Table<User & { _id?: string }>({ primaryKey: [] });
+    await table.bulkInsert(testData);
+    return new TransactionTable<User & { _id?: string }>(generateId(), table);
+  });
 });

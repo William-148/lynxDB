@@ -5,7 +5,8 @@ export { generateId } from "./utils/generate-id";
 export * from "./core/errors";
 
 // Enums
-export { ComparisonOperatorType } from "./types/filter.type";
+export { ComparisonOp } from "./types/query.type";
+export { LogicalOp } from "./types/query.type";
 export { IsolationLevel } from "./types/transaction.type";
 
 // Types e interfaces

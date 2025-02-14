@@ -1,5 +1,5 @@
 import { Table } from "../../../../src/core/table";
-import { selectTestsWithFields, selectWithWrongQueryOperatorTest } from "../common-tests/select/select.table";
+import { selectTestsWithFields } from "../common-tests/select/select.table";
 import { selectEqTests, selectEqTestsWithObjects } from "../common-tests/select/select.eq.table";
 import { selectGtGteTests } from "../common-tests/select/select.gt.table";
 import { selectIncludesTests } from "../common-tests/select/select.includes.table";
@@ -12,11 +12,6 @@ describe("Table - select() method", () => {
   selectTestsWithFields(async (dataTest) => {
     const table = new Table<any>({ primaryKey: ['id'] });
     await table.bulkInsert(dataTest);
-    return table;
-  });
-  
-  selectWithWrongQueryOperatorTest(async () => {
-    const table = new Table<any>({ primaryKey: ['id'] });
     return table;
   });
   //#endregion

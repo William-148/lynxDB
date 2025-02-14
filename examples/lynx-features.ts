@@ -83,16 +83,16 @@ async function operations(){
 
   // Select
   const usersSelected: Partial<User>[] = await users.select(
-    ["id", "name"], // Fields to select, array empty ([]) to select all fields
-    { id: { $gt: 1 } } // Where clause, empty object({}) to select all records
+    ["id", "name"], // Fields to select, array empty ([]) or undefined to select all fields
+    { id: { $gt: 1 } } // Where clause, empty object({}) or undefined to select all records
   );
-  const enrollmentSelected: Partial<Enrollment>[] = await enrrollments.select(
-    [], // Select all fields 
-    { // Where clause
-      year: { $gt: 2025 },
-      semester: { $eq: "Spring" }
-    }
-  );
+
+  // Select all fields 
+  const enrollmentSelected: Enrollment[] = await enrrollments.select({ 
+    // Where clause
+    year: { $gt: 2025 },
+    semester: { $eq: "Spring" }
+  });
 
   console.table(usersSelected);
   console.table(enrollmentSelected);
@@ -136,7 +136,6 @@ async function operations(){
 async function comparisonOperatorInWhereClause(){
   // Equal to
   const resultWithEq = await users.select(
-    [], 
     { id: { $eq: 1 } } // Where clause
   );
   const affectedRowsWithEq = await users.update(
@@ -147,60 +146,84 @@ async function comparisonOperatorInWhereClause(){
   console.log("Affected rows with $eq:", affectedRowsWithEq);
 
   // Not equal to
-  await users.select([], 
+  await users.select(
     { id: { $ne: 1 } } // Where clause
   );
 
   // Greater than
-  await users.select([], 
+  await users.select(
     { id: { $gt: 1 } } // Where clause
   );
 
   // Greater than or equal to
-  await users.select([], 
+  await users.select(
     { id: { $gte: 1 } } // Where clause
   );
 
   // Less than
-  await users.select([], 
+  await users.select(
     { id: { $lt: 1 } } // Where clause
   );
 
   // Less than or equal to
-  await users.select([], 
+  await users.select(
     { id: { $lte: 1 } } // Where clause
   );
 
   // Array inclusion check
-  await users.select([], 
-    { id: { $includes: [1, 2, 3] } } // Where clause
+  await users.select(
+    { id: { $in: [1, 2, 3] } } // Where clause
+  );
+
+  // Array exclusion check
+  await users.select(
+    { id: { $nin: [1, 2, 3] } } // Where clause
   );
 
   // String pattern match
-  await users.select([], 
+  await users.select(
     { name: { $like: "Jhon%" } } // Where clause
   );
 }
 
 async function logicalOperatorsInWhereClause(){
-  /* - Operator $or not supported yet
-   * - Operator $not not supported yet
-   * - Operator $and not supported yet
-   */
-
-  // Operator and can be simulated by adding multiple conditions
-  await users.select([], 
+  // Operator "and" implicit
+  await users.select(
     { // Where clause 
-      id: { $eq: 1 }, 
-      name: { $like: "Jhon%" } 
+      id: { $gte: 3, $lte: 50 }, 
+      name: { $like: "jhon%" } 
     }
   );
-  await users.select([], 
+  await users.select(
     { // Where clause
-      name: { $like: "Jhon%" },
+      name: { $like: "jhon%" },
       email: { $like: "some%" },
-      // otras condiciones
       // another conditions
     }
   );
+
+  // Operator "and" explicit
+  await users.select(
+    { // Where clause
+      $and: [ 
+        { id: { $gte: 3 } },
+        { id: { $lte: 50 } },
+        { name: { $like: "jhon%" } }
+      ]
+    }
+  );
+
+  // Operator "or"
+  await users.select({
+    $or: [ 
+      { id: { $gte: 3 } },
+      { name: { $like: "jhon%" } },
+      { email: { $like: "%@some.com" } }
+    ]
+  });
+
+  // Operator "not"
+  await users.select({
+      $not: { id: { $eq: 1 } }
+  });
 }
