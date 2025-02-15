@@ -32,7 +32,6 @@ jobs:
   publish-npm:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' 
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
