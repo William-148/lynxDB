@@ -1,6 +1,6 @@
 import { match } from "../../../src/core/query/matcher";
 import { compileQuery } from "../../../src/core/query/compiler";
-import { ComparisonCompiledQuery, LogicalCompiledQuery, OpeartorType } from "../../../src/types/query.type";
+import { ComparisonCompiledQuery, LogicalCompiledQuery, LogicalOp, OpeartorType } from "../../../src/types/query.type";
 import { ProductDetail } from "../../types/product-test.type";
 
 const productDetails: ProductDetail[] = [
@@ -122,18 +122,29 @@ describe("Matcher", () => {
   });
 
   it("should match 'string pattern match' query", () => {
-    const compiledQuery1 = compileQuery<ProductDetail>({
+    const compiledQueryA1 = compileQuery<ProductDetail>({
       description: { $like: "latest%" }
     });
-    const compiledQuery2 = compileQuery<ProductDetail>({
-      description: { $like: "%desk%" }
+    const compiledQueryA2 = compileQuery<ProductDetail>({
+      description: { $like: /^latest.*$/i }
     });
 
-    expect(match(productDetails[1], compiledQuery1)).toBe(true);
-    expect(match(productDetails[2], compiledQuery1)).toBe(false);
+    const compiledQueryB1 = compileQuery<ProductDetail>({
+      description: { $like: "%desk%" }
+    });
+    const compiledQueryB2 = compileQuery<ProductDetail>({
+      description: { $like: /^.*desk.*$/i }
+    });
 
-    expect(match(productDetails[5], compiledQuery2)).toBe(true);
-    expect(match(productDetails[4], compiledQuery2)).toBe(false);
+    expect(match(productDetails[1], compiledQueryA1)).toBe(true);
+    expect(match(productDetails[2], compiledQueryA1)).toBe(false);
+    expect(match(productDetails[1], compiledQueryA2)).toBe(true);
+    expect(match(productDetails[2], compiledQueryA2)).toBe(false);
+
+    expect(match(productDetails[5], compiledQueryB1)).toBe(true);
+    expect(match(productDetails[4], compiledQueryB1)).toBe(false);
+    expect(match(productDetails[5], compiledQueryB2)).toBe(true);
+    expect(match(productDetails[4], compiledQueryB2)).toBe(false);
   });
 
   it("should match and not match a simple query with logical operators", () => {
@@ -178,23 +189,100 @@ describe("Matcher", () => {
     const matchResult = productDetails.filter(item => match(item, compiledQuery));
 
     expect(matchResult.map(i => i.id)).toEqual(filterResult.map(i => i.id));
-  })
+  });
+
+  it("should match the query with implicit '$and' and explicit '$or' correctly", () => {
+    const productToMatchA: ProductDetail = {
+      id: 11,
+      name: "Printer Ink",
+      price: 100,
+      active: true,
+      tags: ["test", "product"],
+      description: "Office devices",
+      details: { discount: 20, weight: 50 }
+    }
+    const productToMatchB: ProductDetail = {
+      ...productToMatchA,
+      name: "Office devices",
+      description: "Printer Ink"
+    }
+    const productNotMatchA: ProductDetail = {
+      ...productToMatchA,
+      active: false
+    }
+
+
+    const query = compileQuery<ProductDetail>({
+      active: true,
+      $or: [
+        { name: { $like: "%printer%" }, description: { $like: "%office%"}},
+        { name: { $like: "%office%" }, description: { $like: "%printer%"}},
+      ]
+    });
+
+    expect(match(productToMatchA, query)).toBe(true);
+    expect(match(productToMatchB, query)).toBe(true);
+    expect(match(productNotMatchA, query)).toBe(false);
+    expect(match(productDetails[5], query)).toBe(false);
+
+  });
 
   it("should throw an error for unsupported operator", () => {
-    const comparisonQuery: ComparisonCompiledQuery<ProductDetail>[] = [{
+    const comparisonQuery: ComparisonCompiledQuery<ProductDetail> = {
       type: OpeartorType.Comparison,
       field: 'id',
       operator: '$unknown' as any,
       operand: 5
-    }];
-    const logicalQuery: LogicalCompiledQuery<ProductDetail>[] = [{
+    };
+    const logicalQuery: LogicalCompiledQuery<ProductDetail> = {
       type: OpeartorType.Logical,
       operator: '$unknown' as any,
       expressions: []
-    }];
+    };
 
     expect(() => match(productDetails[0], comparisonQuery)).toThrow("Unsupported operator: $unknown");
     expect(() => match(productDetails[0], logicalQuery)).toThrow("Unsupported operator: $unknown");
+  });
+
+  describe("Empty queries", () => {
+
+    it("should match when a query is empty", () => {
+      const query = compileQuery<ProductDetail>({});
+  
+      expect(match(productDetails[0], query)).toBe(true);
+      expect(match(productDetails[4], query)).toBe(true);
+      expect(match(productDetails[6], query)).toBe(true);
+      expect(match(productDetails[8], query)).toBe(true);
+    });
+  
+    it("should match when '$and' query is empty", () => {
+      const query = compileQuery<ProductDetail>({ 
+        $and: [
+          {}, {}, {},
+          { $and: [ {}, {}, {} ] }
+        ] 
+      });
+  
+      expect(match(productDetails[0], query)).toBe(true);
+      expect(match(productDetails[3], query)).toBe(true);
+      expect(match(productDetails[6], query)).toBe(true);
+      expect(match(productDetails[5], query)).toBe(true);
+    });
+  
+    it("should not match when '$or' query is empty", () => {
+      const query = compileQuery<ProductDetail>({
+        $or: [
+          {}, {}, {},
+          { $or: [ {}, {}, {} ] }
+        ]
+      });
+  
+      expect(match(productDetails[0], query)).toBe(false);
+      expect(match(productDetails[8], query)).toBe(false);
+      expect(match(productDetails[5], query)).toBe(false);
+      expect(match(productDetails[2], query)).toBe(false);
+    });
+  
   });
 
   describe("Matching with objects and arrays values", () => {
