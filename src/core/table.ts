@@ -121,7 +121,7 @@ export class Table<T> implements TableSchema<T> {
       ? [arg1, arg2]
       : [undefined, arg1];
 
-    const compiledQuery = query ? compileQuery(query) : [];
+    const compiledQuery = query ? compileQuery(query) : null;
     const result: Partial<RecordWithId<T>>[] = [];
     const areFieldsToSelectEmpty = !fields || (fields.length === 0);
 

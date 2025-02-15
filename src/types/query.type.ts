@@ -51,7 +51,7 @@ export type ComparisonQuery<T> = {
   /** Array exclude check */
   [ComparisonOp.$nin]?: T extends any[] ? T[number][] : T[];
   /** String pattern match */
-  [ComparisonOp.$like]?: string;
+  [ComparisonOp.$like]?: string | RegExp;
 };
 
 /**
@@ -81,9 +81,9 @@ export type LogicalQuery<T> = {
 /**
  * Represents a query that can be used to filter data based on multiple conditions.
  */
-export type Query<T> = {
+export type Query<T> = LogicalQuery<T> & {
   [P in keyof T]?: T[P] | ComparisonQuery<T[P]>;
-} & LogicalQuery<T>;
+};
 
 /**
  * Represents a logical compiled query that has many expressions.

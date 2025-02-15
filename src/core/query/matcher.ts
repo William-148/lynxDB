@@ -2,67 +2,42 @@ import {
   ComparisonOp, 
   CompiledQuery, 
   OpeartorType, 
-  LogicalCompiledQuery 
+  LogicalOp
 } from "../../types/query.type";
 
-export function match<T>(record: T, compiledQuery: CompiledQuery<T>[]): boolean {
-  for (const compiled of compiledQuery) {
-    if (compiled.type === OpeartorType.Comparison) {
-      if (!proccessComparison(record[compiled.field], compiled.operator, compiled.operand)) {
-        return false;
-      }
-    }
-    else {
-      if (!proccessLogic(record, compiled)) return false;
-    }
+const comparisonOperators: Record<ComparisonOp, (a: any, b: any) => boolean> = {
+  '$eq': (a, b) => deepEqual(a, b),
+  '$ne': (a, b) => !deepEqual(a, b),
+  '$gt': (a, b) => a > b,
+  '$gte': (a, b) => a >= b,
+  '$lt': (a, b) => a < b,
+  '$lte': (a, b) => a <= b,
+  '$in': (a, b) => Array.isArray(a) ? a.some(value => b.has(value)) : b.has(a),
+  '$nin': (a, b) => !Array.isArray(a) ? !b.has(a) : !a.some(value => b.has(value)),
+  '$like': (a, b) => typeof a === 'string' && (b as RegExp).test(a)
+};
+
+const logicalOperators: Record<LogicalOp, (record: any, expressions: CompiledQuery<any>[]) => boolean> = {
+  '$and': (record, expressions) => expressions.every(exp =>  match(record, exp)),
+  '$or': (record, expressions) => expressions.some(exp =>  match(record, exp)),
+  '$not': (record, expressions) => !match(record, expressions[0])
+};
+
+export function match<T>(record: T, compiled: CompiledQuery<T> | null): boolean {
+  if (!compiled) return true;
+  
+  switch (compiled.type) {
+    case OpeartorType.Comparison:
+      const fnComp = comparisonOperators[compiled.operator];
+      if (!fnComp) throw new Error(`Unsupported operator: ${compiled.operator}`);
+      return fnComp(record[compiled.field], compiled.operand);
+
+    case OpeartorType.Logical:
+      const fnLogic = logicalOperators[compiled.operator];
+      if (!fnLogic) throw new Error(`Unsupported operator: ${compiled.operator}`);
+      return fnLogic(record, compiled.expressions);
   }
-  return true;
-}
 
-function proccessComparison<T>(fieldValue: T, operator: ComparisonOp, operand: any): boolean {
-  switch (operator) {
-    case '$eq': return deepEqual(fieldValue, operand);
-    case '$ne': return !deepEqual(fieldValue, operand);
-    case '$gt': return fieldValue > operand;
-    case '$gte': return fieldValue >= operand;
-    case '$lt': return fieldValue < operand;
-    case '$lte': return fieldValue <= operand;
-    case '$in': return proccessInOp(fieldValue, operand);
-    case '$nin': return !proccessInOp(fieldValue, operand);
-    case '$like':
-      return typeof fieldValue === 'string' && (operand as RegExp).test(fieldValue);
-    default:
-      throw new Error(`Unsupported operator: ${operator}`);
-  }
-}
-
-function proccessLogic<T>(record: T, compiled: LogicalCompiledQuery<T>): boolean {
-  switch (compiled.operator) {
-    case '$and':
-      return compiled.expressions.every(subQuery => matchLogic(record, subQuery));
-    case '$or':
-      return compiled.expressions.some(subQuery => matchLogic(record, subQuery));
-    case '$not':
-      return !matchLogic(record, compiled.expressions[0]);
-    default:
-      throw new Error(`Unsupported operator: ${compiled.operator}`);
-  }
-}
-
-function matchLogic<T>(record: T, expression: CompiledQuery<T>): boolean {
-  return (expression.type === OpeartorType.Comparison) 
-    ? proccessComparison(
-        record[expression.field],
-        expression.operator,
-        expression.operand
-      )
-    : proccessLogic(record, expression); 
-}
-
-function proccessInOp<T>(fieldValue: T, operand: Set<T>): boolean {
-  return Array.isArray(fieldValue)
-  ? fieldValue.some(value => operand.has(value))
-  : operand.has(fieldValue);
 }
 
 function deepEqual<T>(recordValue: T, conditionValue: T): boolean {

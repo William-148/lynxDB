@@ -210,7 +210,7 @@ export class TransactionTable<T> implements TableSchema<T>, TwoPhaseCommitPartic
       ? [arg1, arg2]
       : [undefined, arg1];
 
-    const compiledQuery = query ? compileQuery(query) : [];
+    const compiledQuery = query ? compileQuery(query) : null;
     const committedResults: Partial<T>[] = [];
     const newestResults: Partial<T>[] = [];
 
