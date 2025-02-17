@@ -10,6 +10,7 @@ export { LogicalOp } from "./types/query.type";
 export { IsolationLevel } from "./types/transaction.type";
 
 // Types e interfaces
+export type { Database, TableProvider } from "./types/database.type";
 export type { TableSchema } from "./types/table.type";
 export type { TransactionHandler } from "./types/transaction.type";
 export type { TablesDefinition, TableConfig } from "./types/table.type";

@@ -1,4 +1,4 @@
-import { LynxDB, TablesDefinition } from "../src";
+import { LynxDB, TableProvider, TablesDefinition } from "../src";
 
 type User = { 
   id: number; 
@@ -225,5 +225,26 @@ async function logicalOperatorsInWhereClause(){
   // Operator "not"
   await users.select({
       $not: { id: { $eq: 1 } }
+  });
+}
+
+async function repositoryExample(){
+  class UserRepository {
+    // Puede recibir Database o Transaction indistintamente
+    constructor(private readonly db: TableProvider<{ users: User }>) {}
+    
+    getUsers() {
+      return this.db.get('users').select();
+    }
+  }
+
+  // With LynxDB instance
+  const userRepository = new UserRepository(db);
+
+  // With Transaction instance
+  db.transaction(async (tx) => {
+    const txUserRepository = new UserRepository(tx);
+    const users = await txUserRepository.getUsers();
+
   });
 }

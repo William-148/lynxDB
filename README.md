@@ -25,6 +25,7 @@
   - [Isolation Levels](#isolation-levels)
   - [Locks](#locks)
   - [Phenomena occurrence](#phenomena-occurrence)
+- [Dependency Injection](#dependency-injection)
 
 ## **LynxDB - In-Memory Database for Fast Testing**
 
@@ -464,3 +465,72 @@ Under Repeatable Read, it is possible for two transactions to read data that, wh
 Can occur in Repeatable Read if two transactions base their updates on stale data. In Serializable, using exclusive locks for both reads and writes prevents this issue.
 
 This lock-based implementation ensures the integrity of transactional operations. However, it is important to understand the implications of the chosen isolation level and the potential phenomena in high-concurrency environments. For critical systems, it is recommended to use the *Serializable level*, even though it imposes stricter access control.
+
+# Dependency Injection
+
+The dependency injection pattern allows classes to receive their dependencies from external sources, rather than creating them themselves. This improves code testability and flexibility.
+
+## Example
+Initial setup:
+```typescript
+import { LynxDB, TableProvider, TablesDefinition } from "lynxdb";
+
+// Type definitions
+type Example = { /* ... */ }
+type MyTables = { examples: Example }
+
+// Table configurations
+const tableConfigs: TablesDefinition<MyTables> = {/* ... */}
+const db = new LynxDB(tableConfigs);
+```
+
+Repository:
+```typescript
+// Repository definition
+class ExampleRepository {
+  constructor(private readonly provider: TableProvider<MyTables>) {}
+
+  // Fetch examples
+  async getExamples(): Promise<Example[]> {
+    return this.provider.get('examples').select();
+  }
+
+  // Update example
+  async updateExample(updatedExample: Partial<Example>): Promise<number> {
+    return this.provider.get('examples').update(updatedExample, { ... });
+  }
+}
+
+```
+
+Use with `LynxDB` instance:
+```typescript
+// Function to use with LynxDB instance
+async function useWithLynxDBInstance() {
+  const exampleRepo = new ExampleRepository(db); // Injecting the LynxDB instance
+
+  // Perform operations
+  const examples: Example[] = await exampleRepo.getExamples();
+  const affectedRows: number = await exampleRepo.updateExample({/* ... */});
+
+  console.table(examples);
+  console.log(affectedRows);
+}
+```
+
+Use with transaction:
+```typescript
+// Function to use with transaction
+async function useWithTransaction() {
+  const transactionResult = await db.transaction(async (tx) => {
+    const exampleRepo = new ExampleRepository(tx); // Injecting the transaction
+
+    // Perform operations
+    const examples: Example[] = await exampleRepo.getExamples();
+    const affectedRows: number = await exampleRepo.updateExample({/* ... */});
+    return { examples, affectedRows };
+  });
+
+  console.log(transactionResult);
+}
+```

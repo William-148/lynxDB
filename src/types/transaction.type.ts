@@ -1,4 +1,4 @@
-import { TableSchema } from "./table.type";
+import { TableProvider } from "./database.type";
 import { 
   TransactionCompletedError, 
   TransactionConflictError 
@@ -23,16 +23,7 @@ export enum IsolationLevel {
  * 
  * ```
  */
-export interface TransactionHandler<Tables extends Record<string, any>> {
-  /**
-   * Retrieves a table for the specified table name.
-   * 
-   * @param name - Name of the table to retrieve (type-safe key from Tables)
-   * @returns {TableSchema<Tables[K]>} Transaction table manager instance for the specified table
-   * @throws {TransactionCompletedError} If the transaction has already been committed or rolled back
-   * @throws {TableNotFoundError} If the table doesn't exist in the main tables collection (via createTransactionTable)
-   */
-  get<K extends keyof Tables>(name: K): TableSchema<Tables[K]>;
+export interface TransactionHandler<Tables extends Record<string, any>> extends TableProvider<Tables> {
 
   /**
    * Commits the transaction, saving all changes to the database.

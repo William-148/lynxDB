@@ -1,4 +1,4 @@
-import { TableNotFoundError } from "./errors/data-base.error";
+import { Database } from "../types/database.type";
 import { Transaction } from "./transaction";
 import { Table } from "./table";
 import { TableSchema, TablesDefinition } from "../types/table.type";
@@ -7,6 +7,7 @@ import { ConfigOptions } from "../types/config.type";
 import { Config } from "./config";
 import { TransactionHandler } from "../types/transaction.type";
 import { TransactionManager } from "./transaction-manager";
+import { TableNotFoundError } from "./errors/data-base.error";
 import { DuplicatePrimaryKeyValueError } from "./errors/table.error";
 import { LockTimeoutError } from "./errors/record-lock-manager.error";
 
@@ -23,7 +24,7 @@ import { LockTimeoutError } from "./errors/record-lock-manager.error";
  * 
  * ```
  */
-export class LynxDB<Tables extends Record<string, any>> {
+export class LynxDB<Tables extends Record<string, any>> implements Database<Tables> {
   /** Map of tables in the database */
   private tablesMap: Map<string, Table<Tables[any]>>;
   /** Map of table managers in the database */
@@ -57,34 +58,16 @@ export class LynxDB<Tables extends Record<string, any>> {
     });
   }
 
-  /**
-   * Resets the database by clearing all tables.
-   * If a transaction is in progress, it will rollback the transaction.
-   */
   public reset(): void {
     this.tablesMap.forEach((table) => table.reset());
   }
 
-  /**
-   * Retrieves a table for the specified table name.
-   * 
-   * @param tableName - Name of the table to retrieve (type-safe key from Tables)
-   * @returns {TableSchema<Tables[K]>} Transaction table manager instance for the specified table
-   * @throws {TransactionCompletedError} If the transaction has already been committed or rolled back
-   * @throws {TableNotFoundError} If the table doesn't exist in the main tables collection (via createTransactionTable)
-   */
   public get<K extends keyof Tables>(tableName: K): TableSchema<Tables[K]> {
     const tableManager = this.tableManagersMap.get(String(tableName));
     if (!tableManager) throw new TableNotFoundError(String(tableName));
     return tableManager;
   }
 
-  /**
-   * Creates a new transaction in the database.
-   * 
-   * @param {ConfigOptions} [options] - Optional configuration options for the transaction.
-   * @returns {TransactionHandler<Tables>} The newly created transaction.
-   */
   public createTransaction(options?: ConfigOptions): TransactionHandler<Tables> {
     const transaction = new Transaction<Tables>(
       this.tablesMap,
@@ -93,23 +76,6 @@ export class LynxDB<Tables extends Record<string, any>> {
     return new TransactionManager(transaction);
   }
 
-  /**
-   * Executes a callback function within a database transaction.
-   * 
-   * Possible scenarios:
-   * - If the transaction completes successfully, the changes are committed.
-   * - If an error occurs during the transaction, the changes are rolled back.
-   * 
-   * @param {function} callback - The callback function to execute within the transaction. 
-   * The callback receives a `Transaction<Tables>` object as its argument and returns a promise.
-   * 
-   * @param {ConfigOptions} [options] - Optional configuration options for the transaction.
-   * @returns {Promise<T>} A promise that resolves to the result of the callback function.
-   * @throws {LockTimeoutError} If a record lock cannot be acquired within the specified timeout.
-   * @throws {DuplicatePrimaryKeyValueError} If an insert operation violates a primary key constraint.
-   * @throws {Error} If an error occurs during the execution of the callback, 
-   * the transaction is rolled back and the error is rethrown.
-   */
   public async transaction<T>(callback: (transaction: TransactionHandler<Tables>) => Promise<T>, options?: ConfigOptions): Promise<T> {
     const transaction = this.createTransaction(options);
     try {
