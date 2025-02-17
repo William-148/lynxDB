@@ -1,6 +1,6 @@
 {
   "name": "lynxdb",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "An in-memory database for TypeScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

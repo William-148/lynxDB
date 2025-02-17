@@ -69,23 +69,33 @@ export interface TableSchema<T> {
   findOne(where: Query<RecordWithId<T>>): Promise<T | null>;
   
   /**
-   * Find records in the table
+   * Retrieves all records from the table.
+   * Each record will contain all its fields.
    * 
-   * @param where The query conditions
-   * @returns A promise that resolves to an array of objects
+   * @returns A promise that resolves to an array of all records.
+   */
+  select(): Promise<T[]>;
+  /**
+   * Retrieves all records from the table that match the given `where` condition.
+   * Each record will contain all its fields.
+   * 
+   * @param where The condition to filter records by.
+   * @returns A promise that resolves to an array of records that match the `where` condition.
    */
   select(where: Query<RecordWithId<T>>): Promise<T[]>;
   /**
-   * Find records in the table
+   * Retrieves records from the table that match the given `where` condition.
+   * If no `where` condition is provided, all records will be returned.
+   * Only the specified fields will be included in each record.
    * 
-   * @param fields The fields to select
-   * @param where The query conditions
-   * @returns A promise that resolves to an array of partial objects
+   * @param fields The fields to include in the results.
+   * @param [where] The condition to filter records by (optional).
+   * @returns A promise that resolves to an array of records with the specified fields.
    */
-  select(fields?: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
+  select(fields: (keyof T)[], where?: Query<RecordWithId<T>>): Promise<Partial<T>[]>;
   
   /**
-   * Update a record in the table
+   * Update records from the table that match the given `where` condition.
    * 
    * @param updatedFields The fields to update
    * @param where A function that matches the records to be updated
